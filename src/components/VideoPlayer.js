@@ -19,20 +19,36 @@ export default function VideoPlayer({ src, poster = '', autoPlay = true, control
 
   useEffect(() => {
     let hls;
+    let timeoutId;
     const video = videoRef.current;
     if (!video || !src) return;
 
-    // Mixed Content: sitio https con stream http (bloqueado por navegador)
+    // Mixed content
     if (window.location.protocol === 'https:' && src.startsWith('http://')) {
-      const msg = 'La URL del stream es HTTP y el sitio es HTTPS (Mixed Content). Usa una URL HTTPS o el proxy /hls/.';
+      const msg = 'Mixed Content: el sitio es HTTPS pero el stream es HTTP. Usa HTTPS o /hls/.';
       setErrorMsg(msg);
       setStatus('error');
       onError?.(new Error(msg));
       return;
     }
 
-    const onReadyOnce = () => setStatus('ready');
+    // Timeout de seguridad (10s)
+    timeoutId = setTimeout(() => {
+      if (status === 'loading') {
+        const msg = 'Tiempo de espera agotado al cargar el video. Puede ser CORS/hotlink o el stream está caído.';
+        setErrorMsg(msg);
+        setStatus('error');
+        onError?.(new Error(msg));
+      }
+    }, 10000);
+
+    const onReadyOnce = () => {
+      clearTimeout(timeoutId);
+      setStatus('ready');
+    };
+
     const onVideoError = () => {
+      clearTimeout(timeoutId);
       const mediaError = video.error;
       const msg = mediaError ? `Error de reproducción (code ${mediaError.code}).` : 'Error de reproducción.';
       setErrorMsg(msg);
@@ -51,7 +67,6 @@ export default function VideoPlayer({ src, poster = '', autoPlay = true, control
     const setup = async () => {
       try {
         if (video.canPlayType('application/vnd.apple.mpegurl')) {
-          // Safari iOS soporta HLS nativo
           attachNative();
           return;
         }
@@ -61,23 +76,35 @@ export default function VideoPlayer({ src, poster = '', autoPlay = true, control
           hls = new window.Hls({ enableWorker: true });
           hls.loadSource(src);
           hls.attachMedia(video);
+
           hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+            clearTimeout(timeoutId);
             setStatus('ready');
             if (autoPlay) video.play().catch(() => {});
           });
+
           hls.on(window.Hls.Events.ERROR, (_evt, data) => {
-            if (data?.fatal) {
-              const msg = `HLS error: ${data?.type || 'fatal'}`;
+            // Log de ayuda (abre DevTools > Console)
+            // console.log('[HLS ERROR]', data);
+
+            // Trata como error visible si es fatal o si es NETWORK_ERROR
+            const fatal = data?.fatal;
+            const networkErr = data?.type === 'networkError' || data?.type === 'networkError'.toUpperCase();
+
+            if (fatal || networkErr) {
+              clearTimeout(timeoutId);
+              const msg = `HLS error${fatal ? ' (fatal)' : ''}: ${data?.type || 'desconocido'} ${data?.details || ''}`;
               setErrorMsg(msg);
               setStatus('error');
               onError?.(new Error(msg));
+              try { hls.destroy(); } catch {}
             }
           });
         } else {
-          // Fall-back: intenta nativo
           attachNative();
         }
       } catch (e) {
+        clearTimeout(timeoutId);
         const msg = `No se pudo inicializar el reproductor: ${e?.message || e}`;
         setErrorMsg(msg);
         setStatus('error');
@@ -88,8 +115,9 @@ export default function VideoPlayer({ src, poster = '', autoPlay = true, control
     setup();
 
     return () => {
+      clearTimeout(timeoutId);
       if (hls) {
-        try { hls.destroy(); } catch (_) {}
+        try { hls.destroy(); } catch {}
       }
       if (video) {
         video.removeEventListener('error', onVideoError);
@@ -113,9 +141,9 @@ export default function VideoPlayer({ src, poster = '', autoPlay = true, control
         <div className="font-semibold mb-2">No se pudo reproducir el canal</div>
         <div className="text-sm opacity-90">{errorMsg}</div>
         <ul className="text-sm opacity-80 mt-2 list-disc pl-5">
-          <li>Usa la URL proxied (empiece con <code>/hls/</code>) en producción.</li>
-          <li>Verifica que la playlist .m3u8 y segmentos estén online.</li>
-          <li>Si el origen exige referer, configúralo en la Edge Function.</li>
+          <li>Comprueba que la URL esté viva. En producción usa la ruta proxied que empieza con <code>/hls/</code>.</li>
+          <li>Si el origen exige <em>referer</em>, el proxy ya envía el del sitio.</li>
+          <li>Revisa DevTools → Network para ver el status del .m3u8 y .ts (200/403/404).</li>
         </ul>
       </div>
     );
