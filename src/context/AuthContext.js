@@ -1,6 +1,7 @@
 // src/context/AuthContext.jsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
+// 👇 Import corregido: el archivo está en src/supabaseClients.js
+import { supabase } from '../supabaseClients';
 
 const AuthContext = createContext();
 
@@ -20,10 +21,10 @@ export const AuthProvider = ({ children }) => {
         setSession(data?.session ?? null);
 
         if (data?.session?.user) {
-          // Carga de perfil si aplica (ajusta a tu tabla real)
+          // Carga tu perfil real si lo usas:
           // const { data: p } = await supabase.from('profiles').select('*').eq('id', data.session.user.id).single();
           // setProfile(p);
-          setProfile({ role: 'admin' }); // placeholder hasta que integres tu tabla
+          setProfile({ role: 'admin' }); // placeholder
         }
       } catch (err) {
         setAuthError(err?.message || String(err));
@@ -53,13 +54,10 @@ export const AuthProvider = ({ children }) => {
   const signIn = async (...args) => {
     setAuthError(null);
     try {
-      // soporte a ambas firmas: ({email, password}) o (email, password)
+      // Soporta ambas firmas: ({email, password}) o (email, password)
       let creds = {};
-      if (typeof args[0] === 'object') {
-        creds = args[0];
-      } else {
-        creds = { email: args[0], password: args[1] };
-      }
+      if (typeof args[0] === 'object') creds = args[0];
+      else creds = { email: args[0], password: args[1] };
       const { error } = await supabase.auth.signInWithPassword(creds);
       if (error) throw error;
     } catch (err) {
@@ -72,17 +70,13 @@ export const AuthProvider = ({ children }) => {
     setAuthError(null);
     try {
       let email, password, fullName, country;
-      if (typeof args[0] === 'object') {
-        ({ email, password, fullName, country } = args[0]);
-      } else {
-        [email, password, fullName, country] = args;
-      }
+      if (typeof args[0] === 'object') ({ email, password, fullName, country } = args[0]);
+      else [email, password, fullName, country] = args;
+
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: { fullName, country },
-        },
+        options: { data: { fullName, country } },
       });
       if (error) throw error;
     } catch (err) {
