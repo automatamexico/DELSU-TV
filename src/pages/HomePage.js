@@ -8,7 +8,7 @@ import VideoPlayer from '../components/VideoPlayer';
 import { useChannels } from '../hooks/useChannels';
 import { useAuth } from '../context/AuthContext';
 import { categories } from '../data/channels';
-import { toProxiedHls } from '../utils/streamUrl'; // 👈 usa el proxy /hls/*
+import { toProxiedHls } from '../utils/streamUrl';
 
 const HomePage = () => {
   const { profile } = useAuth();
@@ -29,10 +29,6 @@ const HomePage = () => {
 
   const handleChannelClick = (channel) => {
     setSelectedChannel(channel);
-    // Tracking (opcional)
-    if (channel?.id) {
-      console.log('Tracking view for channel:', channel.id);
-    }
   };
 
   const handleClosePlayer = () => setSelectedChannel(null);
@@ -45,7 +41,6 @@ const HomePage = () => {
     );
   }
 
-  // Deriva la URL de stream y pásala por el proxy /hls/*
   const streamSrc = selectedChannel
     ? toProxiedHls(
         selectedChannel.stream_url ||
@@ -80,7 +75,6 @@ const HomePage = () => {
         <ChannelGrid channels={channels} onChannelClick={handleChannelClick} />
       </motion.main>
 
-      {/* Overlay del reproductor */}
       <AnimatePresence>
         {selectedChannel && (
           <motion.div
