@@ -1,4 +1,3 @@
-// src/pages/LoginPage.jsx
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { User, Lock, Mail, Globe, LogIn, UserPlus, Tv } from 'lucide-react';
@@ -19,21 +18,12 @@ const LoginPage = () => {
   const location = useLocation();
   const { signIn, signUp } = useAuth();
 
-  // ✅ Helper: intenta ambas firmas de signIn sin que tengas que modificar tu AuthContext
+  // Helper para soportar ambos tipos de firma de signIn
   const safeSignIn = async (emailArg, passwordArg) => {
-    // 1) Primero intenta con objeto
     try {
       await signIn({ email: emailArg, password: passwordArg });
-      return;
-    } catch (e1) {
-      // 2) Si falla, intenta con parámetros sueltos
-      try {
-        await signIn(emailArg, passwordArg);
-        return;
-      } catch (e2) {
-        // Lanza el error real de la segunda llamada
-        throw e2;
-      }
+    } catch {
+      await signIn(emailArg, passwordArg);
     }
   };
 
@@ -42,20 +32,14 @@ const LoginPage = () => {
     setLoading(true);
     try {
       await safeSignIn(email, password);
-
-      // Si ProtectedRoute te mandó aquí, vuelve a donde ibas:
       const from = location.state?.from?.pathname;
       if (from) {
         navigate(from, { replace: true });
         return;
       }
-
-      // Si no hay "from", usa tu lógica de tipo de usuario:
-      if (userType === 'admin') {
-        navigate('/dashboard', { replace: true });
-      } else {
-        navigate('/', { replace: true });
-      }
+      // Tu lógica actual: redirige según tipo (puedes quitarla si usas AdminRoute)
+      if (userType === 'admin') navigate('/dashboard', { replace: true });
+      else navigate('/', { replace: true });
     } catch (error) {
       window.alert('Error al iniciar sesión: ' + (error?.message || String(error)));
     } finally {
@@ -67,14 +51,14 @@ const LoginPage = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      // Validación básica de contraseña
-      const passwordRegex = /^(?=.*[a-zA-Z])(?=.*[0-9])[a-zA-Z0-9]{6,12}$/;
+      // ✅ Nueva regla: cualquier contraseña con mínimo 4 caracteres
+      const passwordRegex = /^.{4,}$/;
       if (!passwordRegex.test(password)) {
-        window.alert('La contraseña debe tener entre 6 y 12 caracteres, y contener al menos una letra y un número.');
+        window.alert('La contraseña debe tener al menos 4 caracteres.');
         return;
       }
 
-      // Firma flexible también para signUp si tu contexto usa objeto
+      // signUp flexible (objeto o parámetros sueltos)
       try {
         await signUp({ email, password, fullName, country });
       } catch {
@@ -82,7 +66,7 @@ const LoginPage = () => {
       }
 
       setIsRegistering(false);
-      window.alert('Registro exitoso. Verifica tu email para confirmar.');
+      window.alert('Registro exitoso. Revisa tu correo si requiere confirmación.');
     } catch (error) {
       window.alert('Error al registrarse: ' + (error?.message || String(error)));
     } finally {
@@ -111,11 +95,7 @@ const LoginPage = () => {
 
         <form onSubmit={isRegistering ? handleRegister : handleLogin} className="space-y-6">
           {isRegistering && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: 0.1 }}
-            >
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }}>
               <label htmlFor="fullName" className="block text-gray-300 text-sm font-medium mb-2">Nombre Completo</label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -132,11 +112,7 @@ const LoginPage = () => {
             </motion.div>
           )}
 
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: isRegistering ? 0.2 : 0 }}
-          >
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: isRegistering ? 0.2 : 0 }}>
             <label htmlFor="email" className="block text-gray-300 text-sm font-medium mb-2">Correo Electrónico</label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -152,11 +128,7 @@ const LoginPage = () => {
             </div>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: isRegistering ? 0.3 : 0.1 }}
-          >
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: isRegistering ? 0.3 : 0.1 }}>
             <label htmlFor="password" className="block text-gray-300 text-sm font-medium mb-2">Contraseña</label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -166,18 +138,14 @@ const LoginPage = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-gray-700/50 border border-gray-600 rounded-lg pl-10 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
-                placeholder="Mín. 6, Máx. 12 caracteres alfanuméricos"
+                placeholder="Mín. 4 caracteres"
                 required
               />
             </div>
           </motion.div>
 
           {isRegistering && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: 0.4 }}
-            >
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.4 }}>
               <label htmlFor="country" className="block text-gray-300 text-sm font-medium mb-2">País</label>
               <div className="relative">
                 <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -200,11 +168,7 @@ const LoginPage = () => {
           )}
 
           {!isRegistering && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: 0.2 }}
-            >
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.2 }}>
               <label htmlFor="userType" className="block text-gray-300 text-sm font-medium mb-2">Tipo de Acceso</label>
               <select
                 id="userType"
@@ -250,22 +214,14 @@ const LoginPage = () => {
           {isRegistering ? (
             <>
               ¿Ya tienes una cuenta?{' '}
-              <button
-                type="button"
-                onClick={() => setIsRegistering(false)}
-                className="text-red-500 hover:text-red-400 font-semibold"
-              >
+              <button type="button" onClick={() => setIsRegistering(false)} className="text-red-500 hover:text-red-400 font-semibold">
                 Inicia Sesión
               </button>
             </>
           ) : (
             <>
               ¿No tienes una cuenta?{' '}
-              <button
-                type="button"
-                onClick={() => setIsRegistering(true)}
-                className="text-red-500 hover:text-red-400 font-semibold"
-              >
+              <button type="button" onClick={() => setIsRegistering(true)} className="text-red-500 hover:text-red-400 font-semibold">
                 Regístrate aquí
               </button>
             </>
