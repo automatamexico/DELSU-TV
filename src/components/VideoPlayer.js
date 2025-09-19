@@ -1,7 +1,7 @@
 // src/components/VideoPlayer.js
 import React, { useEffect, useRef, useState } from 'react';
 
-/** === Helpers de URL/proxy ============================================ **/
+/** === Helpers de URL/proxy (universal) ================================ **/
 const rewriteAbsoluteToProxy = (absUrl) => {
   try {
     const u = new URL(absUrl);
@@ -31,15 +31,14 @@ const resolveRelativeViaProxy = (baseProxied, relative) => {
   try {
     if (!relative) return '';
     if (/^https?:\/\//i.test(relative)) return rewriteAbsoluteToProxy(relative);
-    const origin = window.location.origin;
-    const absBase = new URL(baseProxied, origin);
+    const absBase = new URL(baseProxied, window.location.origin);
     const abs = new URL(relative, absBase);
     return rewriteAbsoluteToProxy(abs.href);
   } catch {
     return relative;
   }
 };
-/** ====================================================================== **/
+/** ===================================================================== **/
 
 const loadHlsScript = () =>
   new Promise((resolve, reject) => {
@@ -60,21 +59,16 @@ export default function VideoPlayer({
   controls = true,
   muted = true,
   onError,
-  debug = true, // 👈 activo por defecto
+  debug = true, // 👈 debug activado por defecto
 }) {
   const videoRef = useRef(null);
   const [status, setStatus] = useState('loading'); // loading | ready | error
   const [errorMsg, setErrorMsg] = useState('');
   const [debugLines, setDebugLines] = useState([]);
 
-  const log = (...args) => {
-    const line = args.join(' ');
-    // eslint-disable-next-line no-console
-    console.log('[PLAYER]', line);
-    setDebugLines((d) => [...d, line].slice(-40));
-  };
-
   const finalSrc = deriveSrc({ srcProp, channel });
+  const push = (msg) =>
+    setDebugLines((d) => [...d, `[${new Date().toLocaleTimeString()}] ${msg}`].slice(-60));
 
   useEffect(() => {
     let hls;
@@ -87,16 +81,16 @@ export default function VideoPlayer({
       settled = true;
       setErrorMsg(msg);
       setStatus('error');
-      log('❌', msg);
+      push(`❌ ${msg}`);
       onError?.(new Error(msg));
     };
     const ready = () => {
       settled = true;
       setStatus('ready');
-      log('✅ READY');
+      push('✅ READY');
     };
 
-    log('finalSrc:', finalSrc || '(vacío)');
+    push(`finalSrc = ${finalSrc || '(vacío)'}`);
 
     if (!finalSrc) {
       fail('No hay fuente de video.');
@@ -112,13 +106,13 @@ export default function VideoPlayer({
       if (!settled) fail('Tiempo de espera agotado al cargar el video (posible CORS/hotlink).');
     }, 12000);
 
-    // PRECHECK: manifiesto + primer media vía proxy universal
+    // PRECHECK: manifest + primer media
     const controller = new AbortController();
     const precheck = (async () => {
-      log('↓ Manifest:', finalSrc);
+      push(`↓ Manifest: ${finalSrc}`);
       const r = await fetch(finalSrc, { cache: 'no-store', signal: controller.signal });
       const st = r.headers.get('x-proxy-status') || r.status;
-      log('↑ Manifest status:', st);
+      push(`↑ Manifest status: ${st}`);
       if (!r.ok) throw new Error(`Manifest HTTP ${st}`);
       const text = await r.text();
       const lines = text.split(/\r?\n/).filter(Boolean);
@@ -129,7 +123,7 @@ export default function VideoPlayer({
       }
       if (firstMedia) {
         const probe = resolveRelativeViaProxy(finalSrc, firstMedia);
-        log('↓ First media:', probe);
+        push(`↓ First media: ${probe}`);
         const r2 = await fetch(probe, {
           method: 'GET',
           headers: { range: 'bytes=0-1' },
@@ -137,10 +131,10 @@ export default function VideoPlayer({
           signal: controller.signal,
         });
         const st2 = r2.headers.get('x-proxy-status') || r2.status;
-        log('↑ First media status:', st2);
+        push(`↑ First media status: ${st2}`);
         if (!r2.ok) throw new Error(`Media HTTP ${st2}`);
       } else {
-        log('manifest sin media directa (variante m3u8), continuará con hls.js');
+        push('Manifest sin media directa (variant playlist).');
       }
     })();
 
@@ -164,7 +158,7 @@ export default function VideoPlayer({
 
     const setup = async () => {
       try {
-        await precheck; // si falla, fail() ya se llamó
+        await precheck; // si falla, ya se llamó fail()
         if (settled) return;
 
         await loadHlsScript();
@@ -176,53 +170,46 @@ export default function VideoPlayer({
               try {
                 let u = context?.url;
                 if (typeof u === 'string' && u) {
-                  if (!/^https?:\/\//i.test(u) && typeof context?.frag?.baseurl === 'string') {
+                  // Absolutas → /hls/<scheme>/<host>/...
+                  if (/^https?:\/\//i.test(u)) {
+                    context.url = rewriteAbsoluteToProxy(u);
+                  } else if (typeof context?.frag?.baseurl === 'string') {
+                    // Relativas → resuélvelas contra baseurl
                     const abs = new URL(u, context.frag.baseurl).href;
                     context.url = rewriteAbsoluteToProxy(abs);
-                  } else {
-                    context.url = rewriteToProxy(u);
                   }
-                  if (debug) log('HLS load ->', context.url);
+                  push(`HLS load → ${context.url}`);
                 }
               } catch (e) {
-                if (debug) log('HLS load rewrite error:', e?.message || e);
+                push(`HLS rewrite error: ${e?.message || e}`);
               }
               super.load(context, config, callbacks);
             }
           }
 
-          hls = new window.Hls({
-            enableWorker: true,
-            loader: ProxyLoader,
-          });
+          const _hls = new window.Hls({ enableWorker: true, loader: ProxyLoader });
+          hls = _hls;
 
-          hls.on(window.Hls.Events.ERROR, (_evt, data) => {
+          _hls.on(window.Hls.Events.ERROR, (_evt, data) => {
+            push(`HLS ERROR: ${data?.type || 'unknown'} ${data?.details || ''} fatal=${String(data?.fatal)}`);
             const fatal = data?.fatal;
-            const t = data?.type || 'unknown';
-            const d = data?.details || '';
-            log('HLS ERROR:', t, d, 'fatal=', fatal);
-            if (fatal || String(t).toLowerCase().includes('network')) {
+            const isNetwork = String(data?.type || '').toLowerCase().includes('network');
+            if (fatal || isNetwork) {
               clearTimeout(timeoutId);
-              fail(`HLS error${fatal ? ' (fatal)' : ''}: ${t} ${d}`);
-              try { hls.destroy(); } catch {}
+              fail(`HLS error${fatal ? ' (fatal)' : ''}: ${data?.type || 'desconocido'} ${data?.details || ''}`);
+              try { _hls.destroy(); } catch {}
             }
           });
 
-          hls.on(window.Hls.Events.LEVEL_LOADED, (_evt, data) => {
-            if (debug) log('LEVEL_LOADED:', 'frag', data?.details?.fragments?.length ?? '?');
-          });
-          hls.on(window.Hls.Events.FRAG_LOADED, (_evt, data) => {
-            if (debug) log('FRAG_LOADED:', data?.frag?.relurl || '(?)');
-          });
-          hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+          _hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
             clearTimeout(timeoutId);
-            log('MANIFEST_PARSED');
+            push('MANIFEST_PARSED');
             ready();
             if (autoPlay) video.play().catch(() => {});
           });
 
-          hls.loadSource(finalSrc);
-          hls.attachMedia(video);
+          _hls.loadSource(finalSrc);
+          _hls.attachMedia(video);
         } else {
           // HLS nativo (Safari/iOS)
           attachNative();
@@ -245,48 +232,51 @@ export default function VideoPlayer({
         video.load();
       }
     };
-  }, [finalSrc, autoPlay, onError, debug]);
+  }, [finalSrc, autoPlay, onError]);
+
+  // UI
+  const DebugBox = () =>
+    debug ? (
+      <div className="mt-2 text-xs leading-4 text-gray-200 bg-black/40 p-2 rounded max-h-40 overflow-auto">
+        <div className="font-semibold mb-1">DEBUG</div>
+        <pre className="whitespace-pre-wrap break-all">{debugLines.join('\n')}</pre>
+      </div>
+    ) : null;
 
   if (status === 'loading') {
     return (
-      <div className="w-full aspect-video bg-black/70 text-white flex items-center justify-center rounded-lg">
-        Cargando video…
-        {debug && (
-          <div className="absolute bottom-2 left-2 right-2 text-[11px] opacity-70">
-            <pre className="whitespace-pre-wrap">{debugLines.join('\n')}</pre>
-          </div>
-        )}
+      <div className="w-full aspect-video bg-black/70 text-white flex flex-col items-center justify-center rounded-lg p-3">
+        <div>Cargando video…</div>
+        <DebugBox />
       </div>
     );
   }
 
   if (status === 'error') {
     return (
-      <div className="w-full aspect-video bg-black/70 text-red-300 p-4 rounded-lg overflow-auto relative">
-        <div className="font-semibold mb-2">No se pudo reproducir el canal</div>
+      <div className="w-full aspect-video bg-black/70 text-red-300 p-3 rounded-lg overflow-auto">
+        <div className="font-semibold mb-1">No se pudo reproducir el canal</div>
         <div className="text-sm opacity-90 mb-2">{errorMsg}</div>
         <ul className="text-sm opacity-80 list-disc pl-5">
           <li>La URL se reescribe a <code>/hls/&lt;scheme&gt;/&lt;host&gt;/…</code>.</li>
-          <li>Abre DevTools → Network y filtra por <code>hls</code>, <code>m3u8</code> o <code>.ts</code>.</li>
-          <li>Revisa el header <code>x-proxy-status</code> (debe ser 200).</li>
+          <li>En Network revisa <code>x-proxy-status</code> del <code>.m3u8</code> y los <code>.ts</code>.</li>
         </ul>
-        {debug && (
-          <div className="absolute bottom-2 left-2 right-2 text-[11px] opacity-80 text-red-200">
-            <pre className="whitespace-pre-wrap">{debugLines.join('\n')}</pre>
-          </div>
-        )}
+        <DebugBox />
       </div>
     );
   }
 
   return (
-    <video
-      ref={videoRef}
-      poster={poster}
-      controls={controls}
-      muted={muted}
-      playsInline
-      className="w-full rounded-lg"
-    />
+    <div>
+      <video
+        ref={videoRef}
+        poster={poster}
+        controls={controls}
+        muted={muted}
+        playsInline
+        className="w-full rounded-lg"
+      />
+      <DebugBox />
+    </div>
   );
 }
