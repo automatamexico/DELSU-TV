@@ -1,52 +1,61 @@
+// src/App.jsx
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import HomePage from './pages/HomePage';
-import DashboardPage from './pages/DashboardPage';
+import ProtectedRoute from './routes/ProtectedRoute'; // tu versión que espera { children }
 import LoginPage from './pages/LoginPage';
-import ProtectedRoute from './components/ProtectedRoute';
+import DashboardPage from './pages/DashboardPage';
+import HomePage from './pages/HomePage';
 
-function AppContent() {
-  const { user, loading } = useAuth();
+const AuthStatusGate = ({ children }) => {
+  const { loading, authError } = useAuth();
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen text-white">Cargando...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center text-white">
+        Cargando sesión…
+      </div>
+    );
   }
 
-  return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      
-      <Route 
-        path="/" 
-        element={
-          <ProtectedRoute allowedRoles={['user', 'admin']} user={user}>
-            <HomePage />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/dashboard" 
-        element={
-          <ProtectedRoute allowedRoles={['admin']} user={user}>
-            <DashboardPage />
-          </ProtectedRoute>
-        } 
-      />
-    </Routes>
-  );
-}
-
-const App = () => {
-  return (
-    <Router>
-      <AuthProvider>
-        <div className="App">
-          <AppContent />
+  if (authError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-red-300 p-6 text-center">
+        <div>
+          <div className="text-xl font-bold mb-2">Error de autenticación</div>
+          <div className="opacity-80">{authError}</div>
+          <div className="mt-4 text-sm opacity-70">
+            Verifica tus variables en Netlify (REACT_APP_SUPABASE_URL / REACT_APP_SUPABASE_ANON_KEY)
+            y la configuración de URLs en Supabase Auth.
+          </div>
         </div>
-      </AuthProvider>
-    </Router>
-  );
+      </div>
+    );
+  }
+
+  return children;
 };
 
-export default App;
+export default function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <AuthStatusGate>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route
+              path="/dashboard/*"
+              element={
+                <ProtectedRoute>
+                  <DashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/" element={<HomePage />} />
+            {/* Puedes añadir otras rutas públicas aquí */}
+          </Routes>
+        </AuthStatusGate>
+      </BrowserRouter>
+    </AuthProvider>
+  );
+}
