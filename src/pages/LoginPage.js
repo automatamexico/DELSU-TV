@@ -1,7 +1,8 @@
+// src/pages/LoginPage.jsx
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { User, Lock, Mail, Globe, LogIn, UserPlus, Tv } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { countries } from '../data/countries';
 
@@ -13,21 +14,50 @@ const LoginPage = () => {
   const [country, setCountry] = useState('');
   const [userType, setUserType] = useState('user');
   const [loading, setLoading] = useState(false);
+
   const navigate = useNavigate();
+  const location = useLocation();
   const { signIn, signUp } = useAuth();
+
+  // ✅ Helper: intenta ambas firmas de signIn sin que tengas que modificar tu AuthContext
+  const safeSignIn = async (emailArg, passwordArg) => {
+    // 1) Primero intenta con objeto
+    try {
+      await signIn({ email: emailArg, password: passwordArg });
+      return;
+    } catch (e1) {
+      // 2) Si falla, intenta con parámetros sueltos
+      try {
+        await signIn(emailArg, passwordArg);
+        return;
+      } catch (e2) {
+        // Lanza el error real de la segunda llamada
+        throw e2;
+      }
+    }
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await signIn(email, password);
+      await safeSignIn(email, password);
+
+      // Si ProtectedRoute te mandó aquí, vuelve a donde ibas:
+      const from = location.state?.from?.pathname;
+      if (from) {
+        navigate(from, { replace: true });
+        return;
+      }
+
+      // Si no hay "from", usa tu lógica de tipo de usuario:
       if (userType === 'admin') {
-        navigate('/dashboard');
+        navigate('/dashboard', { replace: true });
       } else {
-        navigate('/');
+        navigate('/', { replace: true });
       }
     } catch (error) {
-      alert('Error al iniciar sesión: ' + error.message);
+      window.alert('Error al iniciar sesión: ' + (error?.message || String(error)));
     } finally {
       setLoading(false);
     }
@@ -37,25 +67,31 @@ const LoginPage = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      // Password validation
+      // Validación básica de contraseña
       const passwordRegex = /^(?=.*[a-zA-Z])(?=.*[0-9])[a-zA-Z0-9]{6,12}$/;
       if (!passwordRegex.test(password)) {
-        alert('La contraseña debe tener entre 6 y 12 caracteres, y contener al menos una letra y un número.');
+        window.alert('La contraseña debe tener entre 6 y 12 caracteres, y contener al menos una letra y un número.');
         return;
       }
 
-      await signUp(email, password, fullName, country);
+      // Firma flexible también para signUp si tu contexto usa objeto
+      try {
+        await signUp({ email, password, fullName, country });
+      } catch {
+        await signUp(email, password, fullName, country);
+      }
+
       setIsRegistering(false);
-      alert('Registro exitoso. Verifica tu email para confirmar.');
+      window.alert('Registro exitoso. Verifica tu email para confirmar.');
     } catch (error) {
-      alert('Error al registrarse: ' + error.message);
+      window.alert('Error al registrarse: ' + (error?.message || String(error)));
     } finally {
       setLoading(false);
     }
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Cargando...</div>;
+    return <div className="flex items-center justify-center min-h-screen text-white">Cargando...</div>;
   }
 
   return (
