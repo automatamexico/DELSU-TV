@@ -2,11 +2,13 @@
   command = "npm run build"
   publish = "build"
 
-[build.environment]
-  NODE_VERSION = "20"
-
-# SPA fallback (keeps client-side routes working)
+# Si ya tienes redirects para SPA, déjalos igual
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Activa el Edge Function en la ruta /hls/*
+[[edge_functions]]
+  function = "hls-proxy"
+  path = "/hls/*"
