@@ -4,7 +4,14 @@ import { Tv, Search, Menu, ChevronDown, LayoutDashboard, LogOut } from 'lucide-r
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-const Header = ({ searchTerm, onSearchChange, onFilterChange, filters }) => {
+const Header = ({
+  searchTerm,
+  onSearchChange,
+  onFilterChange,
+  filters,
+  // ✅ Declaramos onMenuClick como prop y le damos un no-op por defecto
+  onMenuClick = () => {}
+}) => {
   const [showFilters, setShowFilters] = React.useState(false);
   const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
@@ -97,11 +104,13 @@ const Header = ({ searchTerm, onSearchChange, onFilterChange, filters }) => {
               </motion.button>
             )}
 
+            {/* ✅ Botón móvil que llama a la prop onMenuClick */}
             <motion.button
-              onClick={onMenuClick || (() => {})}
+              onClick={onMenuClick}
               className="md:hidden p-2 text-gray-400 hover:text-white transition-colors"
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
+              aria-label="Abrir menú"
             >
               <Menu className="w-6 h-6" />
             </motion.button>
