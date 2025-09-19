@@ -1,6 +1,15 @@
 // src/components/VideoPlayer.js
+// src/components/VideoPlayer.js
 import React, { useEffect, useRef, useState } from 'react';
-import { toProxiedHls } from '../utils/streamUrl';
+
+// Convierte la URL original a /hls/... (proxy)
+const toProxiedHls = (url) => {
+  if (!url || typeof url !== 'string') return '';
+  const u = url.replace(/^http:\/\//i, 'https://');
+  const HOST = 'https://2-fss-2.streamhoster.com/';
+  if (u.startsWith(HOST)) return '/hls/' + u.slice(HOST.length);
+  return u;
+};
 
 const loadHlsScript = () =>
   new Promise((resolve, reject) => {
@@ -16,7 +25,7 @@ const loadHlsScript = () =>
 /**
  * Props:
  * - src?: string   → URL del stream (m3u8/mp4). Si no viene, usa 'channel'.
- * - channel?: obj  → objeto con { stream_url | streamUrl | m3u8 | url }
+ * - channel?: obj  → { stream_url | streamUrl | m3u8 | url }
  * - poster?: string
  * - autoPlay?: boolean
  * - controls?: boolean
@@ -34,14 +43,13 @@ export default function VideoPlayer({
   const [status, setStatus] = useState('loading'); // loading | ready | error
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Deriva la fuente real (admite src o channel.*) y pásala por /hls/*
+  // Derivar fuente (acepta src o channel.*) y proxear
   const rawFromChannel =
     channel?.stream_url ||
     channel?.streamUrl ||
     channel?.m3u8 ||
     channel?.url ||
     '';
-
   const finalSrc = toProxiedHls(
     typeof srcProp === 'string' && srcProp.length ? srcProp : rawFromChannel
   );
@@ -50,51 +58,62 @@ export default function VideoPlayer({
     let hls;
     let timeoutId;
     let settled = false;
+    const video = videoRef.current;
+    if (!video) return () => {};
 
-    const setReady = () => {
-      settled = true;
-      setStatus('ready');
-    };
-
-    const setFail = (msg) => {
+    const fail = (msg) => {
       settled = true;
       setErrorMsg(msg);
       setStatus('error');
       onError?.(new Error(msg));
     };
-
-    const video = videoRef.current;
-    if (!video) return () => {};
+    const ready = () => {
+      settled = true;
+      setStatus('ready');
+    };
 
     if (!finalSrc) {
-      setFail('No hay fuente de video.');
+      fail('No hay fuente de video.');
       return () => {};
     }
 
-    // Mixed content: https sitio + http stream
+    // Mixed content
     if (window.location.protocol === 'https:' && finalSrc.startsWith('http://')) {
-      setFail('Mixed Content: el sitio es HTTPS pero el stream es HTTP. Usa HTTPS o el proxy /hls/.');
+      fail('Mixed Content: el sitio es HTTPS y el stream es HTTP. Usa HTTPS o /hls/.');
       return () => {};
     }
 
-    // Timeout de seguridad (10s)
+    // 🔎 PRE-CHEQUEO: pide 1 byte para obtener status real del proxy (403/404/etc.)
+    const controller = new AbortController();
+    const precheck = fetch(finalSrc, {
+      method: 'GET',
+      headers: { range: 'bytes=0-1' },
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status} al solicitar playlist/segmento`);
+      })
+      .catch((e) => {
+        fail(e?.message || String(e));
+      });
+
+    // Timeout de seguridad (10s) por si el HLS no llega a ready
     timeoutId = setTimeout(() => {
       if (!settled) {
-        setFail('Tiempo de espera agotado al cargar el video. Puede ser CORS/hotlink o el stream está caído.');
+        fail('Tiempo de espera agotado al cargar el video. Puede ser CORS/hotlink o el stream está caído.');
       }
     }, 10000);
 
     const onReadyOnce = () => {
       clearTimeout(timeoutId);
-      setReady();
+      ready();
       if (autoPlay) video.play().catch(() => {});
     };
-
     const onVideoError = () => {
       clearTimeout(timeoutId);
       const mediaError = video.error;
-      const msg = mediaError ? `Error de reproducción (code ${mediaError.code}).` : 'Error de reproducción.';
-      setFail(msg);
+      fail(mediaError ? `Error de reproducción (code ${mediaError.code}).` : 'Error de reproducción.');
     };
 
     const attachNative = () => {
@@ -106,13 +125,16 @@ export default function VideoPlayer({
 
     const setup = async () => {
       try {
+        // Espera primero el precheck (si falló, ya hemos mostrado error)
+        await precheck;
+        if (settled) return;
+
         // HLS nativo (Safari/iOS)
         if (video.canPlayType('application/vnd.apple.mpegurl')) {
           attachNative();
           return;
         }
 
-        // hls.js para otros navegadores
         await loadHlsScript();
         if (window.Hls && window.Hls.isSupported()) {
           hls = new window.Hls({ enableWorker: true });
@@ -121,7 +143,7 @@ export default function VideoPlayer({
 
           hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
             clearTimeout(timeoutId);
-            setReady();
+            ready();
             if (autoPlay) video.play().catch(() => {});
           });
 
@@ -130,8 +152,7 @@ export default function VideoPlayer({
             const isNetwork = String(data?.type || '').toLowerCase().includes('network');
             if (fatal || isNetwork) {
               clearTimeout(timeoutId);
-              const msg = `HLS error${fatal ? ' (fatal)' : ''}: ${data?.type || 'desconocido'} ${data?.details || ''}`;
-              setFail(msg);
+              fail(`HLS error${fatal ? ' (fatal)' : ''}: ${data?.type || 'desconocido'} ${data?.details || ''}`);
               try { hls.destroy(); } catch {}
             }
           });
@@ -140,13 +161,14 @@ export default function VideoPlayer({
         }
       } catch (e) {
         clearTimeout(timeoutId);
-        setFail(`No se pudo inicializar el reproductor: ${e?.message || e}`);
+        fail(`No se pudo inicializar el reproductor: ${e?.message || e}`);
       }
     };
 
     setup();
 
     return () => {
+      controller.abort();
       clearTimeout(timeoutId);
       if (hls) {
         try { hls.destroy(); } catch {}
@@ -173,9 +195,9 @@ export default function VideoPlayer({
         <div className="font-semibold mb-2">No se pudo reproducir el canal</div>
         <div className="text-sm opacity-90">{errorMsg}</div>
         <ul className="text-sm opacity-80 mt-2 list-disc pl-5">
-          <li>Usa la ruta proxied que empiece con <code>/hls/</code>.</li>
-          <li>Verifica que el <code>.m3u8</code> y los segmentos existan.</li>
-          <li>Si el origen exige <em>referer</em>, el proxy ya envía el del sitio.</li>
+          <li>Usa la ruta proxied que empiece con <code>/hls/</code> (ya lo hacemos automático).</li>
+          <li>Abre DevTools → Network y mira el status del <code>.m3u8</code> y <code>.ts</code>.</li>
+          <li>Si ves <strong>403/401</strong>, el origen bloquea por referer/UA/IP: con el proxy ya mandamos referer/UA, pero algunos CDNs bloquean IPs de clouds.</li>
         </ul>
       </div>
     );
