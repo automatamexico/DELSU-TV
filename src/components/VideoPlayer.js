@@ -20,40 +20,50 @@ export default function VideoPlayer({ src, poster = '', autoPlay = true, control
   useEffect(() => {
     let hls;
     let timeoutId;
-    const video = videoRef.current;
-    if (!video || !src) return;
+    let settled = false; // ← en vez de leer 'status' dentro del efecto
 
-    // Mixed content
-    if (window.location.protocol === 'https:' && src.startsWith('http://')) {
-      const msg = 'Mixed Content: el sitio es HTTPS pero el stream es HTTP. Usa HTTPS o /hls/.';
+    const setReady = () => {
+      settled = true;
+      setStatus('ready');
+    };
+
+    const setFail = (msg) => {
+      settled = true;
       setErrorMsg(msg);
       setStatus('error');
       onError?.(new Error(msg));
-      return;
+    };
+
+    const video = videoRef.current;
+    if (!video || !src) {
+      setFail('No hay fuente de video.');
+      return () => {};
+    }
+
+    // Mixed content
+    if (window.location.protocol === 'https:' && src.startsWith('http://')) {
+      setFail('Mixed Content: el sitio es HTTPS pero el stream es HTTP. Usa HTTPS o el proxy /hls/.');
+      return () => {};
     }
 
     // Timeout de seguridad (10s)
     timeoutId = setTimeout(() => {
-      if (status === 'loading') {
-        const msg = 'Tiempo de espera agotado al cargar el video. Puede ser CORS/hotlink o el stream está caído.';
-        setErrorMsg(msg);
-        setStatus('error');
-        onError?.(new Error(msg));
+      if (!settled) {
+        setFail('Tiempo de espera agotado al cargar el video. Puede ser CORS/hotlink o el stream está caído.');
       }
     }, 10000);
 
     const onReadyOnce = () => {
       clearTimeout(timeoutId);
-      setStatus('ready');
+      setReady();
+      if (autoPlay) video.play().catch(() => {});
     };
 
     const onVideoError = () => {
       clearTimeout(timeoutId);
       const mediaError = video.error;
       const msg = mediaError ? `Error de reproducción (code ${mediaError.code}).` : 'Error de reproducción.';
-      setErrorMsg(msg);
-      setStatus('error');
-      onError?.(new Error(msg));
+      setFail(msg);
     };
 
     const attachNative = () => {
@@ -61,16 +71,17 @@ export default function VideoPlayer({ src, poster = '', autoPlay = true, control
       video.addEventListener('canplay', onReadyOnce, { once: true });
       video.addEventListener('error', onVideoError);
       video.load();
-      if (autoPlay) video.play().catch(() => {});
     };
 
     const setup = async () => {
       try {
+        // HLS nativo (Safari/iOS)
         if (video.canPlayType('application/vnd.apple.mpegurl')) {
           attachNative();
           return;
         }
 
+        // hls.js para otros navegadores
         await loadHlsScript();
         if (window.Hls && window.Hls.isSupported()) {
           hls = new window.Hls({ enableWorker: true });
@@ -79,24 +90,17 @@ export default function VideoPlayer({ src, poster = '', autoPlay = true, control
 
           hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
             clearTimeout(timeoutId);
-            setStatus('ready');
+            setReady();
             if (autoPlay) video.play().catch(() => {});
           });
 
           hls.on(window.Hls.Events.ERROR, (_evt, data) => {
-            // Log de ayuda (abre DevTools > Console)
-            // console.log('[HLS ERROR]', data);
-
-            // Trata como error visible si es fatal o si es NETWORK_ERROR
             const fatal = data?.fatal;
-            const networkErr = data?.type === 'networkError' || data?.type === 'networkError'.toUpperCase();
-
+            const networkErr = String(data?.type || '').toLowerCase().includes('network');
             if (fatal || networkErr) {
               clearTimeout(timeoutId);
               const msg = `HLS error${fatal ? ' (fatal)' : ''}: ${data?.type || 'desconocido'} ${data?.details || ''}`;
-              setErrorMsg(msg);
-              setStatus('error');
-              onError?.(new Error(msg));
+              setFail(msg);
               try { hls.destroy(); } catch {}
             }
           });
@@ -105,10 +109,7 @@ export default function VideoPlayer({ src, poster = '', autoPlay = true, control
         }
       } catch (e) {
         clearTimeout(timeoutId);
-        const msg = `No se pudo inicializar el reproductor: ${e?.message || e}`;
-        setErrorMsg(msg);
-        setStatus('error');
-        onError?.(new Error(msg));
+        setFail(`No se pudo inicializar el reproductor: ${e?.message || e}`);
       }
     };
 
@@ -125,7 +126,7 @@ export default function VideoPlayer({ src, poster = '', autoPlay = true, control
         video.load();
       }
     };
-  }, [src, autoPlay, onError]);
+  }, [src, autoPlay, onError]); // ✅ sin 'status' en deps
 
   if (status === 'loading') {
     return (
@@ -141,9 +142,9 @@ export default function VideoPlayer({ src, poster = '', autoPlay = true, control
         <div className="font-semibold mb-2">No se pudo reproducir el canal</div>
         <div className="text-sm opacity-90">{errorMsg}</div>
         <ul className="text-sm opacity-80 mt-2 list-disc pl-5">
-          <li>Comprueba que la URL esté viva. En producción usa la ruta proxied que empieza con <code>/hls/</code>.</li>
+          <li>Usa la URL proxied (empiece con <code>/hls/</code>) en producción.</li>
+          <li>Verifica que el .m3u8 y los segmentos existan y no estén bloqueados.</li>
           <li>Si el origen exige <em>referer</em>, el proxy ya envía el del sitio.</li>
-          <li>Revisa DevTools → Network para ver el status del .m3u8 y .ts (200/403/404).</li>
         </ul>
       </div>
     );
