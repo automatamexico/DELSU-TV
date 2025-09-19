@@ -1,3 +1,4 @@
+// src/pages/LoginPage.jsx
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { User, Lock, Mail, Globe, LogIn, UserPlus, Tv } from 'lucide-react';
@@ -18,7 +19,6 @@ const LoginPage = () => {
   const location = useLocation();
   const { signIn, signUp } = useAuth();
 
-  // Helper para soportar ambos tipos de firma de signIn
   const safeSignIn = async (emailArg, passwordArg) => {
     try {
       await signIn({ email: emailArg, password: passwordArg });
@@ -31,13 +31,12 @@ const LoginPage = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      await safeSignIn(email, password);
+      const emailSanitized = email.trim().toLowerCase();
+      await safeSignIn(emailSanitized, password);
+
       const from = location.state?.from?.pathname;
-      if (from) {
-        navigate(from, { replace: true });
-        return;
-      }
-      // Tu lógica actual: redirige según tipo (puedes quitarla si usas AdminRoute)
+      if (from) return navigate(from, { replace: true });
+
       if (userType === 'admin') navigate('/dashboard', { replace: true });
       else navigate('/', { replace: true });
     } catch (error) {
@@ -51,23 +50,32 @@ const LoginPage = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      // ✅ Nueva regla: cualquier contraseña con mínimo 4 caracteres
-      const passwordRegex = /^.{4,}$/;
-      if (!passwordRegex.test(password)) {
+      const emailSanitized = email.trim().toLowerCase();
+
+      // Validación simple (evita cosas claramente inválidas)
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(emailSanitized)) {
+        window.alert('Correo inválido. Revisa que tenga el formato correcto (ej: nombre@dominio.com).');
+        return;
+      }
+
+      // Password: cualquier cosa con mínimo 4
+      if (password.length < 4) {
         window.alert('La contraseña debe tener al menos 4 caracteres.');
         return;
       }
 
-      // signUp flexible (objeto o parámetros sueltos)
+      // Llamada flexible a signUp
       try {
-        await signUp({ email, password, fullName, country });
+        await signUp({ email: emailSanitized, password, fullName, country });
       } catch {
-        await signUp(email, password, fullName, country);
+        await signUp(emailSanitized, password, fullName, country);
       }
 
       setIsRegistering(false);
       window.alert('Registro exitoso. Revisa tu correo si requiere confirmación.');
     } catch (error) {
+      // Muestra el mensaje crudo que devuelve Supabase (útil para diagnósticos)
       window.alert('Error al registrarse: ' + (error?.message || String(error)));
     } finally {
       setLoading(false);
