@@ -1,8 +1,8 @@
-// src/App.jsx
+// src/App.js
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import ProtectedRoute from './routes/ProtectedRoute'; // tu versión que espera { children }
+import AdminRoute from './routes/AdminRoute';     // ✅ nuevo guardia solo-admin
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import HomePage from './pages/HomePage';
@@ -43,16 +43,19 @@ export default function App() {
         <AuthStatusGate>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+
+            {/* 🔒 Solo admins pueden entrar al dashboard */}
             <Route
               path="/dashboard/*"
               element={
-                <ProtectedRoute>
+                <AdminRoute>
                   <DashboardPage />
-                </ProtectedRoute>
+                </AdminRoute>
               }
             />
+
+            {/* Rutas públicas */}
             <Route path="/" element={<HomePage />} />
-            {/* Puedes añadir otras rutas públicas aquí */}
           </Routes>
         </AuthStatusGate>
       </BrowserRouter>
