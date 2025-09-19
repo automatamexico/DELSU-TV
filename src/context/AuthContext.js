@@ -1,7 +1,6 @@
 // src/context/AuthContext.jsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
-// 👇 Import corregido: el archivo está en src/supabaseClients.js
-import { supabase } from '../supabaseClients';
+import { supabase } from './supabaseClients'; // ✅ import local al mismo directorio
 
 const AuthContext = createContext();
 
@@ -21,7 +20,7 @@ export const AuthProvider = ({ children }) => {
         setSession(data?.session ?? null);
 
         if (data?.session?.user) {
-          // Carga tu perfil real si lo usas:
+          // Ajusta a tu tabla de perfiles si la tienes:
           // const { data: p } = await supabase.from('profiles').select('*').eq('id', data.session.user.id).single();
           // setProfile(p);
           setProfile({ role: 'admin' }); // placeholder
