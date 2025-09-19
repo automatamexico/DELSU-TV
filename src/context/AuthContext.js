@@ -1,6 +1,6 @@
 // src/context/AuthContext.jsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from './supabaseClients'; // ✅ import local al mismo directorio
+import { supabase } from '../supabaseClient'; // ← usa tu ruta real al cliente
 
 const AuthContext = createContext();
 
@@ -9,25 +9,37 @@ export const AuthProvider = ({ children }) => {
   const [profile, setProfile] = useState(null);
   const [authError, setAuthError] = useState(null);
 
+  const fetchProfile = async (userId) => {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('id, full_name, country, role')
+      .eq('id', userId)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  };
+
   useEffect(() => {
     let mounted = true;
 
     const init = async () => {
       try {
         const { data, error } = await supabase.auth.getSession();
-        if (!mounted) return;
         if (error) throw error;
-        setSession(data?.session ?? null);
+        const s = data?.session ?? null;
+        if (!mounted) return;
+        setSession(s);
 
-        if (data?.session?.user) {
-          // Ajusta a tu tabla de perfiles si la tienes:
-          // const { data: p } = await supabase.from('profiles').select('*').eq('id', data.session.user.id).single();
-          // setProfile(p);
-          setProfile({ role: 'admin' }); // placeholder
+        if (s?.user) {
+          const p = await fetchProfile(s.user.id);
+          setProfile(p);
+        } else {
+          setProfile(null);
         }
       } catch (err) {
         setAuthError(err?.message || String(err));
         setSession(null);
+        setProfile(null);
       }
     };
 
@@ -36,67 +48,68 @@ export const AuthProvider = ({ children }) => {
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       setSession(newSession ?? null);
       if (newSession?.user) {
-        // const { data: p } = await supabase.from('profiles').select('*').eq('id', newSession.user.id).single();
-        // setProfile(p);
-        setProfile({ role: 'admin' });
+        try {
+          const p = await fetchProfile(newSession.user.id);
+          setProfile(p);
+        } catch {
+          setProfile(null);
+        }
       } else {
         setProfile(null);
       }
     });
 
     return () => {
-      mounted = false;
       sub?.subscription?.unsubscribe?.();
+      mounted = false;
     };
   }, []);
 
   const signIn = async (...args) => {
     setAuthError(null);
-    try {
-      // Soporta ambas firmas: ({email, password}) o (email, password)
-      let creds = {};
-      if (typeof args[0] === 'object') creds = args[0];
-      else creds = { email: args[0], password: args[1] };
-      const { error } = await supabase.auth.signInWithPassword(creds);
-      if (error) throw error;
-    } catch (err) {
-      setAuthError(err?.message || String(err));
-      throw err;
-    }
+    let creds = typeof args[0] === 'object' ? args[0] : { email: args[0], password: args[1] };
+    const { error } = await supabase.auth.signInWithPassword(creds);
+    if (error) throw error;
   };
 
   const signUp = async (...args) => {
     setAuthError(null);
-    try {
-      let email, password, fullName, country;
-      if (typeof args[0] === 'object') ({ email, password, fullName, country } = args[0]);
-      else [email, password, fullName, country] = args;
+    let email, password, fullName, country;
+    if (typeof args[0] === 'object') ({ email, password, fullName, country } = args[0]);
+    else [email, password, fullName, country] = args;
 
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: { fullName, country } },
-      });
-      if (error) throw error;
-    } catch (err) {
-      setAuthError(err?.message || String(err));
-      throw err;
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { fullName, country }, // se guarda en raw_user_meta_data
+      },
+    });
+    if (error) throw error;
+
+    // Crea/actualiza tu fila en user_profiles al registrarse (si no usas trigger)
+    const { data: user } = await supabase.auth.getUser();
+    if (user?.user?.id) {
+      await supabase
+        .from('user_profiles')
+        .upsert({
+          id: user.user.id,
+          full_name: fullName || null,
+          country: country || null,
+          role: 'user',
+        });
     }
   };
 
   const signOut = async () => {
     setAuthError(null);
-    try {
-      await supabase.auth.signOut();
-    } catch (err) {
-      setAuthError(err?.message || String(err));
-    }
+    await supabase.auth.signOut();
   };
 
   const value = {
     user: session?.user ?? null,
     session,
-    profile,
+    profile, // ← aquí viene role: 'user' | 'admin'
     loading: session === undefined,
     authError,
     signIn,
