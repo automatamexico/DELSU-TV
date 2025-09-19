@@ -1,8 +1,7 @@
 // src/supabaseClients.js
 import { createClient } from '@supabase/supabase-js';
 
-// 1) Primero intenta leer variables de entorno (Netlify)
-// 2) Si no existen, usa tus valores actuales como fallback
+// 1) Lee de env en Netlify; 2) fallback a tus valores actuales
 const supabaseUrl =
   process.env.REACT_APP_SUPABASE_URL ||
   'https://uqzcnlmhmglzflkuzczk.supabase.co';
