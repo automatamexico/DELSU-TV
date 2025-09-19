@@ -22,14 +22,23 @@ export default function VideoPlayer({ src, poster = '', autoPlay = true, control
     const video = videoRef.current;
     if (!video || !src) return;
 
-    // 1) Bloqueo de contenido mixto (https sitio + http stream)
+    // Mixed Content: sitio https con stream http (bloqueado por navegador)
     if (window.location.protocol === 'https:' && src.startsWith('http://')) {
-      const msg = 'La URL del stream es HTTP y el sitio es HTTPS (Mixed Content). Usa una URL HTTPS o un proxy.';
+      const msg = 'La URL del stream es HTTP y el sitio es HTTPS (Mixed Content). Usa una URL HTTPS o el proxy /hls/.';
       setErrorMsg(msg);
       setStatus('error');
       onError?.(new Error(msg));
       return;
     }
+
+    const onReadyOnce = () => setStatus('ready');
+    const onVideoError = () => {
+      const mediaError = video.error;
+      const msg = mediaError ? `Error de reproducción (code ${mediaError.code}).` : 'Error de reproducción.';
+      setErrorMsg(msg);
+      setStatus('error');
+      onError?.(new Error(msg));
+    };
 
     const attachNative = () => {
       video.src = src;
@@ -39,27 +48,14 @@ export default function VideoPlayer({ src, poster = '', autoPlay = true, control
       if (autoPlay) video.play().catch(() => {});
     };
 
-    const onReadyOnce = () => setStatus('ready');
-
-    const onVideoError = () => {
-      const mediaError = video.error;
-      const msg = mediaError
-        ? `Error de reproducción (code ${mediaError.code}).`
-        : 'Error de reproducción.';
-      setErrorMsg(msg);
-      setStatus('error');
-      onError?.(new Error(msg));
-    };
-
     const setup = async () => {
       try {
-        // Safari y algunos navegadores soportan HLS nativo
         if (video.canPlayType('application/vnd.apple.mpegurl')) {
+          // Safari iOS soporta HLS nativo
           attachNative();
           return;
         }
 
-        // Otros navegadores: carga hls.js desde CDN (sin instalar nada)
         await loadHlsScript();
         if (window.Hls && window.Hls.isSupported()) {
           hls = new window.Hls({ enableWorker: true });
@@ -70,8 +66,7 @@ export default function VideoPlayer({ src, poster = '', autoPlay = true, control
             if (autoPlay) video.play().catch(() => {});
           });
           hls.on(window.Hls.Events.ERROR, (_evt, data) => {
-            const fatal = data?.fatal;
-            if (fatal) {
+            if (data?.fatal) {
               const msg = `HLS error: ${data?.type || 'fatal'}`;
               setErrorMsg(msg);
               setStatus('error');
@@ -79,7 +74,7 @@ export default function VideoPlayer({ src, poster = '', autoPlay = true, control
             }
           });
         } else {
-          // Fall-back: intenta nativo igualmente
+          // Fall-back: intenta nativo
           attachNative();
         }
       } catch (e) {
@@ -97,6 +92,7 @@ export default function VideoPlayer({ src, poster = '', autoPlay = true, control
         try { hls.destroy(); } catch (_) {}
       }
       if (video) {
+        video.removeEventListener('error', onVideoError);
         video.removeAttribute('src');
         video.load();
       }
@@ -117,9 +113,9 @@ export default function VideoPlayer({ src, poster = '', autoPlay = true, control
         <div className="font-semibold mb-2">No se pudo reproducir el canal</div>
         <div className="text-sm opacity-90">{errorMsg}</div>
         <ul className="text-sm opacity-80 mt-2 list-disc pl-5">
-          <li>Verifica que el stream sea HTTPS (no HTTP) para evitar “Mixed Content”.</li>
-          <li>Confirma que la URL .m3u8/.mp4 esté online.</li>
-          <li>Si requiere CORS, el servidor del stream debe permitirlo.</li>
+          <li>Usa la URL proxied (empiece con <code>/hls/</code>) en producción.</li>
+          <li>Verifica que la playlist .m3u8 y segmentos estén online.</li>
+          <li>Si el origen exige referer, configúralo en la Edge Function.</li>
         </ul>
       </div>
     );
