@@ -2,11 +2,13 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import AdminRoute from './routes/AdminRoute';     // ✅ nuevo guardia solo-admin
+import ProtectedRoute from './routes/ProtectedRoute'; // versión que espera { children }
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import HomePage from './pages/HomePage';
+import TestStreamPage from './pages/TestStreamPage'; // ⬅️ NUEVO
 
+// Mantén el mismo "gate" que ya usabas
 const AuthStatusGate = ({ children }) => {
   const { loading, authError } = useAuth();
 
@@ -43,18 +45,17 @@ export default function App() {
         <AuthStatusGate>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
-
-            {/* 🔒 Solo admins pueden entrar al dashboard */}
             <Route
               path="/dashboard/*"
               element={
-                <AdminRoute>
+                <ProtectedRoute>
                   <DashboardPage />
-                </AdminRoute>
+                </ProtectedRoute>
               }
             />
+            {/* ⬇️ Ruta de test del reproductor */}
+            <Route path="/test" element={<TestStreamPage />} />
 
-            {/* Rutas públicas */}
             <Route path="/" element={<HomePage />} />
           </Routes>
         </AuthStatusGate>
