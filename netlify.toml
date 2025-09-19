@@ -2,13 +2,13 @@
   command = "npm run build"
   publish = "build"
 
-# Si ya tienes redirects para SPA, déjalos igual
+# Proxy HLS: este edge function atiende /hls/* ANTES que el redirect de SPA
+[[edge_functions]]
+  function = "hls-proxy"
+  path = "/hls/*"
+
+# SPA: tus rutas de React
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-
-# Activa el Edge Function en la ruta /hls/*
-[[edge_functions]]
-  function = "hls-proxy"
-  path = "/hls/*"
