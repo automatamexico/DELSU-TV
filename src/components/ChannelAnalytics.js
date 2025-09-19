@@ -5,6 +5,8 @@ import { Calendar as CalendarIcon, Search, BarChart2 } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { channels } from '../data/channels'; // Assuming channels data is available
++ import { X } from "lucide-react";
+
 
 // Mock data for channel views
 const generateMockViews = (channelId, startDate, endDate) => {
