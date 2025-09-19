@@ -1,11 +1,11 @@
 // src/context/AuthContext.jsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '../supabaseClient'; // ← usa tu ruta real al cliente
+import { supabase } from '../supabaseClient'; // usa tu ruta real
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [session, setSession] = useState(undefined); // undefined = cargando
+  const [session, setSession] = useState(undefined);
   const [profile, setProfile] = useState(null);
   const [authError, setAuthError] = useState(null);
 
@@ -21,36 +21,26 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     let mounted = true;
-
-    const init = async () => {
+    (async () => {
       try {
         const { data, error } = await supabase.auth.getSession();
         if (error) throw error;
         const s = data?.session ?? null;
         if (!mounted) return;
         setSession(s);
-
-        if (s?.user) {
-          const p = await fetchProfile(s.user.id);
-          setProfile(p);
-        } else {
-          setProfile(null);
-        }
-      } catch (err) {
-        setAuthError(err?.message || String(err));
+        if (s?.user) setProfile(await fetchProfile(s.user.id));
+      } catch (e) {
+        setAuthError(e.message || String(e));
         setSession(null);
         setProfile(null);
       }
-    };
+    })();
 
-    init();
-
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_evt, newSession) => {
       setSession(newSession ?? null);
       if (newSession?.user) {
         try {
-          const p = await fetchProfile(newSession.user.id);
-          setProfile(p);
+          setProfile(await fetchProfile(newSession.user.id));
         } catch {
           setProfile(null);
         }
@@ -59,15 +49,12 @@ export const AuthProvider = ({ children }) => {
       }
     });
 
-    return () => {
-      sub?.subscription?.unsubscribe?.();
-      mounted = false;
-    };
+    return () => sub?.subscription?.unsubscribe?.();
   }, []);
 
   const signIn = async (...args) => {
     setAuthError(null);
-    let creds = typeof args[0] === 'object' ? args[0] : { email: args[0], password: args[1] };
+    const creds = typeof args[0] === 'object' ? args[0] : { email: args[0], password: args[1] };
     const { error } = await supabase.auth.signInWithPassword(creds);
     if (error) throw error;
   };
@@ -78,26 +65,22 @@ export const AuthProvider = ({ children }) => {
     if (typeof args[0] === 'object') ({ email, password, fullName, country } = args[0]);
     else [email, password, fullName, country] = args;
 
-    const { error } = await supabase.auth.signUp({
+    // Guarda datos en raw_user_meta_data para que el TRIGGER los use
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: { fullName, country }, // se guarda en raw_user_meta_data
-      },
+      options: { data: { fullName, country } }
     });
     if (error) throw error;
 
-    // Crea/actualiza tu fila en user_profiles al registrarse (si no usas trigger)
-    const { data: user } = await supabase.auth.getUser();
-    if (user?.user?.id) {
-      await supabase
-        .from('user_profiles')
-        .upsert({
-          id: user.user.id,
-          full_name: fullName || null,
-          country: country || null,
-          role: 'user',
-        });
+    // Si NO usas confirmación por email, ya estás logueado: crea tu fila (por si el trigger no corriera)
+    if (data.session?.user?.id) {
+      await supabase.from('user_profiles').upsert({
+        id: data.session.user.id,
+        full_name: fullName || null,
+        country: country || null,
+        role: 'user'
+      });
     }
   };
 
@@ -106,18 +89,21 @@ export const AuthProvider = ({ children }) => {
     await supabase.auth.signOut();
   };
 
-  const value = {
-    user: session?.user ?? null,
-    session,
-    profile, // ← aquí viene role: 'user' | 'admin'
-    loading: session === undefined,
-    authError,
-    signIn,
-    signUp,
-    signOut,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{
+      user: session?.user ?? null,
+      session,
+      profile,              // ← aquí viene role: 'user' | 'admin'
+      loading: session === undefined,
+      authError,
+      signIn,
+      signUp,
+      signOut
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = () => useContext(AuthContext);
+
