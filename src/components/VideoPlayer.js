@@ -1,13 +1,27 @@
 // src/components/VideoPlayer.js
 import React, { useEffect, useRef, useState } from 'react';
 
-// Convierte URL original -> /hls/... para pasar por el proxy
-const toProxiedHls = (url) => {
+/* Reescribe cualquier URL del host origen a la ruta del proxy /hls/* */
+const ORIGIN_HOST = 'https://2-fss-2.streamhoster.com/';
+const rewriteToProxy = (url) => {
   if (!url || typeof url !== 'string') return '';
-  const u = url.replace(/^http:\/\//i, 'https://');
-  const HOST = 'https://2-fss-2.streamhoster.com/';
-  if (u.startsWith(HOST)) return '/hls/' + u.slice(HOST.length);
-  return u;
+  const httpsUrl = url.replace(/^http:\/\//i, 'https://');
+  if (httpsUrl.startsWith(ORIGIN_HOST)) {
+    return '/hls/' + httpsUrl.slice(ORIGIN_HOST.length);
+  }
+  return httpsUrl;
+};
+
+/* Convierte la URL del canal (src o channel.*) a la del proxy */
+const deriveSrc = ({ srcProp, channel }) => {
+  const raw =
+    (typeof srcProp === 'string' && srcProp) ||
+    channel?.stream_url ||
+    channel?.streamUrl ||
+    channel?.m3u8 ||
+    channel?.url ||
+    '';
+  return rewriteToProxy(raw);
 };
 
 const loadHlsScript = () =>
@@ -21,15 +35,15 @@ const loadHlsScript = () =>
     document.head.appendChild(s);
   });
 
-// Convierte ruta relativa del manifest a URL absoluta basada en finalSrc
+/* Resuelve rutas relativas de un manifest respecto a otra URL */
 const resolveRelative = (basePath, relative) => {
   try {
-    if (/^https?:\/\//i.test(relative) || relative.startsWith('/hls/')) {
-      return relative;
-    }
+    if (/^https?:\/\//i.test(relative) || relative.startsWith('/hls/')) return relative;
     const base = new URL(basePath, window.location.origin);
     const abs = new URL(relative, base);
-    return abs.pathname + abs.search; // mantenemos /hls/...
+    // si el host es el de origen, lo pasamos por proxy
+    const out = abs.href;
+    return rewriteToProxy(out);
   } catch {
     return relative;
   }
@@ -37,13 +51,13 @@ const resolveRelative = (basePath, relative) => {
 
 /**
  * Props:
- * - src?: string   → URL directa (m3u8/mp4). Si no viene, usa 'channel'.
- * - channel?: obj  → campos { stream_url | streamUrl | m3u8 | url }
- * - poster?: string
- * - autoPlay?: boolean
- * - controls?: boolean
- * - muted?: boolean (por defecto true para evitar bloqueos de autoplay)
- * - onError?: (err) => void
+ *  - src?: string   (opcional)
+ *  - channel?: { stream_url | streamUrl | m3u8 | url } (opcional)
+ *  - poster?: string
+ *  - autoPlay?: boolean
+ *  - controls?: boolean
+ *  - muted?: boolean  (true recomendado para autoplay)
+ *  - onError?: (err) => void
  */
 export default function VideoPlayer({
   src: srcProp,
@@ -58,16 +72,7 @@ export default function VideoPlayer({
   const [status, setStatus] = useState('loading'); // loading | ready | error
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Deriva fuente (src o channel.*) y proxéala
-  const rawFromChannel =
-    channel?.stream_url ||
-    channel?.streamUrl ||
-    channel?.m3u8 ||
-    channel?.url ||
-    '';
-  const finalSrc = toProxiedHls(
-    typeof srcProp === 'string' && srcProp.length ? srcProp : rawFromChannel
-  );
+  const finalSrc = deriveSrc({ srcProp, channel });
 
   useEffect(() => {
     let hls;
@@ -92,44 +97,39 @@ export default function VideoPlayer({
       return () => {};
     }
 
-    // Mixed content
     if (window.location.protocol === 'https:' && finalSrc.startsWith('http://')) {
       fail('Mixed Content: el sitio es HTTPS y el stream es HTTP. Usa HTTPS o /hls/.');
       return () => {};
     }
 
-    // ⏳ Timeout de seguridad (12s)
+    // ⏳ Timeout de seguridad
     timeoutId = setTimeout(() => {
       if (!settled) fail('Tiempo de espera agotado al cargar el video (posible CORS/hotlink).');
     }, 12000);
 
-    // 🔎 PRECHECK: descargar manifest y probar 1er media (.ts o child m3u8)
+    // 🔎 PRECHECK: manifest y primer media vía proxy
+    const controller = new AbortController();
     const precheck = (async () => {
-      // 1) fetch manifest
-      const r = await fetch(finalSrc, { cache: 'no-store' });
-      const statusHdr = r.headers.get('x-proxy-status');
-      if (!r.ok) throw new Error(`Manifest HTTP ${statusHdr || r.status}`);
+      const r = await fetch(finalSrc, { cache: 'no-store', signal: controller.signal });
+      const st = r.headers.get('x-proxy-status') || r.status;
+      if (!r.ok) throw new Error(`Manifest HTTP ${st}`);
       const text = await r.text();
-
-      // 2) busca primera línea no comentario
       const lines = text.split(/\r?\n/).filter(Boolean);
       let firstMedia = '';
       for (const line of lines) {
         if (!line.trim().startsWith('#')) { firstMedia = line.trim(); break; }
       }
-      if (!firstMedia) return; // algunos manifests cargan al volar otro manifest
-
-      // 3) resuelve URL del primer media relativo al manifest
-      const mediaUrl = resolveRelative(finalSrc, firstMedia);
-
-      // 4) HEAD o Range para verificar acceso
-      const r2 = await fetch(mediaUrl, {
-        method: 'GET',
-        headers: { range: 'bytes=0-1' },
-        cache: 'no-store',
-      });
-      const status2 = r2.headers.get('x-proxy-status') || r2.status;
-      if (!r2.ok) throw new Error(`Media HTTP ${status2}`);
+      if (firstMedia) {
+        const probe = resolveRelative(finalSrc, firstMedia);
+        const r2 = await fetch(probe, {
+          method: 'GET',
+          headers: { range: 'bytes=0-1' },
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        const st2 = r2.headers.get('x-proxy-status') || r2.status;
+        if (!r2.ok) throw new Error(`Media HTTP ${st2}`);
+      }
     })();
 
     const onReadyOnce = () => {
@@ -137,6 +137,7 @@ export default function VideoPlayer({
       ready();
       if (autoPlay) video.play().catch(() => {});
     };
+
     const onVideoError = () => {
       clearTimeout(timeoutId);
       const mediaError = video.error;
@@ -152,20 +153,30 @@ export default function VideoPlayer({
 
     const setup = async () => {
       try {
-        // Espera precheck (si falla, mostrará el error)
-        await precheck;
+        await precheck;                 // si falla, ya mostrará error
         if (settled) return;
 
-        // HLS nativo (Safari/iOS)
-        if (video.canPlayType('application/vnd.apple.mpegurl')) {
-          attachNative();
-          return;
-        }
-
-        // hls.js para Chrome/Firefox/etc.
         await loadHlsScript();
+
+        // 🔁 Loader personalizado: reescribe TODAS las URLs a /hls/*
         if (window.Hls && window.Hls.isSupported()) {
-          hls = new window.Hls({ enableWorker: true });
+          const BaseLoader = window.Hls.DefaultConfig.loader;
+          class ProxyLoader extends BaseLoader {
+            load(context, config, callbacks) {
+              try {
+                if (typeof context.url === 'string') {
+                  context.url = rewriteToProxy(context.url);
+                }
+              } catch {}
+              super.load(context, config, callbacks);
+            }
+          }
+
+          hls = new window.Hls({
+            enableWorker: true,
+            loader: ProxyLoader,
+          });
+
           hls.loadSource(finalSrc);
           hls.attachMedia(video);
 
@@ -185,6 +196,7 @@ export default function VideoPlayer({
             }
           });
         } else {
+          // HLS nativo (Safari/iOS)
           attachNative();
         }
       } catch (e) {
@@ -196,6 +208,7 @@ export default function VideoPlayer({
     setup();
 
     return () => {
+      controller.abort();
       clearTimeout(timeoutId);
       if (hls) { try { hls.destroy(); } catch {} }
       if (video) {
@@ -220,9 +233,8 @@ export default function VideoPlayer({
         <div className="font-semibold mb-2">No se pudo reproducir el canal</div>
         <div className="text-sm opacity-90">{errorMsg}</div>
         <ul className="text-sm opacity-80 mt-2 list-disc pl-5">
-          <li>La URL debe pasar por <code>/hls/</code> (el componente ya la reescribe solo).</li>
-          <li>Abre DevTools → Network y revisa <code>x-proxy-status</code> del <code>.m3u8</code> y <code>.ts</code>.</li>
-          <li>Si ves <strong>403/401</strong>, el origen bloquea por referer/UA/IP. El proxy ya envía referer/UA; si persiste, el proveedor está filtrando IPs de cloud.</li>
+          <li>Usamos un proxy y un loader que reescribe todas las peticiones a <code>/hls/</code>.</li>
+          <li>Si aparece HTTP 403/401 en Network, el origen está bloqueando por IP de cloud.</li>
         </ul>
       </div>
     );
@@ -233,9 +245,10 @@ export default function VideoPlayer({
       ref={videoRef}
       poster={poster}
       controls={controls}
-      muted={muted}      // ← ayuda a que autoplay no sea bloqueado
+      muted={muted}
       playsInline
       className="w-full rounded-lg"
     />
   );
 }
+
