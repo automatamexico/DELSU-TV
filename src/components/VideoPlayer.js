@@ -44,9 +44,12 @@ const loadHlsScript = () =>
   });
 
 /**
- * Props sugeridas:
- *  - src: string  (pásame tu .m3u8 original)
- *  - poster, controls, autoPlay, muted
+ * Uso:
+ *   <VideoPlayer src={urlM3u8} poster="..." />
+ * Props:
+ *   - src: string (tu .m3u8 original)
+ *   - poster, controls, autoPlay, muted
+ *   - debug (opcional, por defecto false; si lo activas, solo loggea a consola)
  */
 export default function VideoPlayer({
   src,
@@ -54,16 +57,12 @@ export default function VideoPlayer({
   controls = true,
   autoPlay = true,
   muted = true,
+  debug = false,
 }) {
   const videoRef = useRef(null);
   const proxiedSrc = rewriteToProxy(src || '');
   const [status, setStatus] = useState('loading'); // loading | ready | error
   const [errorMsg, setErrorMsg] = useState('');
-  const [log, setLog] = useState([
-    `finalSrc = ${proxiedSrc || '(vacío)'}`,
-    `original = ${src || '(vacío)'}`
-  ]);
-  const push = (m) => setLog((d) => [...d, m].slice(-100));
 
   useEffect(() => {
     let hls;
@@ -72,20 +71,24 @@ export default function VideoPlayer({
     const video = videoRef.current;
     if (!video) return () => {};
 
+    const dlog = (...a) => { if (debug) console.log('[PLAYER]', ...a); };
+
     const fail = (msg) => {
       if (done) return;
       done = true;
       setErrorMsg(msg);
       setStatus('error');
-      push(`❌ ${msg}`);
+      dlog('❌', msg);
     };
     const ready = () => {
       if (done) return;
       done = true;
       setStatus('ready');
-      push('✅ READY');
+      dlog('✅ READY');
       if (autoPlay) video.play().catch(() => {});
     };
+
+    dlog('finalSrc =', proxiedSrc || '(vacío)', 'original =', src || '(vacío)');
 
     if (!proxiedSrc) {
       fail('No hay fuente de video (src vacío).');
@@ -96,6 +99,7 @@ export default function VideoPlayer({
       return () => {};
     }
 
+    // Timeout de seguridad (12s)
     timeoutId = setTimeout(() => {
       if (!done) fail('Tiempo de espera agotado (posible bloqueo).');
     }, 12000);
@@ -104,10 +108,10 @@ export default function VideoPlayer({
     const controller = new AbortController();
     const precheck = (async () => {
       try {
-        push(`↓ Manifest: ${proxiedSrc}`);
+        dlog('↓ Manifest:', proxiedSrc);
         const r = await fetch(proxiedSrc, { cache: 'no-store', signal: controller.signal });
         const st = r.headers.get('x-proxy-status') || r.status;
-        push(`↑ Manifest status: ${st}`);
+        dlog('↑ Manifest status:', st);
         if (!r.ok) throw new Error(`Manifest HTTP ${st}`);
 
         const text = await r.text();
@@ -118,7 +122,7 @@ export default function VideoPlayer({
         }
         if (firstMedia) {
           const url = resolveRelativeViaProxy(proxiedSrc, firstMedia);
-          push(`↓ First media: ${url}`);
+          dlog('↓ First media:', url);
           const r2 = await fetch(url, {
             method: 'GET',
             headers: { range: 'bytes=0-1' },
@@ -126,13 +130,13 @@ export default function VideoPlayer({
             signal: controller.signal,
           });
           const st2 = r2.headers.get('x-proxy-status') || r2.status;
-          push(`↑ First media status: ${st2}`);
+          dlog('↑ First media status:', st2);
           if (!r2.ok) throw new Error(`Media HTTP ${st2}`);
         } else {
-          push('Manifest sin media directa (variant playlist).');
+          dlog('Manifest sin media directa (variant playlist).');
         }
       } catch (e) {
-        push(`❌ PRECHECK: ${e?.message || e}`);
+        dlog('❌ PRECHECK:', e?.message || e);
         throw e;
       }
     })();
@@ -170,10 +174,10 @@ export default function VideoPlayer({
                     const abs2 = new URL(u, new URL(proxiedSrc, window.location.origin)).href;
                     context.url = rewriteAbsoluteToProxy(abs2);
                   }
-                  push(`HLS load → ${context.url}`);
+                  dlog('HLS load →', context.url);
                 }
               } catch (e) {
-                push(`HLS rewrite error: ${e?.message || e}`);
+                dlog('HLS rewrite error:', e?.message || e);
               }
               super.load(context, config, callbacks);
             }
@@ -182,7 +186,7 @@ export default function VideoPlayer({
           hls = new window.Hls({ enableWorker: true, loader: ProxyLoader });
 
           hls.on(window.Hls.Events.ERROR, (_evt, data) => {
-            push(`HLS ERROR: ${data?.type || 'unknown'} ${data?.details || ''} fatal=${String(data?.fatal)}`);
+            dlog('HLS ERROR:', data?.type || 'unknown', data?.details || '', 'fatal=', String(data?.fatal));
             if (data?.fatal || String(data?.type || '').toLowerCase().includes('network')) {
               fail(`HLS error${data?.fatal ? ' (fatal)' : ''}: ${data?.type || ''} ${data?.details || ''}`);
               try { hls.destroy(); } catch {}
@@ -190,7 +194,7 @@ export default function VideoPlayer({
           });
           hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
             clearTimeout(timeoutId);
-            push('MANIFEST_PARSED');
+            dlog('MANIFEST_PARSED');
             ready();
           });
 
@@ -217,9 +221,9 @@ export default function VideoPlayer({
         video.load();
       }
     };
-  }, [proxiedSrc, autoPlay]);
+  }, [proxiedSrc, autoPlay, debug]);
 
-  // UI con depuración visible SIEMPRE
+  // UI sin panel de DEBUG
   return (
     <div className="w-full">
       {status === 'loading' && (
@@ -231,9 +235,6 @@ export default function VideoPlayer({
         <div className="w-full aspect-video bg-black/70 text-red-300 p-3 rounded-lg overflow-auto">
           <div className="font-semibold mb-1">No se pudo reproducir el canal</div>
           <div className="text-sm opacity-90 mb-2">{errorMsg}</div>
-          <div className="text-xs opacity-80">
-            Intenta abrir <a className="underline" href={proxiedSrc} target="_blank" rel="noreferrer">esta URL</a> en otra pestaña.
-          </div>
         </div>
       )}
       <video
@@ -245,10 +246,6 @@ export default function VideoPlayer({
         className="w-full rounded-lg"
         style={{ display: status === 'ready' ? 'block' : 'none' }}
       />
-      <div className="mt-2 text-xs leading-4 text-gray-200 bg-black/40 p-2 rounded max-h-40 overflow-auto">
-        <div className="font-semibold mb-1">DEBUG</div>
-        <pre className="whitespace-pre-wrap break-all m-0">{log.join('\n')}</pre>
-      </div>
     </div>
   );
 }
