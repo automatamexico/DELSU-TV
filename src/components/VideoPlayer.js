@@ -2,7 +2,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 
 /* ========= Helpers de proxy universal ========= */
-// Convierte cualquier URL absoluta a /hls/<scheme>/<host>/<path>?<query>
 const rewriteAbsoluteToProxy = (absUrl) => {
   try {
     const u = new URL(absUrl);
@@ -12,14 +11,12 @@ const rewriteAbsoluteToProxy = (absUrl) => {
     return absUrl;
   }
 };
-// Si ya es absoluta -> proxificar; si es relativa, se deja (se resolverá después)
 const rewriteToProxy = (url) => {
   if (!url || typeof url !== 'string') return '';
   const httpsUrl = url.replace(/^http:\/\//i, 'https://');
   if (/^https?:\/\//i.test(httpsUrl)) return rewriteAbsoluteToProxy(httpsUrl);
   return httpsUrl;
 };
-// Resuelve relativa contra baseProxied y proxifica
 const resolveRelativeViaProxy = (baseProxied, relative) => {
   try {
     if (!relative) return '';
@@ -49,7 +46,7 @@ const loadHlsScript = () =>
  * Props:
  *   - src: string (tu .m3u8 original)
  *   - poster, controls, autoPlay, muted
- *   - debug (opcional, por defecto false; si lo activas, solo loggea a consola)
+ *   - debug (opcional: si true, solo escribe logs en consola)
  */
 export default function VideoPlayer({
   src,
@@ -221,9 +218,9 @@ export default function VideoPlayer({
         video.load();
       }
     };
-  }, [proxiedSrc, autoPlay, debug]);
+  // ✅ incluye 'src' para satisfacer react-hooks/exhaustive-deps
+  }, [proxiedSrc, autoPlay, debug, src]);
 
-  // UI sin panel de DEBUG
   return (
     <div className="w-full">
       {status === 'loading' && (
