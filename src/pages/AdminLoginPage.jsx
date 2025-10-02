@@ -13,41 +13,69 @@ export default function AdminLoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  // Pequeño helper: intenta leer user_profiles varias veces
+  const fetchProfileWithRetry = async (uid, tries = 8, delayMs = 300) => {
+    for (let i = 0; i < tries; i++) {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('id', uid)
+        .maybeSingle(); // no lanza error si no hay fila
+
+      if (data) return data; // { role: 'user' | 'admin' }
+
+      // Si hay error de "no encontrado", reintenta; otros errores los mostramos
+      if (error && error.code && error.code !== 'PGRST116') {
+        throw error;
+      }
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+    return null;
+  };
 
   const handleAdminLogin = async (e) => {
     e.preventDefault();
+    setErrorMsg('');
     setLoading(true);
+
     try {
       const emailSanitized = email.trim().toLowerCase();
 
-      // Iniciar sesión (soporta ambas firmas de tu AuthContext)
+      // Inicia sesión (soporta ambas firmas que usas en AuthContext)
       try {
         await signIn({ email: emailSanitized, password });
       } catch {
         await signIn(emailSanitized, password);
       }
 
-      // Verificar rol en user_profiles
-      const { data: userRes } = await supabase.auth.getUser();
-      const uid = userRes?.user?.id;
+      // Obtén el usuario autenticado
+      const { data: ures, error: getUserErr } = await supabase.auth.getUser();
+      if (getUserErr) throw getUserErr;
+      const uid = ures?.user?.id;
       if (!uid) throw new Error('No se pudo obtener el usuario actual.');
 
-      const { data: prof, error: profErr } = await supabase
-        .from('user_profiles')
-        .select('role')
-        .eq('id', uid)
-        .single();
-
-      if (profErr) throw profErr;
-
-      if (prof?.role === 'admin') {
-        navigate('/dashboard', { replace: true });
-      } else {
+      // Lee el perfil (con reintentos, por si el trigger tarda en crear la fila)
+      const prof = await fetchProfileWithRetry(uid, 10, 350);
+      if (!prof) {
+        // Si después de reintentar no hay perfil, salimos
         await signOut();
-        alert('Tu cuenta no tiene permisos de administrador.');
+        throw new Error(
+          'No se encontró tu perfil en user_profiles. Verifica el trigger de creación o crea la fila manualmente.'
+        );
       }
+
+      if (prof.role !== 'admin') {
+        await signOut();
+        setErrorMsg('Tu cuenta no tiene permisos de administrador.');
+        return;
+      }
+
+      // OK → al dashboard
+      navigate('/dashboard', { replace: true });
     } catch (err) {
-      alert('Error al iniciar sesión: ' + (err?.message || String(err)));
+      setErrorMsg(err?.message || 'Error al iniciar sesión.');
     } finally {
       setLoading(false);
     }
@@ -64,12 +92,19 @@ export default function AdminLoginPage() {
         <div className="flex justify-center mb-6">
           <Tv className="w-16 h-16 text-red-500" />
         </div>
+
         <h2 className="text-3xl font-bold text-center mb-2">Acceso Administrador</h2>
-        <p className="text-center text-gray-400 mb-8 text-sm">
+        <p className="text-center text-gray-400 mb-6 text-sm">
           Ingresa con una cuenta con permisos de administrador.
         </p>
 
-        <form onSubmit={handleAdminLogin} className="space-y-6">
+        {errorMsg && (
+          <div className="mb-4 p-3 rounded-lg bg-red-900/40 border border-red-700 text-red-200 text-sm">
+            {errorMsg}
+          </div>
+        )}
+
+        <form onSubmit={handleAdminLogin} className="space-y-5">
           <div>
             <label htmlFor="email" className="block text-gray-300 text-sm font-medium mb-2">
               Correo
