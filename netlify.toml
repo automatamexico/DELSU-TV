@@ -1,20 +1,47 @@
+# netlify.toml
+
 [build]
   command = "npm run build"
   publish = "build"
+  edge_functions = "netlify/edge-functions"
 
-# ⚠️ El edge function debe declararse ANTES del redirect de SPA
-[[edge_functions]]
-  function = "hls-proxy"
-  path = "/hls/*"
-
-# SPA: manda cualquier ruta a index.html
+# Redirección SPA
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
-# Evita cache agresivo de index.html (arregla la pantalla en blanco al refrescar)
+# No cachear index.html (para evitar pantallas blancas por versiones viejas)
 [[headers]]
   for = "/index.html"
   [headers.values]
     cache-control = "no-cache, no-store, must-revalidate, max-age=0, s-maxage=0"
+
+# CSP ABIERTA A SUPABASE Y HLS
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # ⚠️ Ajusta el host .streamhoster.com si cambias de CDN
+    Content-Security-Policy = """
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval';
+      connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://delsutv.netlify.app;
+      img-src 'self' data: https:;
+      style-src 'self' 'unsafe-inline' https:;
+      font-src 'self' data: https:;
+      media-src 'self' https://delsutv.netlify.app https://*.streamhoster.com blob: data:;
+      frame-ancestors *;
+    """
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
+
+# (Si usas Lighthouse plugin, no pasa nada)
+# [[plugins]]
+#   package = "@netlify/plugin-lighthouse"
+
+# Edge function para proxy HLS
+[[edge_functions]]
+  path = "/hls/*"
+  function = "hls-proxy"
