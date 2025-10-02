@@ -1,109 +1,143 @@
 // src/context/AuthContext.jsx
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '../supabaseClient'; // usa tu ruta real
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { supabase } from '../supabaseClients';
 
-const AuthContext = createContext();
+const AuthCtx = createContext(null);
 
-export const AuthProvider = ({ children }) => {
-  const [session, setSession] = useState(undefined);
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [authError, setAuthError] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState('');
 
-  const fetchProfile = async (userId) => {
-    const { data, error } = await supabase
-      .from('user_profiles')
-      .select('id, full_name, country, role')
-      .eq('id', userId)
-      .maybeSingle();
-    if (error) throw error;
-    return data;
-  };
+  // -------- helpers ----------
+  const fetchProfile = useCallback(async (uid) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', uid)
+        .maybeSingle();
 
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const { data, error } = await supabase.auth.getSession();
-        if (error) throw error;
-        const s = data?.session ?? null;
-        if (!mounted) return;
-        setSession(s);
-        if (s?.user) setProfile(await fetchProfile(s.user.id));
-      } catch (e) {
-        setAuthError(e.message || String(e));
-        setSession(null);
-        setProfile(null);
+      if (error) throw error;
+
+      // si no existe, créalo con rol "user" por defecto
+      if (!data) {
+        const { data: inserted, error: insErr } = await supabase
+          .from('user_profiles')
+          .insert([{ id: uid, full_name: '', country: '', role: 'user' }])
+          .select()
+          .single();
+        if (insErr) throw insErr;
+        setProfile(inserted);
+        return inserted;
       }
-    })();
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_evt, newSession) => {
-      setSession(newSession ?? null);
-      if (newSession?.user) {
-        try {
-          setProfile(await fetchProfile(newSession.user.id));
-        } catch {
-          setProfile(null);
-        }
-      } else {
-        setProfile(null);
-      }
-    });
-
-    return () => sub?.subscription?.unsubscribe?.();
+      setProfile(data);
+      return data;
+    } catch (e) {
+      console.warn('[auth] fetchProfile error:', e?.message || e);
+      setProfile(null);
+      return null;
+    }
   }, []);
 
-  const signIn = async (...args) => {
-    setAuthError(null);
-    const creds = typeof args[0] === 'object' ? args[0] : { email: args[0], password: args[1] };
-    const { error } = await supabase.auth.signInWithPassword(creds);
+  const setFromSession = useCallback(async (session) => {
+    const sUser = session?.user ?? null;
+    setUser(sUser);
+    if (sUser) {
+      await fetchProfile(sUser.id);
+    } else {
+      setProfile(null);
+    }
+  }, [fetchProfile]);
+
+  // -------- init + listener ----------
+  useEffect(() => {
+    let unsub;
+
+    (async () => {
+      try {
+        setLoading(true);
+        setAuthError('');
+
+        // 1) sesión inicial
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        await setFromSession(data.session);
+      } catch (e) {
+        console.error('[auth] getSession error:', e?.message || e);
+        setAuthError(e?.message || 'Failed to fetch');
+        setUser(null);
+        setProfile(null);
+      } finally {
+        setLoading(false);
+      }
+
+      // 2) suscripción a cambios de auth
+      unsub = supabase.auth.onAuthStateChange(async (_event, session) => {
+        // eventos: SIGNED_IN / SIGNED_OUT / TOKEN_REFRESHED / USER_UPDATED ...
+        await setFromSession(session);
+        setLoading(false);
+      }).data.subscription;
+    })();
+
+    return () => {
+      try { unsub?.unsubscribe(); } catch {}
+    };
+  }, [setFromSession]);
+
+  // -------- acciones públicas ----------
+  const signIn = useCallback(async (email, password) => {
+    setAuthError('');
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
-  };
+    await setFromSession(data.session);
+    return data.user;
+  }, [setFromSession]);
 
-  const signUp = async (...args) => {
-    setAuthError(null);
-    let email, password, fullName, country;
-    if (typeof args[0] === 'object') ({ email, password, fullName, country } = args[0]);
-    else [email, password, fullName, country] = args;
-
-    // Guarda datos en raw_user_meta_data para que el TRIGGER los use
+  const signUp = useCallback(async (email, password, fullName = '', country = '') => {
+    setAuthError('');
+    // metadata deja rol=user por defecto
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { fullName, country } }
+      options: {
+        data: { full_name: fullName, country, role: 'user' },
+        emailRedirectTo: `${window.location.origin}/`,
+      },
     });
     if (error) throw error;
 
-    // Si NO usas confirmación por email, ya estás logueado: crea tu fila (por si el trigger no corriera)
+    // si el proyecto NO requiere confirmación por email y ya hubo sesión:
     if (data.session?.user?.id) {
-      await supabase.from('user_profiles').upsert({
-        id: data.session.user.id,
-        full_name: fullName || null,
-        country: country || null,
-        role: 'user'
-      });
+      await fetchProfile(data.session.user.id);
     }
+    return data.user;
+  }, [fetchProfile]);
+
+  const signOut = useCallback(async () => {
+    setAuthError('');
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+    // limpiar estado local inmediatamente para que el UI responda
+    setUser(null);
+    setProfile(null);
+  }, []);
+
+  const value = {
+    user,
+    profile,
+    loading,
+    authError,
+    signIn,
+    signUp,
+    signOut,
   };
 
-  const signOut = async () => {
-    setAuthError(null);
-    await supabase.auth.signOut();
-  };
+  return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
+}
 
-  return (
-    <AuthContext.Provider value={{
-      user: session?.user ?? null,
-      session,
-      profile,              // ← aquí viene role: 'user' | 'admin'
-      loading: session === undefined,
-      authError,
-      signIn,
-      signUp,
-      signOut
-    }}>
-      {children}
-    </AuthContext.Provider>
-  );
-};
-
-export const useAuth = () => useContext(AuthContext);
-
+export function useAuth() {
+  return useContext(AuthCtx);
+}
