@@ -1,7 +1,7 @@
 // src/supabaseClientCore.js
 import { createClient } from '@supabase/supabase-js';
 
-// Variables de entorno (Create React App usa REACT_APP_* en build)
+// Variables de entorno (CRA usa REACT_APP_* en build)
 const urlFromEnv = process.env.REACT_APP_SUPABASE_URL?.trim();
 const keyFromEnv = process.env.REACT_APP_SUPABASE_ANON_KEY?.trim();
 
@@ -22,13 +22,8 @@ if (!urlFromEnv || !keyFromEnv) {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-  global: {
-    fetch: (input, init) => fetch(input, { ...init, cache: 'no-store' }),
-  },
+  auth: { persistSession: true, autoRefreshToken: true },
+  global: { fetch: (input, init) => fetch(input, { ...init, cache: 'no-store' }) },
 });
 
 export default supabase;
