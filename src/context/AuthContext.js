@@ -1,6 +1,6 @@
 // src/context/AuthContext.jsx
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { supabase } from '../supabaseClients';
+import { supabase } from '../supabaseClientCore'; // 👈 usa SIEMPRE este import
 
 const AuthCtx = createContext(null);
 
@@ -10,7 +10,6 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState('');
 
-  // -------- helpers ----------
   const fetchProfile = useCallback(async (uid) => {
     try {
       const { data, error } = await supabase
@@ -21,7 +20,6 @@ export function AuthProvider({ children }) {
 
       if (error) throw error;
 
-      // si no existe, créalo con rol "user" por defecto
       if (!data) {
         const { data: inserted, error: insErr } = await supabase
           .from('user_profiles')
@@ -52,7 +50,6 @@ export function AuthProvider({ children }) {
     }
   }, [fetchProfile]);
 
-  // -------- init + listener ----------
   useEffect(() => {
     let unsub;
 
@@ -61,7 +58,6 @@ export function AuthProvider({ children }) {
         setLoading(true);
         setAuthError('');
 
-        // 1) sesión inicial
         const { data, error } = await supabase.auth.getSession();
         if (error) throw error;
         await setFromSession(data.session);
@@ -74,9 +70,7 @@ export function AuthProvider({ children }) {
         setLoading(false);
       }
 
-      // 2) suscripción a cambios de auth
       unsub = supabase.auth.onAuthStateChange(async (_event, session) => {
-        // eventos: SIGNED_IN / SIGNED_OUT / TOKEN_REFRESHED / USER_UPDATED ...
         await setFromSession(session);
         setLoading(false);
       }).data.subscription;
@@ -87,7 +81,6 @@ export function AuthProvider({ children }) {
     };
   }, [setFromSession]);
 
-  // -------- acciones públicas ----------
   const signIn = useCallback(async (email, password) => {
     setAuthError('');
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -98,7 +91,6 @@ export function AuthProvider({ children }) {
 
   const signUp = useCallback(async (email, password, fullName = '', country = '') => {
     setAuthError('');
-    // metadata deja rol=user por defecto
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -109,7 +101,6 @@ export function AuthProvider({ children }) {
     });
     if (error) throw error;
 
-    // si el proyecto NO requiere confirmación por email y ya hubo sesión:
     if (data.session?.user?.id) {
       await fetchProfile(data.session.user.id);
     }
@@ -120,7 +111,6 @@ export function AuthProvider({ children }) {
     setAuthError('');
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
-    // limpiar estado local inmediatamente para que el UI responda
     setUser(null);
     setProfile(null);
   }, []);
