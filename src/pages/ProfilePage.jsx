@@ -1,6 +1,7 @@
 // src/pages/ProfilePage.jsx
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function ProfilePage() {
@@ -9,6 +10,7 @@ export default function ProfilePage() {
   const [country, setCountry] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const navigate = useNavigate();
 
   // Sincroniza formularios cuando cambie el perfil
   useEffect(() => {
@@ -56,13 +58,25 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white">
       <div className="max-w-2xl mx-auto p-6">
-        <motion.h1
-          className="text-3xl font-bold mb-6"
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          Mi Perfil
-        </motion.h1>
+        {/* Encabezado con botón Regresar al inicio */}
+        <div className="flex items-center justify-between mb-6">
+          <motion.h1
+            className="text-3xl font-bold"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            Mi Perfil
+          </motion.h1>
+
+          <motion.button
+            onClick={() => navigate('/')}
+            className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700 text-sm"
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            ← Regresar al inicio
+          </motion.button>
+        </div>
 
         <div className="bg-gray-800/60 border border-gray-700 rounded-2xl p-6">
           <div className="flex items-center gap-6 mb-6">
@@ -127,4 +141,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
 
