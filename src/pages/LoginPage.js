@@ -1,5 +1,5 @@
 // src/pages/LoginPage.jsx
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { User, Lock, Mail, Globe, LogIn, UserPlus, Tv } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -12,13 +12,17 @@ const LoginPage = () => {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [country, setCountry] = useState('');
-  const [userType, setUserType] = useState('user');
   const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, user, profile, loading: authLoading } = useAuth();
 
+  // Para manejar la redirección una vez que el perfil esté cargado en el contexto
+  const [pendingRedirect, setPendingRedirect] = useState(false);
+  const fromPath = location.state?.from?.pathname;
+
+  // signIn compatible con signIn({ email, password }) y signIn(email, password)
   const safeSignIn = async (emailArg, passwordArg) => {
     try {
       await signIn({ email: emailArg, password: passwordArg });
@@ -33,12 +37,8 @@ const LoginPage = () => {
     try {
       const emailSanitized = email.trim().toLowerCase();
       await safeSignIn(emailSanitized, password);
-
-      const from = location.state?.from?.pathname;
-      if (from) return navigate(from, { replace: true });
-
-      if (userType === 'admin') navigate('/dashboard', { replace: true });
-      else navigate('/', { replace: true });
+      // No navegamos aún; esperamos a que AuthContext termine de cargar el perfil
+      setPendingRedirect(true);
     } catch (error) {
       window.alert('Error al iniciar sesión: ' + (error?.message || String(error)));
     } finally {
@@ -46,26 +46,47 @@ const LoginPage = () => {
     }
   };
 
+  // Redirección centralizada: cuando ya hay user/profile y dejó de cargar
+  useEffect(() => {
+    if (!pendingRedirect) return;
+    if (authLoading) return;         // Espera a que AuthContext termine
+    if (!user) return;               // Si no hay user, no navegues aún
+
+    // 1) Si venías de una ruta protegida, regresa ahí
+    if (fromPath) {
+      navigate(fromPath, { replace: true });
+    } else {
+      // 2) Si es admin -> dashboard; si no, inicio
+      if (profile?.role === 'admin') {
+        navigate('/dashboard', { replace: true });
+      } else {
+        navigate('/', { replace: true });
+      }
+    }
+    setPendingRedirect(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingRedirect, authLoading, user, profile, fromPath, navigate]);
+
   const handleRegister = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
       const emailSanitized = email.trim().toLowerCase();
 
-      // Validación simple (evita cosas claramente inválidas)
+      // Validación simple de email
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(emailSanitized)) {
         window.alert('Correo inválido. Revisa que tenga el formato correcto (ej: nombre@dominio.com).');
         return;
       }
 
-      // Password: cualquier cosa con mínimo 4
-      if (password.length < 4) {
-        window.alert('La contraseña debe tener al menos 4 caracteres.');
+      // Contraseña mínima 6 para alinear con placeholder y Supabase por defecto
+      if (password.length < 6) {
+        window.alert('La contraseña debe tener al menos 6 caracteres.');
         return;
       }
 
-      // Llamada flexible a signUp
+      // signUp compatible con objeto o parámetros sueltos
       try {
         await signUp({ email: emailSanitized, password, fullName, country });
       } catch {
@@ -75,14 +96,13 @@ const LoginPage = () => {
       setIsRegistering(false);
       window.alert('Registro exitoso. Revisa tu correo si requiere confirmación.');
     } catch (error) {
-      // Muestra el mensaje crudo que devuelve Supabase (útil para diagnósticos)
       window.alert('Error al registrarse: ' + (error?.message || String(error)));
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading) {
+  if (loading || authLoading) {
     return <div className="flex items-center justify-center min-h-screen text-white">Cargando...</div>;
   }
 
@@ -146,7 +166,7 @@ const LoginPage = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-gray-700/50 border border-gray-600 rounded-lg pl-10 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
-                placeholder="Mín. 4 caracteres"
+                placeholder="Min 6 caracteres"
                 required
               />
             </div>
@@ -175,21 +195,6 @@ const LoginPage = () => {
             </motion.div>
           )}
 
-          {!isRegistering && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.2 }}>
-              <label htmlFor="userType" className="block text-gray-300 text-sm font-medium mb-2">Tipo de Acceso</label>
-              <select
-                id="userType"
-                value={userType}
-                onChange={(e) => setUserType(e.target.value)}
-                className="w-full bg-gray-700/50 border border-gray-600 rounded-lg py-3 px-3 text-white focus:outline-none focus:ring-2 focus:ring-red-500"
-              >
-                <option value="user">Usuario</option>
-                <option value="admin">Administrador</option>
-              </select>
-            </motion.div>
-          )}
-
           <motion.button
             type="submit"
             disabled={loading}
@@ -214,22 +219,30 @@ const LoginPage = () => {
         </form>
 
         <motion.p
-          className="text-center text-gray-400 mt-6"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: isRegistering ? 0.5 : 0.3 }}
-        >
+            className="text-center text-gray-400 mt-6"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: isRegistering ? 0.5 : 0.3 }}
+          >
           {isRegistering ? (
             <>
               ¿Ya tienes una cuenta?{' '}
-              <button type="button" onClick={() => setIsRegistering(false)} className="text-red-500 hover:text-red-400 font-semibold">
+              <button
+                type="button"
+                onClick={() => setIsRegistering(false)}
+                className="text-red-500 hover:text-red-400 font-semibold"
+              >
                 Inicia Sesión
               </button>
             </>
           ) : (
             <>
               ¿No tienes una cuenta?{' '}
-              <button type="button" onClick={() => setIsRegistering(true)} className="text-red-500 hover:text-red-400 font-semibold">
+              <button
+                type="button"
+                onClick={() => setIsRegistering(true)}
+                className="text-red-500 hover:text-red-400 font-semibold"
+              >
                 Regístrate aquí
               </button>
             </>
