@@ -1,7 +1,7 @@
 // src/pages/AdminLoginPage.jsx
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Mail, Lock, LogIn, Tv } from 'lucide-react';
+import { Mail, Lock, LogIn, Tv, ChevronDown, ChevronUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabaseClientCore';
@@ -12,79 +12,92 @@ export default function AdminLoginPage() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [debugOpen, setDebugOpen] = useState(false);
+  const [steps, setSteps] = useState([]);
 
-  // Reintenta leer la fila del perfil (por si el trigger tarda)
-  const fetchProfileWithRetry = async (uid, tries = 8, delayMs = 300) => {
-    for (let i = 0; i < tries; i++) {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('role')
-        .eq('id', uid)
-        .maybeSingle(); // null si no existe
-
-      if (error && error.code && error.code !== 'PGRST116') {
-        // error real distinto a "no rows"
-        throw error;
-      }
-      if (data) return data; // { role: 'user'|'admin' }
-
-      await new Promise((r) => setTimeout(r, delayMs));
-    }
-    return null;
-  };
+  const log = (msg) => setSteps((s) => [...s, msg]);
 
   const handleAdminLogin = async (e) => {
     e.preventDefault();
-    setErrorMsg('');
     setLoading(true);
+    setErrorMsg('');
+    setSteps([]);
 
     try {
       const emailSanitized = email.trim().toLowerCase();
+      log('1) Iniciando sesión…');
 
-      // Inicia sesión (soporta ambas firmas que usas en AuthContext)
+      // Soporta ambas firmas que has usado en tu AuthContext
       try {
         await signIn({ email: emailSanitized, password });
       } catch {
         await signIn(emailSanitized, password);
       }
+      log('✔ Sesión iniciada.');
 
       // Usuario actual
       const { data: ures, error: getUserErr } = await supabase.auth.getUser();
       if (getUserErr) throw getUserErr;
       const uid = ures?.user?.id;
       if (!uid) throw new Error('No se pudo obtener el usuario actual.');
+      log(`2) UID actual: ${uid}`);
 
-      // Intenta leer perfil
-      let prof = await fetchProfileWithRetry(uid, 10, 350);
+      // UPSERT del perfil: si no existe, lo crea con defaults (role = 'user').
+      // ignoreDuplicates evita pisar un perfil ya existente (por ej. admin).
+      log('3) Verificando/creando perfil en user_profiles…');
+      const { data: upsertData, error: upsertErr } = await supabase
+        .from('user_profiles')
+        .upsert([{ id: uid }], { onConflict: 'id', ignoreDuplicates: true })
+        .select('role')
+        .single();
 
-      // Si no existe, lo creamos con role 'user' y lo volvemos a leer
-      if (!prof) {
-        const { error: insErr } = await supabase
+      if (upsertErr) {
+        // Si la RLS bloquea el upsert, intentamos al menos LEER el perfil
+        log(`⚠ upsert falló: ${upsertErr.message}. Intentando solo SELECT…`);
+        const { data: profMaybe, error: profSelErr } = await supabase
           .from('user_profiles')
-          .insert({ id: uid, role: 'user' });
-        if (insErr) throw insErr;
+          .select('role')
+          .eq('id', uid)
+          .maybeSingle();
 
-        // vuelve a leer
-        prof = await fetchProfileWithRetry(uid, 6, 300);
+        if (profSelErr) {
+          throw new Error(`No se pudo leer perfil: ${profSelErr.message}`);
+        }
+        if (!profMaybe) {
+          throw new Error(
+            'No existe fila en user_profiles y la política RLS no permite crearla. Revisa las políticas INSERT/SELECT.'
+          );
+        }
+        // Tenemos perfil leído
+        if (profMaybe.role !== 'admin') {
+          await signOut();
+          setErrorMsg('Tu cuenta no tiene permisos de administrador.');
+          return;
+        }
+        log(`✔ Perfil leído. Rol = ${profMaybe.role}`);
+        navigate('/dashboard', { replace: true });
+        return;
       }
 
-      if (!prof) {
-        await signOut();
-        throw new Error('No se encontró tu perfil. Revisa el trigger de creación o políticas RLS.');
-      }
+      // Si el upsert devolvió la fila, ya tenemos el role
+      const role = upsertData?.role || 'user';
+      log(`✔ Perfil ok. Rol actual: ${role}`);
 
-      if (prof.role !== 'admin') {
+      if (role !== 'admin') {
         await signOut();
         setErrorMsg('Tu cuenta no tiene permisos de administrador.');
         return;
       }
 
-      // OK → Dashboard
+      log('4) Rol = admin → navegando a /dashboard…');
       navigate('/dashboard', { replace: true });
     } catch (err) {
-      setErrorMsg(err?.message || 'Error al iniciar sesión.');
+      const msg = err?.message || 'Error al iniciar sesión.';
+      setErrorMsg(msg);
+      log(`✖ Error: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -112,6 +125,31 @@ export default function AdminLoginPage() {
             {errorMsg}
           </div>
         )}
+
+        {/* Panel de detalles técnicos (puedes cerrarlo si no lo quieres ver) */}
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={() => setDebugOpen((v) => !v)}
+            className="text-xs text-gray-400 hover:text-gray-200 inline-flex items-center gap-1"
+          >
+            {debugOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            {debugOpen ? 'Ocultar detalles' : 'Mostrar detalles'}
+          </button>
+          {debugOpen && (
+            <div className="mt-2 bg-black/30 border border-gray-700 rounded-lg p-2 max-h-40 overflow-auto text-xs text-gray-300">
+              {steps.length === 0 ? (
+                <div className="opacity-60">Sin eventos aún…</div>
+              ) : (
+                steps.map((s, i) => (
+                  <div key={i} className="whitespace-pre-wrap">
+                    • {s}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
 
         <form onSubmit={handleAdminLogin} className="space-y-5">
           <div>
@@ -167,4 +205,3 @@ export default function AdminLoginPage() {
     </div>
   );
 }
-
