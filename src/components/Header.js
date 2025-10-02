@@ -1,24 +1,18 @@
+// src/components/Header.jsx
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Tv, Search, Menu, ChevronDown, LayoutDashboard, LogOut } from 'lucide-react';
+import { Tv, Search, Menu, ChevronDown, LayoutDashboard, LogOut, User as UserIcon } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-const Header = ({
-  searchTerm,
-  onSearchChange,
-  onFilterChange,
-  filters,
-  // ✅ Declaramos onMenuClick como prop y le damos un no-op por defecto
-  onMenuClick = () => {}
-}) => {
+const Header = ({ searchTerm, onSearchChange, onFilterChange, filters, onMenuClick }) => {
   const [showFilters, setShowFilters] = React.useState(false);
   const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
-    onFilterChange(name, value);
+    onFilterChange?.(name, value);
   };
 
   const handleLogout = async () => {
@@ -27,9 +21,10 @@ const Header = ({
   };
 
   const isAdmin = profile?.role === 'admin';
+  const avatarMini = profile?.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(profile?.full_name || user?.email || 'U')}`;
 
   return (
-    <motion.header 
+    <motion.header
       className="bg-black/95 backdrop-blur-xl border-b border-gray-800/50 sticky top-0 z-50"
       initial={{ y: -100 }}
       animate={{ y: 0 }}
@@ -38,10 +33,7 @@ const Header = ({
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3">
-            <motion.div 
-              className="flex items-center gap-3"
-              whileHover={{ scale: 1.05 }}
-            >
+            <motion.div className="flex items-center gap-3" whileHover={{ scale: 1.05 }}>
               <div className="p-2 bg-gradient-to-r from-red-600 to-red-500 rounded-lg">
                 <Tv className="w-8 h-8 text-white" />
               </div>
@@ -65,7 +57,7 @@ const Header = ({
                 type="text"
                 placeholder="Buscar canales..."
                 value={searchTerm}
-                onChange={(e) => onSearchChange(e.target.value)}
+                onChange={(e) => onSearchChange?.(e.target.value)}
                 className="bg-gray-800/50 border border-gray-700 rounded-full pl-10 pr-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-300 w-64"
               />
             </div>
@@ -93,24 +85,35 @@ const Header = ({
             )}
 
             {user && (
-              <motion.button
-                onClick={handleLogout}
-                className="hidden md:flex items-center gap-2 p-2 text-gray-400 hover:text-white transition-colors bg-gray-800/50 rounded-full px-4"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-              >
-                <LogOut className="w-5 h-5" />
-                Salir
-              </motion.button>
+              <>
+                <Link to="/profile">
+                  <motion.button
+                    className="hidden md:flex items-center gap-2 p-2 text-gray-400 hover:text-white transition-colors bg-gray-800/50 rounded-full px-4"
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                  >
+                    <img src={avatarMini} alt="Perfil" className="w-5 h-5 rounded-full border border-gray-700" />
+                    Perfil
+                  </motion.button>
+                </Link>
+
+                <motion.button
+                  onClick={handleLogout}
+                  className="hidden md:flex items-center gap-2 p-2 text-gray-400 hover:text-white transition-colors bg-gray-800/50 rounded-full px-4"
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                >
+                  <LogOut className="w-5 h-5" />
+                  Salir
+                </motion.button>
+              </>
             )}
 
-            {/* ✅ Botón móvil que llama a la prop onMenuClick */}
             <motion.button
-              onClick={onMenuClick}
+              onClick={onMenuClick || (() => {})}
               className="md:hidden p-2 text-gray-400 hover:text-white transition-colors"
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
-              aria-label="Abrir menú"
             >
               <Menu className="w-6 h-6" />
             </motion.button>
@@ -123,16 +126,18 @@ const Header = ({
               Iniciar Sesión
             </Link>
           )}
+
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
               placeholder="Buscar canales..."
               value={searchTerm}
-              onChange={(e) => onSearchChange(e.target.value)}
+              onChange={(e) => onSearchChange?.(e.target.value)}
               className="w-full bg-gray-800/50 border border-gray-700 rounded-full pl-10 pr-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-300"
             />
           </div>
+
           <motion.button
             onClick={() => setShowFilters(!showFilters)}
             className="flex items-center gap-2 p-2 text-gray-400 hover:text-white transition-colors bg-gray-800/50 rounded-full px-4 mt-2 w-full justify-center"
@@ -141,6 +146,7 @@ const Header = ({
           >
             Filtros <ChevronDown className={`w-4 h-4 transition-transform ${showFilters ? 'rotate-180' : 'rotate-0'}`} />
           </motion.button>
+
           {isAdmin && user && (
             <Link to="/dashboard">
               <motion.button
@@ -153,16 +159,30 @@ const Header = ({
               </motion.button>
             </Link>
           )}
+
           {user && (
-            <motion.button
-              onClick={handleLogout}
-              className="flex items-center gap-2 p-2 text-gray-400 hover:text-white transition-colors bg-gray-800/50 rounded-full px-4 mt-2 w-full justify-center"
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-            >
-              <LogOut className="w-5 h-5" />
-              Salir
-            </motion.button>
+            <>
+              <Link to="/profile">
+                <motion.button
+                  className="flex items-center gap-2 p-2 text-gray-400 hover:text-white transition-colors bg-gray-800/50 rounded-full px-4 mt-2 w-full justify-center"
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                >
+                  <UserIcon className="w-5 h-5" />
+                  Perfil
+                </motion.button>
+              </Link>
+
+              <motion.button
+                onClick={handleLogout}
+                className="flex items-center gap-2 p-2 text-gray-400 hover:text-white transition-colors bg-gray-800/50 rounded-full px-4 mt-2 w-full justify-center"
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+              >
+                <LogOut className="w-5 h-5" />
+                Salir
+              </motion.button>
+            </>
           )}
         </div>
 
@@ -181,7 +201,7 @@ const Header = ({
                   <select
                     id="country-filter"
                     name="country"
-                    value={filters.country}
+                    value={filters?.country || ''}
                     onChange={handleFilterChange}
                     className="w-full bg-gray-700/50 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-red-500"
                   >
@@ -199,7 +219,7 @@ const Header = ({
                   <select
                     id="language-filter"
                     name="language"
-                    value={filters.language}
+                    value={filters?.language || ''}
                     onChange={handleFilterChange}
                     className="w-full bg-gray-700/50 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-red-500"
                   >
