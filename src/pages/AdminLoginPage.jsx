@@ -1,24 +1,71 @@
 // src/pages/AdminLoginPage.jsx
-import React, { useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Mail, Lock, LogIn, Tv, ChevronDown, ChevronUp } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Mail, Lock, LogIn, Tv, ChevronDown, ChevronUp, Clipboard } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabaseClientCore';
+
+function ts() {
+  const d = new Date();
+  return d.toISOString().replace('T', ' ').replace('Z', '');
+}
 
 export default function AdminLoginPage() {
   const { signIn, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const [debugOpen, setDebugOpen] = useState(false);
+  const [debugOpen, setDebugOpen] = useState(true);
   const [steps, setSteps] = useState([]);
 
-  const log = (msg) => setSteps((s) => [...s, msg]);
+  // Abre el panel si viene ?debug=1
+  useEffect(() => {
+    const sp = new URLSearchParams(location.search);
+    if (sp.get('debug') === '1') setDebugOpen(true);
+  }, [location.search]);
+
+  const addLog = (label, payload) => {
+    const line = `[${ts()}] ${label}${payload !== undefined ? ` | ${safeStr(payload)}` : ''}`;
+    // visible
+    setSteps((prev) => [...prev, line]);
+    // consola
+    // eslint-disable-next-line no-console
+    console.log('[AdminLogin]', line, payload);
+  };
+
+  const safeStr = (obj) => {
+    try {
+      if (obj === undefined) return '';
+      if (typeof obj === 'string') return obj;
+      return JSON.stringify(obj, null, 2)?.slice(0, 2000); // recorta
+    } catch {
+      return String(obj);
+    }
+  };
+
+  const copyDiagnostics = async () => {
+    try {
+      const blob = [
+        '=== Admin Login Diagnostics ===',
+        `Date: ${ts()}`,
+        `Email: ${email}`,
+        `URL: ${window.location.href}`,
+        '',
+        ...steps,
+      ].join('\n');
+      await navigator.clipboard.writeText(blob);
+      addLog('Diagnóstico copiado al portapapeles');
+      alert('Diagnóstico copiado al portapapeles.');
+    } catch (e) {
+      alert('No se pudo copiar: ' + (e?.message || String(e)));
+    }
+  };
 
   const handleAdminLogin = async (e) => {
     e.preventDefault();
@@ -26,82 +73,124 @@ export default function AdminLoginPage() {
     setErrorMsg('');
     setSteps([]);
 
+    // watchdog por si algo raro pasara
+    let finished = false;
+    const watchdog = setTimeout(() => {
+      if (!finished) {
+        addLog('⚠ Watchdog: la operación se está tardando demasiado (10s). Revisa red/RLS/variables.');
+      }
+    }, 10000);
+
     try {
       const emailSanitized = email.trim().toLowerCase();
-      log('1) Iniciando sesión…');
+      addLog('1) Iniciando sesión…', { email: emailSanitized });
 
-      // Soporta ambas firmas que has usado en tu AuthContext
+      // Soporta tus dos firmas de signIn
       try {
         await signIn({ email: emailSanitized, password });
-      } catch {
+        addLog('✔ signIn (obj) OK');
+      } catch (e1) {
+        addLog('signIn (obj) falló, probando signIn(email, pass)…', e1?.message || String(e1));
         await signIn(emailSanitized, password);
+        addLog('✔ signIn (email, pass) OK');
       }
-      log('✔ Sesión iniciada.');
 
       // Usuario actual
       const { data: ures, error: getUserErr } = await supabase.auth.getUser();
+      addLog('2) auth.getUser()', { hasError: !!getUserErr, user: ures?.user?.id });
       if (getUserErr) throw getUserErr;
+
       const uid = ures?.user?.id;
-      if (!uid) throw new Error('No se pudo obtener el usuario actual.');
-      log(`2) UID actual: ${uid}`);
+      if (!uid) throw new Error('No se pudo obtener uid del usuario.');
 
-      // UPSERT del perfil: si no existe, lo crea con defaults (role = 'user').
-      // ignoreDuplicates evita pisar un perfil ya existente (por ej. admin).
-      log('3) Verificando/creando perfil en user_profiles…');
-      const { data: upsertData, error: upsertErr } = await supabase
+      // Intento 1: leer perfil directo
+      const sel1 = await supabase
         .from('user_profiles')
-        .upsert([{ id: uid }], { onConflict: 'id', ignoreDuplicates: true })
         .select('role')
-        .single();
+        .eq('id', uid)
+        .maybeSingle();
+      addLog('3) SELECT user_profiles (maybeSingle)', {
+        error: sel1.error?.message,
+        data: sel1.data,
+      });
 
-      if (upsertErr) {
-        // Si la RLS bloquea el upsert, intentamos al menos LEER el perfil
-        log(`⚠ upsert falló: ${upsertErr.message}. Intentando solo SELECT…`);
-        const { data: profMaybe, error: profSelErr } = await supabase
-          .from('user_profiles')
-          .select('role')
-          .eq('id', uid)
-          .maybeSingle();
-
-        if (profSelErr) {
-          throw new Error(`No se pudo leer perfil: ${profSelErr.message}`);
-        }
-        if (!profMaybe) {
-          throw new Error(
-            'No existe fila en user_profiles y la política RLS no permite crearla. Revisa las políticas INSERT/SELECT.'
-          );
-        }
-        // Tenemos perfil leído
-        if (profMaybe.role !== 'admin') {
-          await signOut();
-          setErrorMsg('Tu cuenta no tiene permisos de administrador.');
-          return;
-        }
-        log(`✔ Perfil leído. Rol = ${profMaybe.role}`);
-        navigate('/dashboard', { replace: true });
-        return;
+      // Si hay error distinto a "no rows", lo mostramos
+      if (sel1.error && sel1.error.code && sel1.error.code !== 'PGRST116') {
+        throw new Error('Error leyendo perfil: ' + sel1.error.message);
       }
 
-      // Si el upsert devolvió la fila, ya tenemos el role
-      const role = upsertData?.role || 'user';
-      log(`✔ Perfil ok. Rol actual: ${role}`);
+      let role = sel1.data?.role;
+
+      // Si no hay fila, Intento 2: UPSERT para crearla (no pisa si ya existe)
+      if (!role) {
+        addLog('3.1) No hay fila de perfil → upsert({id})');
+        const up = await supabase
+          .from('user_profiles')
+          .upsert([{ id: uid }], { onConflict: 'id', ignoreDuplicates: true })
+          .select('role')
+          .maybeSingle();
+
+        addLog('3.2) Resultado upsert', { error: up.error?.message, data: up.data });
+
+        if (up.error && up.error.code) {
+          // Si RLS bloquea INSERT, al menos reintenta SELECT
+          addLog('⚠ upsert bloqueado por RLS, reintentando solo SELECT…', up.error.message);
+          const sel2 = await supabase
+            .from('user_profiles')
+            .select('role')
+            .eq('id', uid)
+            .maybeSingle();
+          addLog('3.3) SELECT tras upsert fallido', {
+            error: sel2.error?.message,
+            data: sel2.data,
+          });
+          if (sel2.error && sel2.error.code && sel2.error.code !== 'PGRST116') {
+            throw new Error('Error leyendo perfil tras upsert fallido: ' + sel2.error.message);
+          }
+          role = sel2.data?.role;
+        } else {
+          role = up.data?.role || 'user';
+        }
+      }
+
+      addLog('4) Rol final detectado', { role });
 
       if (role !== 'admin') {
         await signOut();
         setErrorMsg('Tu cuenta no tiene permisos de administrador.');
+        addLog('⛔ No es admin → signOut + mensaje');
         return;
       }
 
-      log('4) Rol = admin → navegando a /dashboard…');
+      addLog('5) Es admin → navegando a /dashboard');
       navigate('/dashboard', { replace: true });
     } catch (err) {
-      const msg = err?.message || 'Error al iniciar sesión.';
+      const msg = err?.message || String(err);
       setErrorMsg(msg);
-      log(`✖ Error: ${msg}`);
+      addLog('✖ ERROR', msg);
     } finally {
+      finished = true;
+      clearTimeout(watchdog);
       setLoading(false);
     }
   };
+
+  const helperNote = useMemo(
+    () => (
+      <div className="text-xs text-gray-400 space-y-1">
+        <div>Si queda bloqueado:</div>
+        <ul className="list-disc pl-4 space-y-1">
+          <li>Revisa en SQL que exista la fila <code>user_profiles</code> para tu usuario.</li>
+          <li>
+            Verifica políticas RLS en <code>public.user_profiles</code> (SELECT/INSERT de la propia
+            fila).
+          </li>
+          <li>Revisa variables en Netlify: <code>REACT_APP_SUPABASE_URL</code> y <code>REACT_APP_SUPABASE_ANON_KEY</code>.</li>
+        </ul>
+      </div>
+    ),
+    []
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center p-4 text-white">
@@ -126,8 +215,7 @@ export default function AdminLoginPage() {
           </div>
         )}
 
-        {/* Panel de detalles técnicos (puedes cerrarlo si no lo quieres ver) */}
-        <div className="mb-4">
+        <div className="mb-4 flex items-center justify-between">
           <button
             type="button"
             onClick={() => setDebugOpen((v) => !v)}
@@ -136,20 +224,31 @@ export default function AdminLoginPage() {
             {debugOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             {debugOpen ? 'Ocultar detalles' : 'Mostrar detalles'}
           </button>
-          {debugOpen && (
-            <div className="mt-2 bg-black/30 border border-gray-700 rounded-lg p-2 max-h-40 overflow-auto text-xs text-gray-300">
-              {steps.length === 0 ? (
-                <div className="opacity-60">Sin eventos aún…</div>
-              ) : (
-                steps.map((s, i) => (
-                  <div key={i} className="whitespace-pre-wrap">
-                    • {s}
-                  </div>
-                ))
-              )}
-            </div>
-          )}
+
+          <button
+            type="button"
+            onClick={copyDiagnostics}
+            className="text-xs text-gray-400 hover:text-gray-200 inline-flex items-center gap-1"
+            title="Copiar diagnóstico"
+          >
+            <Clipboard className="w-4 h-4" />
+            Copiar diagnóstico
+          </button>
         </div>
+
+        {debugOpen && (
+          <div className="mb-4 bg-black/30 border border-gray-700 rounded-lg p-2 max-h-40 overflow-auto text-xs text-gray-300">
+            {steps.length === 0 ? (
+              <div className="opacity-60">Sin eventos aún…</div>
+            ) : (
+              steps.map((s, i) => (
+                <div key={i} className="whitespace-pre-wrap">
+                  • {s}
+                </div>
+              ))
+            )}
+          </div>
+        )}
 
         <form onSubmit={handleAdminLogin} className="space-y-5">
           <div>
@@ -201,6 +300,8 @@ export default function AdminLoginPage() {
             {loading ? 'Procesando…' : 'Entrar'}
           </motion.button>
         </form>
+
+        <div className="mt-4">{helperNote}</div>
       </motion.div>
     </div>
   );
