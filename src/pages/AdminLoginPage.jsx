@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Mail, Lock, LogIn, Tv } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { supabase } from '../supabaseClient'; // Solo importamos supabase (ya no SB_URL aquí)
+import { supabase } from '../supabaseClient';
 
 // Determina la URL de Supabase aquí (sin depender de exports)
 const ENV_URL = process.env.REACT_APP_SUPABASE_URL?.trim();
@@ -26,15 +26,34 @@ async function withTimeout(promise, ms, label = 'operación') {
   }
 }
 
-// Preflight de conectividad a Supabase Auth
-async function preflightAuth() {
-  const health = `${SB_URL}/auth/v1/health`;
-  const res = await withTimeout(fetch(health, { method: 'GET', mode: 'cors' }), 6000, 'preflight');
-  if (!res.ok) {
-    const alt = await withTimeout(fetch(`${SB_URL}/auth/v1/settings`, { method: 'GET', mode: 'cors' }), 6000, 'preflight2');
-    return alt.ok;
+/**
+ * Preflight RELAJADO:
+ * - Intenta /auth/v1/health y /auth/v1/settings
+ * - Si recibe 2xx: ok=true
+ * - Si recibe 4xx/5xx o lanza error CORS: NO BLOQUEA, solo registra y devuelve ok=false (informativo)
+ *   El login continuará de todas formas.
+ */
+async function preflightAuthRelaxed() {
+  let details = { tried: [], ok: false };
+
+  const tryFetch = async (path, label) => {
+    try {
+      const url = `${SB_URL}${path}`;
+      const res = await withTimeout(fetch(url, { method: 'GET', mode: 'cors' }), 6000, label);
+      details.tried.push({ path, status: res.status });
+      if (res.ok) details.ok = true;
+    } catch (e) {
+      details.tried.push({ path, error: e.message || String(e) });
+    }
+  };
+
+  await tryFetch('/auth/v1/health', 'preflight:health');
+  if (!details.ok) {
+    await tryFetch('/auth/v1/settings', 'preflight:settings');
   }
-  return true;
+
+  // Devuelve info pero NO BLOQUEA
+  return details;
 }
 
 export default function AdminLoginPage() {
@@ -73,19 +92,12 @@ export default function AdminLoginPage() {
     setSteps([]);
 
     try {
-      // 0) Preflight
-      log('0) Preflight a Supabase Auth', { SB_URL });
-      try {
-        const ok = await preflightAuth();
-        log('0.1) Preflight resultado', { ok });
-        if (!ok) throw new Error('Preflight a Supabase no OK. Posible CSP/CORS.');
-      } catch (pfErr) {
-        throw new Error(
-          `No se pudo conectar a Supabase Auth (${SB_URL}). ` +
-          `Revisa Content-Security-Policy (connect-src) en netlify.toml. Detalle: ${pfErr.message}`
-        );
-      }
+      // 0) Preflight relajado (solo informativo, NO bloquea)
+      log('0) Preflight relajado a Supabase Auth', { SB_URL });
+      const pf = await preflightAuthRelaxed();
+      log('0.1) Preflight info', pf);
 
+      // 1) Login
       const emailSan = email.trim().toLowerCase();
       log('1) signInWithPassword…', { email: emailSan });
 
@@ -97,6 +109,7 @@ export default function AdminLoginPage() {
       log('1.1) signIn result', { error: signErr?.message, user: signData?.user?.id });
       if (signErr) throw new Error(signErr.message || 'No se pudo iniciar sesión');
 
+      // 2) getUser
       const { data: ures, error: getUserErr } = await withTimeout(
         supabase.auth.getUser(),
         8000,
@@ -107,6 +120,7 @@ export default function AdminLoginPage() {
       const uid = ures?.user?.id;
       if (!uid) throw new Error('No se obtuvo UID');
 
+      // 3) role
       const { data: prof, error: selErr } = await withTimeout(
         supabase.from('user_profiles').select('role').eq('id', uid).maybeSingle(),
         8000,
@@ -235,4 +249,5 @@ export default function AdminLoginPage() {
     </div>
   );
 }
+
 
