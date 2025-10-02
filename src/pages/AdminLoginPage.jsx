@@ -1,9 +1,9 @@
 // src/pages/AdminLoginPage.jsx
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Mail, Lock, LogIn, Tv } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { supabase } from '../supabaseClient'; // ← solo supabase
+import { supabase } from '../supabaseClient'; // Solo importamos supabase (ya no SB_URL aquí)
 
 // Determina la URL de Supabase aquí (sin depender de exports)
 const ENV_URL = process.env.REACT_APP_SUPABASE_URL?.trim();
@@ -235,6 +235,4 @@ export default function AdminLoginPage() {
     </div>
   );
 }
-
-
 
