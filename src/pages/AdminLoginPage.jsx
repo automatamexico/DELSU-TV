@@ -15,21 +15,21 @@ export default function AdminLoginPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Pequeño helper: intenta leer user_profiles varias veces
+  // Reintenta leer la fila del perfil (por si el trigger tarda)
   const fetchProfileWithRetry = async (uid, tries = 8, delayMs = 300) => {
     for (let i = 0; i < tries; i++) {
       const { data, error } = await supabase
         .from('user_profiles')
         .select('role')
         .eq('id', uid)
-        .maybeSingle(); // no lanza error si no hay fila
+        .maybeSingle(); // null si no existe
 
-      if (data) return data; // { role: 'user' | 'admin' }
-
-      // Si hay error de "no encontrado", reintenta; otros errores los mostramos
       if (error && error.code && error.code !== 'PGRST116') {
+        // error real distinto a "no rows"
         throw error;
       }
+      if (data) return data; // { role: 'user'|'admin' }
+
       await new Promise((r) => setTimeout(r, delayMs));
     }
     return null;
@@ -50,20 +50,29 @@ export default function AdminLoginPage() {
         await signIn(emailSanitized, password);
       }
 
-      // Obtén el usuario autenticado
+      // Usuario actual
       const { data: ures, error: getUserErr } = await supabase.auth.getUser();
       if (getUserErr) throw getUserErr;
       const uid = ures?.user?.id;
       if (!uid) throw new Error('No se pudo obtener el usuario actual.');
 
-      // Lee el perfil (con reintentos, por si el trigger tarda en crear la fila)
-      const prof = await fetchProfileWithRetry(uid, 10, 350);
+      // Intenta leer perfil
+      let prof = await fetchProfileWithRetry(uid, 10, 350);
+
+      // Si no existe, lo creamos con role 'user' y lo volvemos a leer
       if (!prof) {
-        // Si después de reintentar no hay perfil, salimos
+        const { error: insErr } = await supabase
+          .from('user_profiles')
+          .insert({ id: uid, role: 'user' });
+        if (insErr) throw insErr;
+
+        // vuelve a leer
+        prof = await fetchProfileWithRetry(uid, 6, 300);
+      }
+
+      if (!prof) {
         await signOut();
-        throw new Error(
-          'No se encontró tu perfil en user_profiles. Verifica el trigger de creación o crea la fila manualmente.'
-        );
+        throw new Error('No se encontró tu perfil. Revisa el trigger de creación o políticas RLS.');
       }
 
       if (prof.role !== 'admin') {
@@ -72,7 +81,7 @@ export default function AdminLoginPage() {
         return;
       }
 
-      // OK → al dashboard
+      // OK → Dashboard
       navigate('/dashboard', { replace: true });
     } catch (err) {
       setErrorMsg(err?.message || 'Error al iniciar sesión.');
@@ -158,3 +167,4 @@ export default function AdminLoginPage() {
     </div>
   );
 }
+
