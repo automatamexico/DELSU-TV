@@ -9,18 +9,35 @@ import { useChannels } from '../hooks/useChannels';
 import { useAuth } from '../context/AuthContext';
 import { categories } from '../data/channels';
 
+// Skeleton simple para primera carga sin cache
+function ChannelsSkeleton() {
+  const items = Array.from({ length: 12 });
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 p-4">
+      {items.map((_, i) => (
+        <div
+          key={i}
+          className="animate-pulse bg-gray-800/40 border border-gray-700 rounded-xl h-48"
+        />
+      ))}
+    </div>
+  );
+}
+
 const HomePage = () => {
   const { profile } = useAuth();
-  const userRole = profile?.role;
+  const userRole = profile?.role || 'user';
+
   const {
     channels,
     loading: channelsLoading,
+    errorMsg,
     searchTerm,
     setSearchTerm,
     selectedCategory,
     setSelectedCategory,
     filters,
-    handleFilterChange
+    handleFilterChange,
   } = useChannels(userRole);
 
   const [selectedChannel, setSelectedChannel] = useState(null);
@@ -29,11 +46,9 @@ const HomePage = () => {
     setSelectedChannel(channel);
   };
 
-  const handleClosePlayer = () => setSelectedChannel(null);
-
-  if (channelsLoading) {
-    return <div className="flex items-center justify-center min-h-screen">Cargando canales...</div>;
-  }
+  const handleClosePlayer = () => {
+    setSelectedChannel(null);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
@@ -44,40 +59,43 @@ const HomePage = () => {
         filters={filters}
       />
 
-      <CategoryFilter
-        categories={categories}
-        selectedCategory={selectedCategory}
-        onCategoryChange={setSelectedCategory}
-      />
+      {channelsLoading && channels.length === 0 ? (
+        // Primera visita sin cache → skeleton (no pantalla en blanco)
+        <ChannelsSkeleton />
+      ) : (
+        <>
+          {/* Barra de estado pequeña si está revalidando con datos en pantalla */}
+          {channelsLoading && channels.length > 0 && (
+            <div className="px-4 py-2 text-xs text-gray-400">
+              Actualizando canales…
+            </div>
+          )}
 
-      <motion.main initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, delay: 0.3 }}>
-        <ChannelGrid channels={channels} onChannelClick={handleChannelClick} />
-      </motion.main>
+          {errorMsg && (
+            <div className="px-4 py-2 text-xs text-red-400">
+              {errorMsg}
+            </div>
+          )}
+
+          <CategoryFilter
+            categories={categories}
+            selectedCategory={selectedCategory}
+            onCategoryChange={setSelectedCategory}
+          />
+
+          <motion.main
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.35 }}
+          >
+            <ChannelGrid channels={channels} onChannelClick={handleChannelClick} />
+          </motion.main>
+        </>
+      )}
 
       <AnimatePresence>
         {selectedChannel && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="w-full max-w-5xl">
-              <div className="flex justify-between items-center mb-3 text-white">
-                <h2 className="text-xl font-bold">{selectedChannel?.name || 'Canal'}</h2>
-                <button
-                  onClick={handleClosePlayer}
-                  className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded"
-                >
-                  Cerrar
-                </button>
-              </div>
-
-              {/* 👇 PASO CLAVE: le pasamos la URL original explícita */}
-              <VideoPlayer
-                src={selectedChannel?.stream_url || selectedChannel?.streamUrl || selectedChannel?.url || ''}
-                poster={selectedChannel?.poster}
-                autoPlay
-                controls
-                muted
-              />
-            </div>
-          </div>
+          <VideoPlayer channel={selectedChannel} onClose={handleClosePlayer} />
         )}
       </AnimatePresence>
     </div>
@@ -85,4 +103,3 @@ const HomePage = () => {
 };
 
 export default HomePage;
-
