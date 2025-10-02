@@ -1,5 +1,7 @@
 // src/supabaseClients.js
-import { createClient } from '@supabase/supabase-js';
+import supabaseDefault, { supabase } from './supabaseClientCore';
+export { supabase };
+export default supabaseDefault;
 
 // 1) Intenta tomar de variables de entorno (CRA usa REACT_APP_* en build-time)
 const urlFromEnv = process.env.REACT_APP_SUPABASE_URL?.trim();
