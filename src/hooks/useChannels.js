@@ -1,136 +1,126 @@
-import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '../supabaseClient';
+// src/hooks/useChannels.js
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { supabase } from '../supabaseClientCore';
 
-export const useChannels = (userRole) => {
-  const [channels, setChannels] = useState([]);
+const CACHE_KEY = 'delsu_channels_v1';
+const STALE_MS = 2 * 60 * 1000; // 2 minutos
+
+export function useChannels(userRole = 'user') {
+  const [allChannels, setAllChannels] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  // UI state
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('Todos');
-  const [filters, setFilters] = useState({
-    country: '',
-    language: ''
-  });
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [filters, setFilters] = useState({ country: '', language: '' });
 
-  useEffect(() => {
-    fetchChannels();
-  }, []);
-
-  const fetchChannels = async () => {
-    let query = supabase.from('channels').select('*').order('created_at', { ascending: false });
-
-    const { data, error } = await query;
-    if (error) {
-      console.error('Error fetching channels:', error);
-    } else {
-      setChannels(data || []);
-    }
-    setLoading(false);
-  };
-
-  const addChannel = async (newChannelData) => {
-    if (userRole !== 'admin') return;
-
-    const { data, error } = await supabase
-      .from('channels')
-      .insert([{
-        ...newChannelData,
-        created_by: supabase.auth.getUser()?.id
-      }])
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error adding channel:', error);
-    } else {
-      setChannels(prev => [data, ...prev]);
-    }
-  };
-
-  const deleteChannel = async (channelId) => {
-    if (userRole !== 'admin') return;
-
-    const { error } = await supabase
-      .from('channels')
-      .delete()
-      .eq('id', channelId);
-
-    if (error) {
-      console.error('Error deleting channel:', error);
-    } else {
-      setChannels(prev => prev.filter(channel => channel.id !== channelId));
-    }
-  };
-
-  const updateChannel = async (channelId, updates) => {
-    if (userRole !== 'admin') return;
-
-    const { data, error } = await supabase
-      .from('channels')
-      .update(updates)
-      .eq('id', channelId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error updating channel:', error);
-    } else {
-      setChannels(prev => prev.map(channel => 
-        channel.id === channelId ? data : channel
-      ));
-    }
-  };
-
-  const filteredChannels = useMemo(() => {
-    let filtered = channels;
-
-    // Filter by category
-    if (selectedCategory !== 'Todos') {
-      filtered = filtered.filter(channel => channel.category === selectedCategory);
-    }
-
-    // Filter by search term
-    if (searchTerm.trim()) {
-      const search = searchTerm.toLowerCase();
-      filtered = filtered.filter(channel =>
-        channel.name.toLowerCase().includes(search) ||
-        channel.description?.toLowerCase().includes(search) ||
-        channel.category.toLowerCase().includes(search)
-      );
-    }
-
-    // Filter by country
-    if (filters.country) {
-      filtered = filtered.filter(channel => channel.country === filters.country);
-    }
-
-    // Filter by language
-    if (filters.language) {
-      filtered = filtered.filter(channel => channel.language === filters.language);
-    }
-
-    return filtered;
-  }, [channels, searchTerm, selectedCategory, filters]);
+  const abortRef = useRef(null);
 
   const handleFilterChange = (name, value) => {
-    setFilters(prevFilters => ({
-      ...prevFilters,
-      [name]: value
-    }));
+    setFilters((prev) => ({ ...prev, [name]: value }));
   };
 
+  // 1) Arranca con cache si existe (instant render)
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(CACHE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.data?.length) {
+          setAllChannels(parsed.data);
+          // si el cache es reciente, no bloqueamos con loading
+          const fresh = Date.now() - (parsed.ts || 0) < STALE_MS;
+          setLoading(!fresh); // si fresco => false; si viejo => true (revalidando)
+        }
+      }
+    } catch {
+      // si falla el JSON, ignoramos
+    }
+  }, []);
+
+  // 2) Revalidate siempre en background (stale-while-revalidate)
+  useEffect(() => {
+    let didCancel = false;
+    (async () => {
+      setErrorMsg('');
+      // cancela petición anterior si existiera
+      try {
+        abortRef.current?.abort?.();
+      } catch {}
+      abortRef.current = new AbortController();
+
+      try {
+        // Trae solo columnas necesarias; ajusta si tu tabla cambia
+        const { data, error } = await supabase
+          .from('channels')
+          .select('id,name,country,description,poster,stream_url,category,language')
+          .order('name', { ascending: true });
+
+        if (error) throw error;
+        if (didCancel) return;
+
+        setAllChannels(Array.isArray(data) ? data : []);
+        setLoading(false);
+
+        // Guarda en cache
+        try {
+          sessionStorage.setItem(
+            CACHE_KEY,
+            JSON.stringify({ ts: Date.now(), data: Array.isArray(data) ? data : [] })
+          );
+        } catch {}
+      } catch (e) {
+        if (didCancel) return;
+        console.warn('[useChannels] fetch error:', e?.message || e);
+        setErrorMsg(e?.message || 'Error cargando canales');
+        // Si ya teníamos cache, no ponemos loading=true; mantenemos UI
+        setLoading((prev) => (allChannels.length ? false : prev));
+      }
+    })();
+
+    return () => {
+      didCancel = true;
+      try {
+        abortRef.current?.abort?.();
+      } catch {}
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // se ejecuta una vez (al entrar a Home)
+
+  // 3) Filtro en memoria (rápido) sobre la lista actual (cache o red)
+  const channels = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return allChannels.filter((ch) => {
+      // filtro por rol si en tu app hay canales restringidos (ejemplo)
+      if (userRole !== 'admin' && ch?.is_admin_only) return false;
+
+      if (selectedCategory && ch?.category !== selectedCategory) return false;
+      if (filters.country && ch?.country !== filters.country) return false;
+      if (filters.language && ch?.language !== filters.language) return false;
+
+      if (!term) return true;
+      const hay =
+        (ch?.name || '').toLowerCase().includes(term) ||
+        (ch?.description || '').toLowerCase().includes(term) ||
+        (ch?.country || '').toLowerCase().includes(term) ||
+        (ch?.category || '').toLowerCase().includes(term);
+      return hay;
+    });
+  }, [allChannels, searchTerm, selectedCategory, filters, userRole]);
+
   return {
-    channels: filteredChannels,
-    allChannels: channels,
+    channels,
     loading,
+    errorMsg,
+
     searchTerm,
     setSearchTerm,
+
     selectedCategory,
     setSelectedCategory,
+
     filters,
     handleFilterChange,
-    addChannel,
-    deleteChannel,
-    updateChannel,
-    refetch: fetchChannels
   };
-};
+}
