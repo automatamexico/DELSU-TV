@@ -1,14 +1,20 @@
 // src/pages/ProfilePage.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 
 export default function ProfilePage() {
   const { user, profile, uploadAvatar, updateProfile, loading } = useAuth();
-  const [fullName, setFullName] = useState(profile?.full_name || '');
-  const [country, setCountry] = useState(profile?.country || '');
+  const [fullName, setFullName] = useState('');
+  const [country, setCountry] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  // Sincroniza formularios cuando cambie el perfil
+  useEffect(() => {
+    setFullName(profile?.full_name || '');
+    setCountry(profile?.country || '');
+  }, [profile?.full_name, profile?.country]);
 
   const handleAvatarChange = async (e) => {
     const file = e.target.files?.[0];
@@ -18,6 +24,7 @@ export default function ProfilePage() {
       await uploadAvatar(file);
       alert('Avatar actualizado.');
     } catch (err) {
+      console.error('[UI] upload avatar:', err);
       alert('Error al subir avatar: ' + (err?.message || String(err)));
     } finally {
       setUploading(false);
@@ -31,6 +38,7 @@ export default function ProfilePage() {
       await updateProfile({ fullName, country });
       alert('Perfil actualizado.');
     } catch (err) {
+      console.error('[UI] update profile:', err);
       alert('Error al guardar: ' + (err?.message || String(err)));
     } finally {
       setSaving(false);
@@ -40,6 +48,10 @@ export default function ProfilePage() {
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center text-white">Cargando perfil…</div>;
   }
+
+  const avatarSrc =
+    profile?.avatar_url ||
+    `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(profile?.full_name || user?.email || 'U')}`;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white">
@@ -55,7 +67,7 @@ export default function ProfilePage() {
         <div className="bg-gray-800/60 border border-gray-700 rounded-2xl p-6">
           <div className="flex items-center gap-6 mb-6">
             <img
-              src={profile?.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(profile?.full_name || user?.email || 'U')}`}
+              src={avatarSrc}
               alt="Avatar"
               className="w-20 h-20 rounded-full object-cover border border-gray-700"
             />
@@ -115,3 +127,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+
