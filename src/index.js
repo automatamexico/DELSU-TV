@@ -1,12 +1,12 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import './index.css';
 
-/* Estilos base para que todo luzca bien desde el inicio */
-html, body, #root {
-  height: 100%;
-}
-
-body {
-  @apply bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white antialiased;
-}
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(
+  // Puedes quitar StrictMode si prefieres
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
