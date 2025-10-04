@@ -1,7 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
-import './index.css'; // aquí cargamos los estilos de Tailwind
+import App from './App'; // NO importes './index.css' en la opción CDN
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
