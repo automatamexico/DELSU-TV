@@ -1,11 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import './index.css';
+import './index.css'; // aquí cargamos los estilos de Tailwind
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
-  // Puedes quitar StrictMode si prefieres
   <React.StrictMode>
     <App />
   </React.StrictMode>
