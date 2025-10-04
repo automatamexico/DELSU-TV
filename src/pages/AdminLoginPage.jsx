@@ -79,5 +79,3 @@ const submit = async (e) => {
     setLoading(false);
   }
 };
-
-
