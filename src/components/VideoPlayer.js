@@ -5,27 +5,27 @@ import { X } from 'lucide-react';
 
 export default function VideoPlayer({ title = 'Reproductor', src, onClose }) {
   const videoRef = useRef(null);
-  const hlsRef = useRef(null);
+  const hlsRef = useRef/** @type {React.MutableRefObject<Hls|null>} */(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
+  const [steps, setSteps] = useState([]);
 
-  // Permite activar depuración solo si la URL trae ?debug=1
-  const showDebug = useMemo(() => {
-    try {
-      return new URLSearchParams(window.location.search).get('debug') === '1';
-    } catch {
-      return false;
-    }
+  const debug = useMemo(() => {
+    try { return new URLSearchParams(window.location.search).get('debug') === '1'; }
+    catch { return false; }
   }, []);
 
-  // Si te llega una URL https://host/... la proxificamos como /hls/host/...
+  const log = (msg, extra) => {
+    if (!debug) return;
+    setSteps(s => [...s, { t: new Date().toISOString(), msg, extra }]);
+  };
+
+  // Normaliza: siempre pasamos por /hls/host/...
   const finalSrc = useMemo(() => {
     if (!src) return '';
-    if (/^https?:\/\//i.test(src)) {
-      return '/hls/' + src.replace(/^https?:\/\//i, '');
-    }
-    // ya viene proxificada
-    return src.startsWith('/hls/') ? src : '/hls/' + src;
+    if (src.startsWith('/hls/')) return src;
+    if (/^https?:\/\//i.test(src)) return '/hls/' + src.replace(/^https?:\/\//i, '');
+    return '/hls/' + src; // por si te llega “host/ruta.m3u8”
   }, [src]);
 
   useEffect(() => {
@@ -34,61 +34,141 @@ export default function VideoPlayer({ title = 'Reproductor', src, onClose }) {
 
     setLoading(true);
     setErrorMsg('');
+    setSteps([]);
 
-    // Si el navegador soporta HLS nativo (Safari), usa source directo
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = finalSrc;
-      video.addEventListener('loadedmetadata', () => setLoading(false));
-      video.addEventListener('error', () => setErrorMsg('No se pudo iniciar la reproducción.'));
-      video.play().catch(() => {});
-      return () => {
-        video.pause();
-        video.removeAttribute('src');
-        video.load();
-      };
-    }
+    let timeoutId;
 
-    // Hls.js para navegadores sin HLS nativo
-    if (Hls.isSupported()) {
-      const hls = new Hls({
-        enableWorker: true,
-        lowLatencyMode: true,
-        backBufferLength: 60,
-        fragLoadingTimeout: 15000,
-        manifestLoadingTimeOut: 15000,
-      });
-      hlsRef.current = hls;
-
-      hls.on(Hls.Events.ERROR, (_, data) => {
-        if (data?.fatal) {
-          setErrorMsg(`Error HLS: ${data?.type || 'fatal'}`);
-          try { hls.destroy(); } catch {}
+    const clearAll = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      try {
+        if (hlsRef.current) {
+          hlsRef.current.destroy();
+          hlsRef.current = null;
         }
-      });
+      } catch {}
+      if (video) {
+        video.pause?.();
+        // Limpieza segura
+        try {
+          video.removeAttribute('src');
+          video.load?.();
+        } catch {}
+      }
+    };
 
-      hls.loadSource(finalSrc);
-      hls.attachMedia(video);
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+    const startTimeout = () => {
+      timeoutId = setTimeout(() => {
+        setErrorMsg('No se pudo iniciar la reproducción (timeout).');
         setLoading(false);
-        video.play().catch(() => {});
-      });
+        log('⏱ Timeout de arranque', { finalSrc });
+      }, 12000);
+    };
+
+    const tryAutoplay = async () => {
+      try {
+        // Algunos navegadores requieren muted para autoplay
+        video.muted = true;
+        await video.play();
+      } catch (e) {
+        log('⚠️ Autoplay bloqueado', { e: String(e) });
+      }
+    };
+
+    // Nativo (Safari) o MSE
+    try {
+      if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        log('HLS nativo', { finalSrc });
+        startTimeout();
+        video.src = finalSrc;
+        const onLoaded = () => {
+          setLoading(false);
+          tryAutoplay();
+          if (timeoutId) clearTimeout(timeoutId);
+        };
+        const onErr = () => {
+          setErrorMsg('No se pudo iniciar la reproducción.');
+          setLoading(false);
+        };
+        video.addEventListener('loadeddata', onLoaded);
+        video.addEventListener('error', onErr);
+
+        return () => {
+          video.removeEventListener('loadeddata', onLoaded);
+          video.removeEventListener('error', onErr);
+          clearAll();
+        };
+      }
+
+      if (Hls.isSupported()) {
+        log('Hls.js cargado', { finalSrc });
+        startTimeout();
+        const hls = new Hls({
+          enableWorker: true,
+          lowLatencyMode: true,
+          backBufferLength: 60,
+          fragLoadingTimeout: 15000,
+          manifestLoadingTimeOut: 15000,
+        });
+        hlsRef.current = hls;
+
+        hls.on(Hls.Events.ERROR, (_, data) => {
+          log('HLS ERROR', { type: data?.type, details: data?.details, fatal: data?.fatal });
+          if (data?.fatal) {
+            setErrorMsg(`Error HLS: ${data.type || 'fatal'}`);
+            setLoading(false);
+            try { hls.destroy(); } catch {}
+          }
+        });
+
+        hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+          log('MEDIA_ATTACHED');
+        });
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          log('MANIFEST_PARSED');
+          setLoading(false);
+          if (timeoutId) clearTimeout(timeoutId);
+          tryAutoplay();
+        });
+        hls.on(Hls.Events.LEVEL_LOADED, (_, d) => {
+          log('LEVEL_LOADED', { live: d?.details?.live });
+        });
+
+        hls.attachMedia(video);
+        hls.loadSource(finalSrc);
+
+        return () => {
+          clearAll();
+        };
+      }
+
+      // Fallback
+      log('Fallback simple', { finalSrc });
+      startTimeout();
+      video.src = finalSrc;
+      const onLoaded = () => {
+        setLoading(false);
+        tryAutoplay();
+        if (timeoutId) clearTimeout(timeoutId);
+      };
+      const onErr = () => {
+        setErrorMsg('No se pudo iniciar la reproducción.');
+        setLoading(false);
+      };
+      video.addEventListener('loadeddata', onLoaded);
+      video.addEventListener('error', onErr);
 
       return () => {
-        try { hls.destroy(); } catch {}
+        video.removeEventListener('loadeddata', onLoaded);
+        video.removeEventListener('error', onErr);
+        clearAll();
       };
+    } catch (e) {
+      setErrorMsg('Error inicializando el reproductor.');
+      setLoading(false);
+      log('Excepción useEffect', { e: String(e) });
+      return () => clearAll();
     }
-
-    // Fallback muy básico
-    video.src = finalSrc;
-    video.addEventListener('loadedmetadata', () => setLoading(false));
-    video.addEventListener('error', () => setErrorMsg('No se pudo iniciar la reproducción.'));
-    video.play().catch(() => {});
-    return () => {
-      video.pause();
-      video.removeAttribute('src');
-      video.load();
-    };
-  }, [finalSrc]);
+  }, [finalSrc, debug]);
 
   return (
     <div className="fixed inset-0 z-[999] flex items-start md:items-center justify-center bg-black/80 p-4">
@@ -115,23 +195,28 @@ export default function VideoPlayer({ title = 'Reproductor', src, onClose }) {
           />
           {loading && (
             <div className="absolute inset-0 grid place-items-center">
-              <div className="text-white/80 text-sm">Cargando video…</div>
+              <div className="text-white/80 text-sm">Cargando video...</div>
             </div>
           )}
         </div>
 
-        {/* Errores visibles (sin URL fuente) */}
+        {/* Mensaje de error (sin mostrar URL de la fuente) */}
         {errorMsg && (
           <div className="px-4 py-3 text-sm text-red-400 border-t border-white/10">
             {errorMsg}
           </div>
         )}
 
-        {/* Panel de depuración (oculto por defecto; solo con ?debug=1) */}
-        {showDebug && (
-          <div className="px-4 py-3 text-xs text-white/70 border-t border-white/10">
-            <div className="font-semibold text-white/80 mb-1">DEBUG</div>
-            <div>finalSrc = {finalSrc}</div>
+        {/* Depuración opcional con ?debug=1 (no muestra la URL exacta del canal) */}
+        {debug && (
+          <div className="px-4 py-3 text-xs text-white/70 border-t border-white/10 space-y-1 max-h-40 overflow-auto">
+            <div className="font-semibold text-white/80">DEBUG</div>
+            <div>src normalizado (proxificado): {finalSrc ? '(oculto)' : '(vacío)'}</div>
+            {steps.map((s, i) => (
+              <div key={i}>
+                • [{s.t}] {s.msg} {s.extra ? `| ${JSON.stringify(s.extra)}` : ''}
+              </div>
+            ))}
           </div>
         )}
       </div>
