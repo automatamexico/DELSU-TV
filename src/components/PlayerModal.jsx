@@ -1,55 +1,70 @@
-import React from "react";
-import VideoPlayer from "./VideoPlayer";
+// src/components/PlayerModal.jsx
+import React, { useEffect } from "react";
 import { X } from "lucide-react";
+import VideoPlayer from "./VideoPlayer";
 
+/**
+ * Modal contenedor del reproductor. Muestra título, botón cerrar y VideoPlayer.
+ *
+ * Props:
+ *  - open: boolean
+ *  - onClose: () => void
+ *  - channel: objeto del canal (name, poster, m3u8Url | streamUrl | url)
+ */
 export default function PlayerModal({ open, onClose, channel }) {
-  if (!open) return null;
+  useEffect(() => {
+    const onEsc = (e) => {
+      if (e.key === "Escape" && open) onClose?.();
+    };
+    window.addEventListener("keydown", onEsc);
+    return () => window.removeEventListener("keydown", onEsc);
+  }, [open, onClose]);
 
-  // Intenta varias propiedades por si tu objeto canal usa otro nombre
-  const src =
-    channel?.m3u8Url ||
-    channel?.streamUrl ||
-    channel?.hls ||
-    channel?.url ||
-    "";
+  if (!open || !channel) return null;
 
+  // Resuelve la fuente M3U8 desde distintas claves
+  const src = channel.m3u8Url || channel.streamUrl || channel.url || "";
+  const title = channel.name || "Reproductor";
   const poster =
-    channel?.poster ||
-    channel?.image ||
-    channel?.thumbnail ||
-    channel?.logo ||
-    undefined;
-
-  const title = channel?.name || channel?.title || "Reproductor";
-
-  const urlParams = new URLSearchParams(window.location.search);
-  const debug = urlParams.has("debug");
+    channel.poster ||
+    channel.image ||
+    channel.thumbnail ||
+    "https://images.unsplash.com/photo-1511379938547-c1f69419868d?q=80&w=1200&auto=format&fit=crop";
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-start md:items-center justify-center bg-black/70 p-3 md:p-6">
-      <div className="w-full max-w-6xl bg-[#0b0e12] border border-white/10 rounded-2xl shadow-xl overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-          <h2 className="text-white/90 font-semibold truncate">{title}</h2>
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center"
+      aria-modal="true"
+      role="dialog"
+    >
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      {/* Contenido */}
+      <div className="relative z-[101] w-[95vw] max-w-6xl bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 bg-gray-800 border-b border-gray-700">
+          <h3 className="text-white font-semibold truncate">{title}</h3>
           <button
+            type="button"
             onClick={onClose}
-            className="flex items-center gap-2 text-white/80 hover:text-white transition"
-            aria-label="Cerrar"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-gray-700 hover:bg-gray-600 text-white text-sm"
           >
-            <X size={18} />
-            <span className="hidden sm:inline">Cerrar</span>
+            <X className="w-4 h-4" /> Cerrar
           </button>
         </div>
 
-        <div className="p-3 md:p-4">
-          {src ? (
-            <VideoPlayer src={src} title={title} poster={poster} debug={debug} />
-          ) : (
-            <div className="text-red-300 text-sm">
-              No se encontró URL del canal. Revisa que el objeto tenga
-              <code className="mx-1 px-1 rounded bg-white/10">m3u8Url</code> o
-              <code className="mx-1 px-1 rounded bg-white/10">streamUrl</code>.
-            </div>
-          )}
+        {/* Player */}
+        <div className="p-0">
+          <VideoPlayer
+            src={src}
+            title={title}
+            poster={poster}
+            hideSource // ⬅️ no mostrar “Fuente”
+          />
         </div>
       </div>
     </div>
