@@ -1,248 +1,154 @@
 // src/components/VideoPlayer.js
 import React, { useEffect, useRef, useState } from 'react';
+import Hls from 'hls.js';
 
-/* ========= Helpers de proxy universal ========= */
-const rewriteAbsoluteToProxy = (absUrl) => {
-  try {
-    const u = new URL(absUrl);
-    const scheme = u.protocol.replace(':', '').toLowerCase(); // http|https
-    return `/hls/${scheme}/${u.hostname}${u.pathname}${u.search}`;
-  } catch {
-    return absUrl;
-  }
-};
-const rewriteToProxy = (url) => {
-  if (!url || typeof url !== 'string') return '';
-  const httpsUrl = url.replace(/^http:\/\//i, 'https://');
-  if (/^https?:\/\//i.test(httpsUrl)) return rewriteAbsoluteToProxy(httpsUrl);
-  return httpsUrl;
-};
-const resolveRelativeViaProxy = (baseProxied, relative) => {
-  try {
-    if (!relative) return '';
-    if (/^https?:\/\//i.test(relative)) return rewriteAbsoluteToProxy(relative);
-    const absBase = new URL(baseProxied, window.location.origin);
-    const abs = new URL(relative, absBase);
-    return rewriteAbsoluteToProxy(abs.href);
-  } catch {
-    return relative;
-  }
-};
+const isAbsoluteHttp = (u = '') => /^https?:\/\//i.test(u);
 
-const loadHlsScript = () =>
-  new Promise((resolve, reject) => {
-    if (window.Hls) return resolve();
-    const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/hls.js@latest';
-    s.async = true;
-    s.onload = () => resolve();
-    s.onerror = reject;
-    document.head.appendChild(s);
-  });
+function buildFinalSrc(raw = '') {
+  const src = (raw || '').trim();
+  if (!src) return '';
 
-/**
- * Uso:
- *   <VideoPlayer src={urlM3u8} poster="..." />
- * Props:
- *   - src: string (tu .m3u8 original)
- *   - poster, controls, autoPlay, muted
- *   - debug (opcional: si true, solo escribe logs en consola)
- */
-export default function VideoPlayer({
-  src,
-  poster = '',
-  controls = true,
-  autoPlay = true,
-  muted = true,
-  debug = false,
-}) {
+  // Si ya viene proxied (/hls/...), úsalo tal cual
+  if (src.startsWith('/hls/')) return src;
+
+  // Si es http/https, proxiar con Edge Function
+  if (isAbsoluteHttp(src)) return `/hls/${encodeURIComponent(src)}`;
+
+  // Si no trae protocolo, asume https y proxía
+  return `/hls/${encodeURIComponent(`https://${src}`)}`;
+}
+
+export default function VideoPlayer({ channel, onClose }) {
   const videoRef = useRef(null);
-  const proxiedSrc = rewriteToProxy(src || '');
-  const [status, setStatus] = useState('loading'); // loading | ready | error
+  const hlsRef = useRef(null);
+  const [status, setStatus] = useState('init'); // init | loading | playing | error | ended
   const [errorMsg, setErrorMsg] = useState('');
 
+  // Acepta streamUrl (camel) o stream_url (snake) por compatibilidad
+  const srcRaw = channel?.streamUrl || channel?.stream_url || channel?.url || '';
+  const finalSrc = buildFinalSrc(srcRaw);
+
   useEffect(() => {
-    let hls;
-    let timeoutId;
-    let done = false;
     const video = videoRef.current;
-    if (!video) return () => {};
-
-    const dlog = (...a) => { if (debug) console.log('[PLAYER]', ...a); };
-
-    const fail = (msg) => {
-      if (done) return;
-      done = true;
-      setErrorMsg(msg);
+    if (!video || !finalSrc) {
       setStatus('error');
-      dlog('❌', msg);
-    };
-    const ready = () => {
-      if (done) return;
-      done = true;
-      setStatus('ready');
-      dlog('✅ READY');
-      if (autoPlay) video.play().catch(() => {});
-    };
-
-    dlog('finalSrc =', proxiedSrc || '(vacío)', 'original =', src || '(vacío)');
-
-    if (!proxiedSrc) {
-      fail('No hay fuente de video (src vacío).');
-      return () => {};
-    }
-    if (window.location.protocol === 'https:' && proxiedSrc.startsWith('http://')) {
-      fail('Mixed Content: el sitio es HTTPS y el stream es HTTP. Usa HTTPS o /hls/.');
-      return () => {};
+      setErrorMsg('No hay fuente de video (src vacío).');
+      return;
     }
 
-    // Timeout de seguridad (12s)
-    timeoutId = setTimeout(() => {
-      if (!done) fail('Tiempo de espera agotado (posible bloqueo).');
-    }, 12000);
+    setStatus('loading');
 
-    // PRECHECK: manifest + primer media
-    const controller = new AbortController();
-    const precheck = (async () => {
-      try {
-        dlog('↓ Manifest:', proxiedSrc);
-        const r = await fetch(proxiedSrc, { cache: 'no-store', signal: controller.signal });
-        const st = r.headers.get('x-proxy-status') || r.status;
-        dlog('↑ Manifest status:', st);
-        if (!r.ok) throw new Error(`Manifest HTTP ${st}`);
+    const onPlaying = () => setStatus('playing');
+    const onEnded = () => setStatus('ended');
+    const onError = (e) => {
+      console.error('[VideoPlayer] <video> error', e);
+      setStatus('error');
+      setErrorMsg('Error del reproductor.');
+    };
 
-        const text = await r.text();
-        const lines = text.split(/\r?\n/).filter(Boolean);
-        let firstMedia = '';
-        for (const line of lines) {
-          if (!line.trim().startsWith('#')) { firstMedia = line.trim(); break; }
-        }
-        if (firstMedia) {
-          const url = resolveRelativeViaProxy(proxiedSrc, firstMedia);
-          dlog('↓ First media:', url);
-          const r2 = await fetch(url, {
-            method: 'GET',
-            headers: { range: 'bytes=0-1' },
-            cache: 'no-store',
-            signal: controller.signal,
-          });
-          const st2 = r2.headers.get('x-proxy-status') || r2.status;
-          dlog('↑ First media status:', st2);
-          if (!r2.ok) throw new Error(`Media HTTP ${st2}`);
-        } else {
-          dlog('Manifest sin media directa (variant playlist).');
-        }
-      } catch (e) {
-        dlog('❌ PRECHECK:', e?.message || e);
-        throw e;
-      }
-    })();
+    video.addEventListener('playing', onPlaying);
+    video.addEventListener('ended', onEnded);
+    video.addEventListener('error', onError);
 
-    const attachNative = () => {
-      video.src = proxiedSrc;
-      video.addEventListener('canplay', ready, { once: true });
-      video.addEventListener('error', () => {
-        const code = video.error?.code;
-        fail(code ? `Error de reproducción (code ${code})` : 'Error de reproducción');
+    const canNative = video.canPlayType('application/vnd.apple.mpegurl');
+
+    if (canNative) {
+      // Safari / algunos navegadores
+      video.src = finalSrc;
+      video.play().catch((err) => {
+        console.error('[VideoPlayer] play() native error', err);
+        setStatus('error');
+        setErrorMsg('No se pudo iniciar la reproducción.');
       });
-      video.load();
-    };
+    } else if (Hls.isSupported()) {
+      const hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: true,
+      });
+      hlsRef.current = hls;
 
-    const setup = async () => {
-      try {
-        await precheck; // si falla, lanzará error arriba
-        if (done) return;
-
-        await loadHlsScript();
-
-        if (window.Hls && window.Hls.isSupported()) {
-          const BaseLoader = window.Hls.DefaultConfig.loader;
-          class ProxyLoader extends BaseLoader {
-            load(context, config, callbacks) {
-              try {
-                const u = context?.url;
-                if (typeof u === 'string' && u) {
-                  if (/^https?:\/\//i.test(u)) {
-                    context.url = rewriteAbsoluteToProxy(u);
-                  } else if (typeof context?.frag?.baseurl === 'string') {
-                    const abs = new URL(u, context.frag.baseurl).href;
-                    context.url = rewriteAbsoluteToProxy(abs);
-                  } else {
-                    const abs2 = new URL(u, new URL(proxiedSrc, window.location.origin)).href;
-                    context.url = rewriteAbsoluteToProxy(abs2);
-                  }
-                  dlog('HLS load →', context.url);
-                }
-              } catch (e) {
-                dlog('HLS rewrite error:', e?.message || e);
-              }
-              super.load(context, config, callbacks);
-            }
+      hls.on(Hls.Events.ERROR, (_, data) => {
+        if (data?.fatal) {
+          console.error('[VideoPlayer] HLS fatal error', data);
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              hls.startLoad();
+              break;
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              hls.recoverMediaError();
+              break;
+            default:
+              setStatus('error');
+              setErrorMsg('Error HLS fatal.');
+              hls.destroy();
           }
-
-          hls = new window.Hls({ enableWorker: true, loader: ProxyLoader });
-
-          hls.on(window.Hls.Events.ERROR, (_evt, data) => {
-            dlog('HLS ERROR:', data?.type || 'unknown', data?.details || '', 'fatal=', String(data?.fatal));
-            if (data?.fatal || String(data?.type || '').toLowerCase().includes('network')) {
-              fail(`HLS error${data?.fatal ? ' (fatal)' : ''}: ${data?.type || ''} ${data?.details || ''}`);
-              try { hls.destroy(); } catch {}
-            }
-          });
-          hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
-            clearTimeout(timeoutId);
-            dlog('MANIFEST_PARSED');
-            ready();
-          });
-
-          hls.loadSource(proxiedSrc);
-          hls.attachMedia(video);
-        } else {
-          // Safari / iOS
-          attachNative();
         }
-      } catch (e) {
-        clearTimeout(timeoutId);
-        fail(e?.message || String(e));
-      }
-    };
+      });
 
-    setup();
+      hls.loadSource(finalSrc);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        video.play().catch((err) => {
+          console.error('[VideoPlayer] play() hls error', err);
+          setStatus('error');
+          setErrorMsg('No se pudo iniciar la reproducción (HLS).');
+        });
+      });
+    } else {
+      // Fallback muy básico
+      video.src = finalSrc;
+      video.play().catch((err) => {
+        console.error('[VideoPlayer] play() basic error', err);
+        setStatus('error');
+        setErrorMsg('El navegador no soporta HLS.');
+      });
+    }
 
     return () => {
-      clearTimeout(timeoutId);
-      controller.abort();
-      if (hls) { try { hls.destroy(); } catch {} }
-      if (video) {
-        video.removeAttribute('src');
-        video.load();
-      }
+      video.removeEventListener('playing', onPlaying);
+      video.removeEventListener('ended', onEnded);
+      video.removeEventListener('error', onError);
+      try {
+        hlsRef.current?.destroy();
+        hlsRef.current = null;
+      } catch {}
     };
-  // ✅ incluye 'src' para satisfacer react-hooks/exhaustive-deps
-  }, [proxiedSrc, autoPlay, debug, src]);
+  }, [finalSrc]);
 
   return (
-    <div className="w-full">
-      {status === 'loading' && (
-        <div className="w-full aspect-video bg-black/70 text-white flex flex-col items-center justify-center rounded-lg p-3">
-          <div>Cargando video…</div>
+    <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
+      <div className="absolute top-4 right-4">
+        <button
+          onClick={onClose}
+          className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-white"
+        >
+          Cerrar
+        </button>
+      </div>
+
+      <div className="w-full max-w-5xl px-4">
+        <h2 className="text-white text-lg mb-3">{channel?.name || 'Canal'}</h2>
+
+        <div className="bg-black rounded-lg overflow-hidden">
+          <video
+            ref={videoRef}
+            controls
+            playsInline
+            className="w-full h-[60vh] bg-black"
+          />
         </div>
-      )}
-      {status === 'error' && (
-        <div className="w-full aspect-video bg-black/70 text-red-300 p-3 rounded-lg overflow-auto">
-          <div className="font-semibold mb-1">No se pudo reproducir el canal</div>
-          <div className="text-sm opacity-90 mb-2">{errorMsg}</div>
-        </div>
-      )}
-      <video
-        ref={videoRef}
-        poster={poster}
-        controls={controls}
-        muted={muted}
-        playsInline
-        className="w-full rounded-lg"
-        style={{ display: status === 'ready' ? 'block' : 'none' }}
-      />
+
+        {/* Mensaje pequeño si hay error */}
+        {status === 'error' && (
+          <p className="mt-3 text-sm text-red-400">
+            No se pudo reproducir el canal. {errorMsg}
+          </p>
+        )}
+
+        {status === 'loading' && (
+          <p className="mt-3 text-sm text-gray-300">Cargando video…</p>
+        )}
+      </div>
     </div>
   );
 }
