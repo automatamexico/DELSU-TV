@@ -1,219 +1,280 @@
 // src/components/VideoPlayer.js
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Hls from 'hls.js';
-import { X } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
 
-export default function VideoPlayer({ title = 'Reproductor', src, onClose }) {
+function toProxied(url) {
+  try {
+    // Si es absoluta (http/https) y es streamhoster, la pasamos por /hls/...
+    const u = new URL(url, window.location.origin);
+    const host = u.hostname.toLowerCase();
+
+    // Si ya viene proxificada (/hls/...) la dejamos igual
+    if (u.pathname.startsWith('/hls/')) return u.pathname + u.search;
+
+    // Proxy para streamhoster (ajusta aquí si quieres añadir otros hostnames)
+    if (host.includes('streamhoster.com')) {
+      // /hls/<todo-el-path-del-manifest>
+      return `/hls${u.pathname}${u.search}`;
+    }
+
+    // Otras URLs absolutas: las dejamos como están (si necesitas proxy, añade condición arriba)
+    return u.toString();
+  } catch {
+    // Si es relativa (p. ej. /hls/...), la regresamos tal cual
+    return url;
+  }
+}
+
+export default function VideoPlayer({ channel, onClose }) {
   const videoRef = useRef(null);
-  const hlsRef = useRef/** @type {React.MutableRefObject<Hls|null>} */(null);
-  const [loading, setLoading] = useState(true);
+  const hlsRef = useRef(null);
+  const [status, setStatus] = useState('init'); // init | loading | playing | error
   const [errorMsg, setErrorMsg] = useState('');
-  const [steps, setSteps] = useState([]);
+  const [events, setEvents] = useState([]);
 
-  // Toggle debug con ?debug=1
+  // NO mostramos la fuente (URL) — solo nombre/poster
+  const { name = 'Canal', poster, stream_url: originalSrc } = channel || {};
+
+  // Debug solo si ?debug=1
   const debug = useMemo(() => {
-    try { return new URLSearchParams(window.location.search).get('debug') === '1'; }
-    catch { return false; }
+    try {
+      return new URLSearchParams(window.location.search).get('debug') === '1';
+    } catch {
+      return false;
+    }
   }, []);
 
-  const log = useCallback(
-    (msg, extra) => {
-      if (!debug) return;
-      setSteps(s => [...s, { t: new Date().toISOString(), msg, extra }]);
-    },
-    [debug]
-  );
+  const srcResolved = useMemo(() => {
+    if (!originalSrc) return '';
+    return toProxied(originalSrc);
+  }, [originalSrc]);
 
-  // Usar la URL tal cual (ya permitida por CSP)
-  const finalSrc = useMemo(() => (src || '').trim(), [src]);
+  // Utilidad simple para loguear eventos en modo debug
+  const log = (label, data) => {
+    if (!debug) return;
+    setEvents(prev => {
+      const now = new Date();
+      return [
+        ...prev,
+        {
+          t: now.toISOString().split('T')[1].replace('Z', ''),
+          label,
+          data
+        }
+      ];
+    });
+    // eslint-disable-next-line no-console
+    console.log('[VideoPlayer]', label, data || '');
+  };
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !finalSrc) return;
-
-    setLoading(true);
-    setErrorMsg('');
-    setSteps([]);
+    if (!video || !srcResolved) return;
 
     let timeoutId;
 
-    const clearAll = () => {
+    const cleanUp = () => {
       if (timeoutId) clearTimeout(timeoutId);
-      try {
-        if (hlsRef.current) {
+      if (hlsRef.current) {
+        try {
           hlsRef.current.destroy();
-          hlsRef.current = null;
+        } catch (e) {
+          // ignore
         }
-      } catch {}
+        hlsRef.current = null;
+      }
+      // limpiar src para evitar fugas
+      if (video) {
+        try {
+          video.pause();
+          video.removeAttribute('src');
+          video.load();
+        } catch (e) {
+          // ignore
+        }
+      }
+    };
+
+    setStatus('loading');
+    setErrorMsg('');
+    setEvents([]);
+
+    const startPlayback = async () => {
       try {
-        video.pause?.();
-        video.removeAttribute('src');
-        video.load?.();
-      } catch {}
-    };
+        // iOS / Safari soporta HLS nativo
+        if (video.canPlayType('application/vnd.apple.mpegurl')) {
+          log('NATIVE_START', { src: srcResolved });
+          video.src = srcResolved;
+          await video.play().catch(() => video.muted = true).then(() => video.play().catch(() => {}));
+          setStatus('playing');
+          log('NATIVE_PLAYING');
+          return;
+        }
 
-    const startTimeout = () => {
-      timeoutId = setTimeout(() => {
-        setErrorMsg('No se pudo iniciar la reproducción (timeout).');
-        setLoading(false);
-        log('⏱ Timeout de arranque', {});
-      }, 12000);
-    };
+        if (Hls.isSupported()) {
+          log('HLS_START', { src: srcResolved });
+          const hls = new Hls({
+            enableWorker: true,
+            lowLatencyMode: true,
+            backBufferLength: 90,
+            // Evita credenciales si no las necesitas
+            xhrSetup: (xhr) => {
+              xhr.withCredentials = false;
+            }
+          });
+          hlsRef.current = hls;
 
-    const tryAutoplay = async () => {
-      try {
-        video.muted = true;
-        await video.play();
-      } catch (e) {
-        log('⚠️ Autoplay bloqueado', { e: String(e) });
+          hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+            log('MEDIA_ATTACHED');
+          });
+          hls.on(Hls.Events.MANIFEST_LOADING, () => {
+            log('MANIFEST_LOADING');
+          });
+          hls.on(Hls.Events.MANIFEST_PARSED, (ev, data) => {
+            log('MANIFEST_PARSED', { levels: (data && data.levels && data.levels.length) || 0 });
+            video
+              .play()
+              .then(() => {
+                setStatus('playing');
+                log('PLAY_OK');
+              })
+              .catch((err) => {
+                // Autoplay policy — forzamos muted y reintento
+                video.muted = true;
+                video.play().then(() => {
+                  setStatus('playing');
+                  log('PLAY_OK_MUTED');
+                }).catch((e2) => {
+                  setStatus('error');
+                  setErrorMsg('No se pudo iniciar la reproducción (autoplay). Toca el botón ▶️.');
+                  log('PLAY_FAIL', { err: String(e2) });
+                });
+              });
+          });
+          hls.on(Hls.Events.LEVEL_LOADED, (ev, data) => {
+            log('LEVEL_LOADED', { details: !!data?.details });
+          });
+          hls.on(Hls.Events.ERROR, (ev, data) => {
+            log('HLS_ERROR', { type: data?.type, details: data?.details, fatal: data?.fatal });
+            if (data?.fatal) {
+              switch (data.type) {
+                case Hls.ErrorTypes.NETWORK_ERROR:
+                  setStatus('loading');
+                  setErrorMsg('Recuperando red…');
+                  hls.startLoad();
+                  break;
+                case Hls.ErrorTypes.MEDIA_ERROR:
+                  setStatus('loading');
+                  setErrorMsg('Recuperando medios…');
+                  hls.recoverMediaError();
+                  break;
+                default:
+                  setStatus('error');
+                  setErrorMsg('Error fatal del reproductor.');
+                  hls.destroy();
+                  break;
+              }
+            }
+          });
+
+          hls.loadSource(srcResolved);
+          hls.attachMedia(video);
+
+          // Watchdog: si en 10s no parsea manifest → error visible
+          timeoutId = setTimeout(() => {
+            if (status !== 'playing') {
+              setStatus('error');
+              setErrorMsg('No se pudo cargar el manifiesto HLS. Verifica el proxy /hls/ y el origen.');
+              log('TIMEOUT_10S');
+            }
+          }, 10000);
+          return;
+        }
+
+        // Si llegamos aquí, ni nativo ni Hls.js soportado
+        setStatus('error');
+        setErrorMsg('Tu navegador no soporta HLS.');
+        log('NO_SUPPORT');
+      } catch (err) {
+        setStatus('error');
+        setErrorMsg('Fallo al inicializar el reproductor.');
+        log('INIT_FAIL', { err: String(err) });
       }
     };
 
-    try {
-      // Safari / iOS: HLS nativo
-      if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        log('HLS nativo', {});
-        startTimeout();
-        video.src = finalSrc;
+    startPlayback();
 
-        const onLoaded = () => {
-          setLoading(false);
-          if (timeoutId) clearTimeout(timeoutId);
-          tryAutoplay();
-        };
-        const onErr = () => {
-          setErrorMsg('No se pudo iniciar la reproducción.');
-          setLoading(false);
-        };
-
-        video.addEventListener('loadeddata', onLoaded);
-        video.addEventListener('error', onErr);
-
-        return () => {
-          video.removeEventListener('loadeddata', onLoaded);
-          video.removeEventListener('error', onErr);
-          clearAll();
-        };
-      }
-
-      // Otros navegadores: Hls.js
-      if (Hls.isSupported()) {
-        log('Hls.js cargado', {});
-        startTimeout();
-
-        const hls = new Hls({
-          enableWorker: true,
-          lowLatencyMode: true,
-          backBufferLength: 60,
-          fragLoadingTimeout: 15000,
-          manifestLoadingTimeOut: 15000,
-        });
-        hlsRef.current = hls;
-
-        hls.on(Hls.Events.ERROR, (_, data) => {
-          log('HLS ERROR', { type: data?.type, details: data?.details, fatal: data?.fatal });
-          if (data?.fatal) {
-            setErrorMsg(`Error HLS: ${data.type || 'fatal'}`);
-            setLoading(false);
-            try { hls.destroy(); } catch {}
-          }
-        });
-
-        hls.on(Hls.Events.MEDIA_ATTACHED, () => log('MEDIA_ATTACHED', {}));
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          log('MANIFEST_PARSED', {});
-          setLoading(false);
-          if (timeoutId) clearTimeout(timeoutId);
-          tryAutoplay();
-        });
-        hls.on(Hls.Events.LEVEL_LOADED, (_, d) => {
-          log('LEVEL_LOADED', { live: d?.details?.live });
-        });
-
-        hls.attachMedia(video);
-        hls.loadSource(finalSrc);
-
-        return () => clearAll();
-      }
-
-      // Fallback simple
-      log('Fallback simple', {});
-      startTimeout();
-      video.src = finalSrc;
-
-      const onLoaded = () => {
-        setLoading(false);
-        if (timeoutId) clearTimeout(timeoutId);
-        tryAutoplay();
-      };
-      const onErr = () => {
-        setErrorMsg('No se pudo iniciar la reproducción.');
-        setLoading(false);
-      };
-
-      video.addEventListener('loadeddata', onLoaded);
-      video.addEventListener('error', onErr);
-
-      return () => {
-        video.removeEventListener('loadeddata', onLoaded);
-        video.removeEventListener('error', onErr);
-        clearAll();
-      };
-    } catch (e) {
-      setErrorMsg('Error inicializando el reproductor.');
-      setLoading(false);
-      log('Excepción useEffect', { e: String(e) });
-      return () => clearAll();
-    }
-  }, [finalSrc, log]);
+    return () => {
+      cleanUp();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [srcResolved, debug]); // incluimos debug para reiniciar logs si activas ?debug=1
 
   return (
-    <div className="fixed inset-0 z-[999] flex items-start md:items-center justify-center bg-black/80 p-4">
-      <div className="w-full max-w-5xl rounded-xl bg-[#0f1216] border border-white/10 shadow-2xl overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-          <h2 className="text-white font-semibold truncate">{title}</h2>
-          <button
-            onClick={onClose}
-            className="inline-flex items-center gap-2 text-sm px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20 text-white transition"
-          >
-            <X size={16} /> Cerrar
-          </button>
+    <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
+      <div className="relative w-full max-w-5xl">
+        {/* Botón cerrar */}
+        <button
+          onClick={onClose}
+          className="absolute -top-12 right-0 text-white/80 hover:text-white flex items-center gap-2"
+          aria-label="Cerrar"
+        >
+          <X className="w-6 h-6" />
+          Cerrar
+        </button>
+
+        {/* Título (sin URL) */}
+        <div className="mb-3 text-white/90 text-lg font-semibold">
+          {name}
         </div>
 
-        {/* Video */}
-        <div className="relative bg-black">
+        {/* Contenedor del video */}
+        <div className="bg-black rounded-xl overflow-hidden border border-white/10">
           <video
             ref={videoRef}
-            className="w-full aspect-video"
+            className="w-full h-[60vh] bg-black"
+            poster={poster || undefined}
             controls
             playsInline
-            preload="auto"
+            // Intento suave de autoplay: muchas veces requiere muted
+            muted
           />
-          {loading && (
-            <div className="absolute inset-0 grid place-items-center">
-              <div className="text-white/80 text-sm">Cargando video...</div>
-            </div>
-          )}
         </div>
 
-        {/* Error sin exponer fuente */}
-        {errorMsg && (
-          <div className="px-4 py-3 text-sm text-red-400 border-t border-white/10">
-            {errorMsg}
+        {/* Estado / errores */}
+        {status !== 'playing' && (
+          <div className="mt-4 text-sm text-white/80">
+            {status === 'loading' && (
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Cargando video…
+              </div>
+            )}
+            {status === 'error' && (
+              <div className="text-red-300">
+                {errorMsg || 'No se pudo reproducir este canal.'}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Debug opcional */}
+        {/* Panel DEBUG solo cuando ?debug=1 */}
         {debug && (
-          <div className="px-4 py-3 text-xs text-white/70 border-t border-white/10 space-y-1 max-h-40 overflow-auto">
-            <div className="font-semibold text-white/80">DEBUG</div>
-            <div>src (oculto)</div>
-            {steps.map((s, i) => (
-              <div key={i}>
-                • [{s.t}] {s.msg} {s.extra ? `| ${JSON.stringify(s.extra)}` : ''}
-              </div>
-            ))}
+          <div className="mt-4 p-3 rounded-lg bg-black/40 border border-white/10 text-xs max-h-48 overflow-auto text-white/80">
+            <div className="mb-2 font-semibold">DEBUG</div>
+            {events.length === 0 ? (
+              <div className="opacity-70">Sin eventos aún…</div>
+            ) : (
+              <ul className="space-y-1">
+                {events.map((e, i) => (
+                  <li key={i} className="font-mono">
+                    [{e.t}] {e.label}{' '}
+                    {e.data ? <span className="opacity-80">{JSON.stringify(e.data)}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
       </div>
