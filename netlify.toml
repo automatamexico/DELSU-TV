@@ -1,43 +1,32 @@
+# netlify.toml
 [build]
   command = "npm run build"
   publish = "build"
-  edge_functions = "netlify/edge-functions"
 
-# Proxy HLS: TODO lo que entre por /hls/* va a 2-fss-2.streamhoster.com, 
-# preservando el path EXACTO (pl_118 o p1_118 o lo que sea dentro de :splat).
 [[redirects]]
   from = "/hls/*"
-  to   = "https://2-fss-2.streamhoster.com/:splat"
+  to = "https://2-fss-2.streamhoster.com/:splat"
   status = 200
   force = true
 
-# Si usas OTRO host adicional (p. ej. 2-fss-1), duplica el bloque con otra ruta:
-# [[redirects]]
-#   from = "/hls1/*"
-#   to   = "https://2-fss-1.streamhoster.com/:splat"
-#   status = 200
-#   force = true
-
-# Seguridad razonable + habilitar nuestros hosts
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy = """
+    Content-Security-Policy = '''
       default-src 'self';
       script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com;
-      connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://delsutv.netlify.app;
+      connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://delsutv.netlify.app https://2-fss-2.streamhoster.com;
       img-src 'self' data: https:;
       style-src 'self' 'unsafe-inline' https:;
       font-src 'self' data: https:;
-      media-src 'self' https://delsutv.netlify.app https://*.streamhoster.com blob: data:;
+      media-src 'self' blob: data: https://delsutv.netlify.app https://*.streamhoster.com;
       frame-ancestors *;
-    """
+    '''
     Referrer-Policy = "strict-origin-when-cross-origin"
     Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
     X-Content-Type-Options = "nosniff"
     X-Frame-Options = "SAMEORIGIN"
 
-# SPA
 [[redirects]]
   from = "/*"
   to = "/index.html"
