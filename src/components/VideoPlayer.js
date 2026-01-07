@@ -2,24 +2,18 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Hls from "hls.js";
 
-/** Reescribe URLs de Streamhoster al proxy /hls */
+/** Convierte URLs de Streamhoster a /hls/<host>/<path> para pasar por el proxy genérico */
 function normalizeM3u8(url = "") {
   if (!url) return "";
   try {
     const u = new URL(url, window.location.origin);
-
-    // Sólo tocar streamhoster
     if (u.hostname.includes("streamhoster.com")) {
-      // Acepta host con dígitos/letras. NO cambies la ruta.
-      // Ejemplo original:
-      //   https://2-fss-2.streamhoster.com/p1_118/207612-6721550-1/chunklist.m3u8
-      // Proxy final:
-      //   /hls/p1_118/207612-6721550-1/chunklist.m3u8
-      return "/hls" + u.pathname;
+      // /hls/<host>/<path>
+      return `/hls/${u.host}${u.pathname}`;
     }
     return u.toString();
   } catch {
-    // Si llega relativo tipo /hls/..., déjalo pasar
+    // Si ya viene relativo (/hls/...), lo dejamos
     if (url.startsWith("/hls/")) return url;
     return url;
   }
@@ -48,10 +42,12 @@ export default function VideoPlayer({
   const hlsRef = useRef(null);
   const [status, setStatus] = useState("idle"); // idle | checking | loading | playing | error
   const [msg, setMsg] = useState("");
+  const [finalUrlShown, setFinalUrlShown] = useState("");
 
   const finalSrc = useMemo(() => {
     const s = normalizeM3u8(src);
-    console.debug("[VideoPlayer] src original:", src, " → final:", s);
+    console.debug("[VideoPlayer] original:", src, "→ final:", s);
+    setFinalUrlShown(s);
     return s;
   }, [src]);
 
@@ -97,28 +93,21 @@ export default function VideoPlayer({
     };
 
     (async () => {
-      // 1) Pre-chequeo HEAD (da errores claros)
       const ok = await headOk(finalSrc, 8000);
       if (!ok) {
         setStatus("error");
-        setMsg(
-          "No se pudo cargar el manifiesto HLS. Revisa el proxy /hls y que la ruta exista (404/403)."
-        );
+        setMsg("No se pudo cargar el manifiesto HLS. Revisa el proxy /hls y que la ruta exista (404/403).");
         console.debug("[VideoPlayer] HEAD falló:", finalSrc);
         return;
       }
 
-      // 2) Reproducción
       if (isHls && Hls.isSupported()) {
         setStatus("loading");
         const hls = new Hls({
           lowLatencyMode: true,
           enableWorker: true,
           backBufferLength: 60,
-          // Si tu CDN requiere cookies, cámbialo a true y gestiona credenciales
-          xhrSetup: (xhr) => {
-            xhr.withCredentials = false;
-          },
+          xhrSetup: (xhr) => { xhr.withCredentials = false; },
         });
         hlsRef.current = hls;
 
@@ -142,10 +131,9 @@ export default function VideoPlayer({
           });
         } catch {
           setStatus("error");
-          setMsg("Error HLS: manifestLoadError (ver URL en consola).");
+          setMsg("Error HLS: manifestLoadError (ver URL final más abajo).");
         }
       } else {
-        // Safari/Android con soporte nativo m3u8 o MP4, etc.
         startNative();
       }
     })();
@@ -182,13 +170,23 @@ export default function VideoPlayer({
 
       {status === "error" && (
         <div className="text-red-400 text-xs px-4 py-2 border-t border-gray-700">
-          {msg || "Error de reproducción."}
+          {msg}
         </div>
       )}
 
-      {!hideSource && (
-        <div className="text-gray-500 text-[11px] px-4 py-2 border-t border-gray-800 truncate">
-          Fuente: {finalSrc || "—"}
+      {/* En errores, muestra la URL final para abrirla en nueva pestaña y verificar 200/403/404 */}
+      {status === "error" && finalUrlShown && (
+        <div className="text-[11px] text-gray-400 px-4 py-2 border-t border-gray-800 truncate">
+          URL final:{" "}
+          <a href={finalUrlShown} target="_blank" rel="noreferrer" className="underline">
+            {finalUrlShown}
+          </a>
+        </div>
+      )}
+
+      {!hideSource && status !== "error" && finalUrlShown && (
+        <div className="text-[11px] text-gray-500 px-4 py-2 border-t border-gray-800 truncate">
+          Fuente: {finalUrlShown}
         </div>
       )}
     </div>
