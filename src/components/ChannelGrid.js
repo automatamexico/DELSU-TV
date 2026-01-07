@@ -1,11 +1,6 @@
 // src/components/ChannelGrid.jsx
 import React from "react";
 
-/**
- * Renderiza una grilla de canales. Llama onChannelClick(channel) al hacer clic.
- * Espera que cada channel tenga al menos: id (o name único), name, country, image/poster opcional,
- * y alguna URL de stream en m3u8 (m3u8Url | streamUrl | url).
- */
 export default function ChannelGrid({ channels = [], onChannelClick }) {
   if (!Array.isArray(channels)) channels = [];
 
@@ -24,9 +19,7 @@ export default function ChannelGrid({ channels = [], onChannelClick }) {
             key={key}
             type="button"
             onClick={() => {
-              // Seguridad: evitar clicks sin handler
               if (typeof onChannelClick === "function") onChannelClick(ch);
-              // Log útil para diagnóstico
               try {
                 console.debug("[ChannelGrid] click", {
                   name: ch?.name,
