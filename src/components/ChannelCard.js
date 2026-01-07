@@ -1,9 +1,7 @@
 // src/components/ChannelCard.jsx
 import React from "react";
-import { LazyLoadImage } from "react-lazy-load-image-component";
 
 export default function ChannelCard({ channel, onClick }) {
-  // Toma de la tabla channels (con fallbacks por si cambian los nombres)
   const title =
     channel?.title ||
     channel?.name ||
@@ -14,7 +12,7 @@ export default function ChannelCard({ channel, onClick }) {
     channel?.poster_url ||
     channel?.poster ||
     channel?.thumbnail ||
-    "/poster-fallback.jpg"; // opcional
+    "/poster-fallback.jpg";
 
   const category =
     channel?.category || channel?.categoria || channel?.genre || "—";
@@ -31,18 +29,17 @@ export default function ChannelCard({ channel, onClick }) {
     >
       {/* Poster alto (vertical) */}
       <div className="relative">
-        {/* 3/4 en móviles, 2/3 desde md en adelante */}
+        {/* 3/4 en móviles, 2/3 desde md */}
         <div className="aspect-[3/4] md:aspect-[2/3] w-full overflow-hidden bg-gray-800">
-          {/* Puedes usar img normal si no usas este paquete */}
-          <LazyLoadImage
+          <img
             src={poster}
             alt={title}
+            loading="lazy"
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-            effect="opacity"
           />
         </div>
 
-        {/* Etiqueta categoría en esquina */}
+        {/* Etiqueta de categoría */}
         <div className="absolute left-2 top-2">
           <span className="text-[11px] px-2 py-1 rounded-full bg-rose-500/90 text-white shadow">
             {category}
@@ -56,14 +53,10 @@ export default function ChannelCard({ channel, onClick }) {
           {title}
         </h3>
 
-        <div className="text-[12px] text-gray-400 flex items-center gap-2">
-          <span className="inline-flex items-center gap-1">
-            <span className="i-ph:map-pin-duotone" />
-            {country}
-          </span>
+        <div className="text-[12px] text-gray-400">
+          {country}
         </div>
 
-        {/* Descripción (2 líneas) */}
         {description ? (
           <p className="text-[12px] leading-4 text-gray-400 line-clamp-2 mt-1.5">
             {description}
