@@ -3,9 +3,10 @@
   command = "npm run build"
   publish = "build"
 
+# Proxy HLS GENÉRICO: /hls/<host>/<path...> -> https://<host>/<path...>
 [[redirects]]
   from = "/hls/*"
-  to = "https://2-fss-2.streamhoster.com/:splat"
+  to = "https://:splat"
   status = 200
   force = true
 
@@ -15,7 +16,7 @@
     Content-Security-Policy = '''
       default-src 'self';
       script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com;
-      connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://delsutv.netlify.app https://2-fss-2.streamhoster.com;
+      connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://delsutv.netlify.app https://*.streamhoster.com;
       img-src 'self' data: https:;
       style-src 'self' 'unsafe-inline' https:;
       font-src 'self' data: https:;
@@ -27,6 +28,7 @@
     X-Content-Type-Options = "nosniff"
     X-Frame-Options = "SAMEORIGIN"
 
+# SPA
 [[redirects]]
   from = "/*"
   to = "/index.html"
