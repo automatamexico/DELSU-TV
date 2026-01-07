@@ -1,174 +1,139 @@
-// src/components/VideoPlayer.jsx
+// src/components/VideoPlayer.js
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Hls from 'hls.js';
-import { X, Play } from 'lucide-react';
+import { X } from 'lucide-react';
 
-function toProxied(src) {
-  if (!src) return '';
-  // ya proxied
-  if (src.startsWith('/hls/')) return src;
-  // convierte https://host/path.m3u8 -> /hls/host/path.m3u8
-  const clean = src.replace(/^https?:\/\//i, '');
-  return `/hls/${clean}`;
-}
-
-export default function VideoPlayer({ channel, onClose }) {
+export default function VideoPlayer({ title = 'Reproductor', src, onClose }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
-  const [error, setError] = useState('');
-  const [showPlay, setShowPlay] = useState(false);
-  const [isReady, setIsReady] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState('');
 
-  const finalSrc = useMemo(() => toProxied(channel?.stream_url || ''), [channel]);
-
-  // Limpia instancia Hls al desmontar o cambiar de canal
-  useEffect(() => {
-    return () => {
-      if (hlsRef.current) {
-        try {
-          hlsRef.current.destroy();
-        } catch {}
-        hlsRef.current = null;
-      }
-    };
+  // Permite activar depuración solo si la URL trae ?debug=1
+  const showDebug = useMemo(() => {
+    try {
+      return new URLSearchParams(window.location.search).get('debug') === '1';
+    } catch {
+      return false;
+    }
   }, []);
 
-  // Inicializa el reproductor
-  useEffect(() => {
-    setError('');
-    setShowPlay(false);
-    setIsReady(false);
+  // Si te llega una URL https://host/... la proxificamos como /hls/host/...
+  const finalSrc = useMemo(() => {
+    if (!src) return '';
+    if (/^https?:\/\//i.test(src)) {
+      return '/hls/' + src.replace(/^https?:\/\//i, '');
+    }
+    // ya viene proxificada
+    return src.startsWith('/hls/') ? src : '/hls/' + src;
+  }, [src]);
 
+  useEffect(() => {
     const video = videoRef.current;
-    if (!video || !finalSrc) {
-      setError('No hay fuente de video (src vacío).');
-      return;
+    if (!video || !finalSrc) return;
+
+    setLoading(true);
+    setErrorMsg('');
+
+    // Si el navegador soporta HLS nativo (Safari), usa source directo
+    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = finalSrc;
+      video.addEventListener('loadedmetadata', () => setLoading(false));
+      video.addEventListener('error', () => setErrorMsg('No se pudo iniciar la reproducción.'));
+      video.play().catch(() => {});
+      return () => {
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
+      };
     }
 
-    // Helper: intenta reproducir lidiando con autoplay
-    const tryPlay = async () => {
-      try {
-        video.muted = true;            // autoplay-friendly
-        video.playsInline = true;      // iOS
-        video.autoplay = true;
-        await video.play();
-        setIsReady(true);
-        setShowPlay(false);
-      } catch (e) {
-        // Autoplay bloqueado: muestra botón ▶
-        setShowPlay(true);
-        setError('Autoplay bloqueado por el navegador. Pulsa ▶ para iniciar.');
-      }
-    };
-
-    // Primero: Hls.js si es soportado
+    // Hls.js para navegadores sin HLS nativo
     if (Hls.isSupported()) {
       const hls = new Hls({
         enableWorker: true,
         lowLatencyMode: true,
         backBufferLength: 60,
+        fragLoadingTimeout: 15000,
+        manifestLoadingTimeOut: 15000,
       });
       hlsRef.current = hls;
 
-      hls.on(Hls.Events.ERROR, (_evt, data) => {
-        // Falla fatal: muestra error
+      hls.on(Hls.Events.ERROR, (_, data) => {
         if (data?.fatal) {
-          setError(`Error HLS: ${data?.type || ''} ${data?.details || ''}`);
-          setShowPlay(false);
+          setErrorMsg(`Error HLS: ${data?.type || 'fatal'}`);
+          try { hls.destroy(); } catch {}
         }
       });
 
-      try {
-        hls.loadSource(finalSrc);
-        hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, tryPlay);
-      } catch (e) {
-        setError('No se pudo iniciar la reproducción (HLS.js).');
-      }
-      return;
+      hls.loadSource(finalSrc);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        setLoading(false);
+        video.play().catch(() => {});
+      });
+
+      return () => {
+        try { hls.destroy(); } catch {}
+      };
     }
 
-    // Fallback Safari/iOS con HLS nativo
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = finalSrc;
-      const onCanPlay = () => tryPlay();
-      video.addEventListener('canplay', onCanPlay, { once: true });
-      video.addEventListener('loadedmetadata', onCanPlay, { once: true });
-      // backup por si no dispara eventos
-      const t = setTimeout(tryPlay, 1000);
-      return () => clearTimeout(t);
-    }
-
-    setError('Este navegador no soporta HLS.');
+    // Fallback muy básico
+    video.src = finalSrc;
+    video.addEventListener('loadedmetadata', () => setLoading(false));
+    video.addEventListener('error', () => setErrorMsg('No se pudo iniciar la reproducción.'));
+    video.play().catch(() => {});
+    return () => {
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+    };
   }, [finalSrc]);
 
-  const handleManualPlay = async () => {
-    const video = videoRef.current;
-    if (!video) return;
-    try {
-      if (video.paused) await video.play();
-      setShowPlay(false);
-      setError('');
-    } catch (e) {
-      setError('No se pudo iniciar la reproducción.');
-    }
-  };
-
   return (
-    <div className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="relative w-full max-w-5xl">
-        {/* Título + cerrar */}
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-white text-xl font-semibold">
-            {channel?.name || 'Reproducción'}
-          </h2>
+    <div className="fixed inset-0 z-[999] flex items-start md:items-center justify-center bg-black/80 p-4">
+      <div className="w-full max-w-5xl rounded-xl bg-[#0f1216] border border-white/10 shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+          <h2 className="text-white font-semibold truncate">{title}</h2>
           <button
             onClick={onClose}
-            className="px-3 py-1 rounded-md bg-gray-800/80 text-gray-200 hover:bg-gray-700 flex items-center gap-2"
+            className="inline-flex items-center gap-2 text-sm px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20 text-white transition"
           >
-            <X className="w-4 h-4" />
-            Cerrar
+            <X size={16} /> Cerrar
           </button>
         </div>
 
-        {/* Player */}
-        <div className="relative bg-black rounded-xl overflow-hidden shadow-xl">
+        {/* Video */}
+        <div className="relative bg-black">
           <video
             ref={videoRef}
-            className="w-full aspect-video bg-black"
+            className="w-full aspect-video"
             controls
             playsInline
-            // importante para policies
-            muted
+            preload="auto"
           />
-
-          {/* Overlay de Play si el autoplay fue bloqueado */}
-          {showPlay && (
-            <button
-              onClick={handleManualPlay}
-              className="absolute inset-0 flex items-center justify-center bg-black/40 hover:bg-black/30 transition"
-              aria-label="Reproducir"
-            >
-              <div className="flex items-center gap-3 bg-white/10 backdrop-blur px-5 py-3 rounded-xl border border-white/20">
-                <Play className="w-6 h-6 text-white" />
-                <span className="text-white font-semibold">Reproducir</span>
-              </div>
-            </button>
+          {loading && (
+            <div className="absolute inset-0 grid place-items-center">
+              <div className="text-white/80 text-sm">Cargando video…</div>
+            </div>
           )}
         </div>
 
-        {/* Mensajes */}
-        {!isReady && !showPlay && (
-          <div className="mt-3 text-sm text-gray-300">Cargando video…</div>
-        )}
-        {error && (
-          <div className="mt-3 text-sm text-red-400">
-            {error}
+        {/* Errores visibles (sin URL fuente) */}
+        {errorMsg && (
+          <div className="px-4 py-3 text-sm text-red-400 border-t border-white/10">
+            {errorMsg}
           </div>
         )}
-        <div className="mt-2 text-xs text-gray-400">
-          Fuente: <code>{finalSrc || '(vacía)'}</code>
-        </div>
+
+        {/* Panel de depuración (oculto por defecto; solo con ?debug=1) */}
+        {showDebug && (
+          <div className="px-4 py-3 text-xs text-white/70 border-t border-white/10">
+            <div className="font-semibold text-white/80 mb-1">DEBUG</div>
+            <div>finalSrc = {finalSrc}</div>
+          </div>
+        )}
       </div>
     </div>
   );
