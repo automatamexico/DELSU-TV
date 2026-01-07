@@ -1,10 +1,9 @@
-// src/components/VideoPlayer.js
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Hls from "hls.js";
 
 /**
  * Props:
- *  - src: string  (URL m3u8 tal como está guardada en tu BD)
+ *  - src: string  (URL .m3u8 tal como viene de tu BD)
  *  - title?: string
  *  - poster?: string
  *  - debug?: boolean
@@ -15,16 +14,15 @@ export default function VideoPlayer({ src, title = "Reproductor", poster, debug 
   const [status, setStatus] = useState("idle"); // idle | loading | playing | error
   const [logLines, setLogLines] = useState([]);
 
-  // logger para ver eventos cuando debug=true
   const log = (tag, payload) => {
     if (!debug) return;
-    const line = `[${new Date().toLocaleTimeString()}] ${tag} ${payload ? JSON.stringify(payload) : ""}`;
+    const line = `[${new Date().toLocaleTimeString()}] ${tag} ${
+      payload ? JSON.stringify(payload) : ""
+    }`;
     setLogLines((ls) => [...ls.slice(-200), line]);
-    // console.log(line);
   };
 
-  // === Sin tocar el path ===
-  // Si es streamhoster.com → usar proxy /hls + pathname exacto (con pl_118 o lo que venga).
+  // No tocamos el path. Solo proxificamos si es streamhoster.
   const finalSrc = useMemo(() => {
     try {
       const u = new URL(src);
@@ -33,12 +31,12 @@ export default function VideoPlayer({ src, title = "Reproductor", poster, debug 
         log("SRC_PROXY", { original: src, final: proxied });
         return proxied;
       }
-    } catch (e) {
-      // src no es URL absoluta
+    } catch (_) {
+      // src puede ser relativo; lo dejamos como está
     }
     log("SRC_DIRECT", { final: src });
     return src;
-  }, [src]);
+  }, [src]); // <- log no es dependencia intencionalmente
 
   useEffect(() => {
     const video = videoRef.current;
@@ -47,7 +45,8 @@ export default function VideoPlayer({ src, title = "Reproductor", poster, debug 
     let destroyed = false;
     setStatus("loading");
 
-    const useNative = () => {
+    // *** IMPORTANTE: no usar nombre que empiece con "use" para evitar la regla de hooks
+    const playNative = () => {
       log("NATIVE_START", { src: finalSrc });
       video.src = finalSrc;
       video.load();
@@ -70,21 +69,22 @@ export default function VideoPlayer({ src, title = "Reproductor", poster, debug 
       return () => {
         video.removeEventListener("canplay", onCanPlay);
         video.removeEventListener("error", onError);
+        try {
+          video.pause();
+        } catch {}
         video.removeAttribute("src");
         video.load();
       };
     };
 
-    // Hls.js si es soportado y parece HLS
     const isHls = /\.m3u8(\?|$)/i.test(finalSrc);
+
     if (Hls.isSupported() && isHls) {
       const hls = new Hls({
-        // tiempos más generosos si upstream a veces tarda
         manifestLoadingTimeOut: 20000,
         manifestLoadingMaxRetry: 3,
         manifestLoadingRetryDelay: 800,
         xhrSetup: (xhr) => {
-          // evita caches tercos
           xhr.setRequestHeader("Cache-Control", "no-cache");
         },
       });
@@ -100,16 +100,21 @@ export default function VideoPlayer({ src, title = "Reproductor", poster, debug 
         setStatus("playing");
         video.play().catch((e) => log("AUTO_PLAY_ERR", { e: String(e) }));
       });
-      hls.on(Hls.Events.LEVEL_LOADED, (_, data) => log("LEVEL_LOADED", { t: data?.details?.totalduration }));
+      hls.on(Hls.Events.LEVEL_LOADED, (_, data) =>
+        log("LEVEL_LOADED", { t: data?.details?.totalduration })
+      );
 
       hls.on(Hls.Events.ERROR, (_, data) => {
         log("HLS_ERROR", { type: data?.type, details: data?.details, fatal: data?.fatal });
         if (data?.fatal) {
-          hls.destroy();
+          // Destruye Hls y cae a nativo
+          try {
+            hls.destroy();
+          } catch {}
           hlsRef.current = null;
-          // Fallback nativo (a veces el <video> sí reproduce directo)
-          const cleanup = useNative();
-          return cleanup;
+          const cleanupNative = playNative();
+          // devolvemos limpieza nativa desde aquí
+          return cleanupNative;
         }
       });
 
@@ -124,13 +129,13 @@ export default function VideoPlayer({ src, title = "Reproductor", poster, debug 
       };
     }
 
-    // Fallback nativo
-    const cleanup = useNative();
+    // Fallback nativo (dispositivos iOS o si HLS.js no se usa)
+    const cleanup = playNative();
     return () => {
       destroyed = true;
       cleanup?.();
     };
-  }, [finalSrc, log]);
+  }, [finalSrc]); // <- log no es dependencia para no re-ejecutar en cada línea
 
   return (
     <div className="w-full">
