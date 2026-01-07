@@ -1,59 +1,21 @@
 // src/components/ChannelGrid.jsx
 import React from "react";
+import ChannelCard from "./ChannelCard";
 
 export default function ChannelGrid({ channels = [], onChannelClick }) {
-  if (!Array.isArray(channels)) channels = [];
+  if (!channels?.length) {
+    return (
+      <div className="p-6 text-center text-gray-400">
+        No hay canales para mostrar.
+      </div>
+    );
+  }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 p-4">
-      {channels.map((ch, idx) => {
-        const key = ch.id ?? ch.slug ?? `${ch.name}-${idx}`;
-        const poster =
-          ch.poster ||
-          ch.image ||
-          ch.thumbnail ||
-          "https://images.unsplash.com/photo-1511379938547-c1f69419868d?q=80&w=1200&auto=format&fit=crop";
-
-        return (
-          <button
-            key={key}
-            type="button"
-            onClick={() => {
-              if (typeof onChannelClick === "function") onChannelClick(ch);
-              try {
-                console.debug("[ChannelGrid] click", {
-                  name: ch?.name,
-                  country: ch?.country,
-                  m3u8Url: ch?.m3u8Url || ch?.streamUrl || ch?.url,
-                });
-              } catch {}
-            }}
-            className="text-left bg-gray-800/50 hover:bg-gray-800 transition-colors border border-gray-700 rounded-xl overflow-hidden shadow-md focus:outline-none focus:ring-2 focus:ring-red-500"
-          >
-            <div className="aspect-[16/9] w-full overflow-hidden bg-black">
-              <img
-                src={poster}
-                alt={ch?.name || "Canal"}
-                className="w-full h-full object-cover"
-                loading="lazy"
-                onError={(e) => {
-                  e.currentTarget.src =
-                    "https://images.unsplash.com/photo-1511379938547-c1f69419868d?q=80&w=1200&auto=format&fit=crop";
-                }}
-              />
-            </div>
-
-            <div className="p-3">
-              <div className="text-white font-semibold truncate">
-                {ch?.name || "Canal"}
-              </div>
-              <div className="text-xs text-gray-400 mt-1 truncate">
-                {ch?.country || "—"}
-              </div>
-            </div>
-          </button>
-        );
-      })}
+    <div className="p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+      {channels.map((ch) => (
+        <ChannelCard key={ch.id || ch.slug || ch.name} channel={ch} onClick={onChannelClick} />
+      ))}
     </div>
   );
 }
