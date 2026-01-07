@@ -1,56 +1,66 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Tv } from 'lucide-react';
-import ChannelCard from './ChannelCard';
+// src/components/ChannelGrid.jsx
+import React from "react";
 
-const ChannelGrid = ({ channels, onChannelClick }) => {
-  if (channels.length === 0) {
-    return (
-      <motion.div 
-        className="flex flex-col items-center justify-center py-20"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <motion.div
-          className="w-24 h-24 bg-gray-800 rounded-full flex items-center justify-center mb-6"
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ delay: 0.2, duration: 0.5, type: "spring" }}
-        >
-          <Tv className="w-12 h-12 text-gray-400" />
-        </motion.div>
-        
-        <h3 className="text-2xl font-bold text-white mb-3">
-          No se encontraron canales
-        </h3>
-        
-        <p className="text-gray-400 text-center max-w-md">
-          No hay canales que coincidan con tu búsqueda. Intenta con otros términos o explora diferentes categorías.
-        </p>
-      </motion.div>
-    );
-  }
+/**
+ * Renderiza una grilla de canales. Llama onChannelClick(channel) al hacer clic.
+ * Espera que cada channel tenga al menos: id (o name único), name, country, image/poster opcional,
+ * y alguna URL de stream en m3u8 (m3u8Url | streamUrl | url).
+ */
+export default function ChannelGrid({ channels = [], onChannelClick }) {
+  if (!Array.isArray(channels)) channels = [];
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <motion.div 
-        className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5 }}
-      >
-        {channels.map((channel, index) => (
-          <ChannelCard
-            key={channel.id}
-            channel={channel}
-            onClick={onChannelClick}
-            index={index}
-          />
-        ))}
-      </motion.div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 p-4">
+      {channels.map((ch, idx) => {
+        const key = ch.id ?? ch.slug ?? `${ch.name}-${idx}`;
+        const poster =
+          ch.poster ||
+          ch.image ||
+          ch.thumbnail ||
+          "https://images.unsplash.com/photo-1511379938547-c1f69419868d?q=80&w=1200&auto=format&fit=crop";
+
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => {
+              // Seguridad: evitar clicks sin handler
+              if (typeof onChannelClick === "function") onChannelClick(ch);
+              // Log útil para diagnóstico
+              try {
+                console.debug("[ChannelGrid] click", {
+                  name: ch?.name,
+                  country: ch?.country,
+                  m3u8Url: ch?.m3u8Url || ch?.streamUrl || ch?.url,
+                });
+              } catch {}
+            }}
+            className="text-left bg-gray-800/50 hover:bg-gray-800 transition-colors border border-gray-700 rounded-xl overflow-hidden shadow-md focus:outline-none focus:ring-2 focus:ring-red-500"
+          >
+            <div className="aspect-[16/9] w-full overflow-hidden bg-black">
+              <img
+                src={poster}
+                alt={ch?.name || "Canal"}
+                className="w-full h-full object-cover"
+                loading="lazy"
+                onError={(e) => {
+                  e.currentTarget.src =
+                    "https://images.unsplash.com/photo-1511379938547-c1f69419868d?q=80&w=1200&auto=format&fit=crop";
+                }}
+              />
+            </div>
+
+            <div className="p-3">
+              <div className="text-white font-semibold truncate">
+                {ch?.name || "Canal"}
+              </div>
+              <div className="text-xs text-gray-400 mt-1 truncate">
+                {ch?.country || "—"}
+              </div>
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
-};
-
-export default ChannelGrid;
+}
