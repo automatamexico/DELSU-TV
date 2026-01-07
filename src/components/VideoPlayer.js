@@ -10,13 +10,12 @@ export default function VideoPlayer({ title = 'Reproductor', src, onClose }) {
   const [errorMsg, setErrorMsg] = useState('');
   const [steps, setSteps] = useState([]);
 
-  // --- DEBUG toggle con ?debug=1 ---
+  // Toggle debug con ?debug=1
   const debug = useMemo(() => {
     try { return new URLSearchParams(window.location.search).get('debug') === '1'; }
     catch { return false; }
   }, []);
 
-  // --- logger memorizado para pasar a efectos sin romper ESLint ---
   const log = useCallback(
     (msg, extra) => {
       if (!debug) return;
@@ -25,13 +24,8 @@ export default function VideoPlayer({ title = 'Reproductor', src, onClose }) {
     [debug]
   );
 
-  // --- Normaliza a nuestro proxy /hls/... ---
-  const finalSrc = useMemo(() => {
-    if (!src) return '';
-    if (src.startsWith('/hls/')) return src;
-    if (/^https?:\/\//i.test(src)) return '/hls/' + src.replace(/^https?:\/\//i, '');
-    return '/hls/' + src;
-  }, [src]);
+  // Usar la URL tal cual (ya permitida por CSP)
+  const finalSrc = useMemo(() => (src || '').trim(), [src]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -62,7 +56,7 @@ export default function VideoPlayer({ title = 'Reproductor', src, onClose }) {
       timeoutId = setTimeout(() => {
         setErrorMsg('No se pudo iniciar la reproducción (timeout).');
         setLoading(false);
-        log('⏱ Timeout de arranque', { finalSrc: '(oculto)' });
+        log('⏱ Timeout de arranque', {});
       }, 12000);
     };
 
@@ -142,7 +136,7 @@ export default function VideoPlayer({ title = 'Reproductor', src, onClose }) {
         return () => clearAll();
       }
 
-      // Fallback
+      // Fallback simple
       log('Fallback simple', {});
       startTimeout();
       video.src = finalSrc;
@@ -171,7 +165,7 @@ export default function VideoPlayer({ title = 'Reproductor', src, onClose }) {
       log('Excepción useEffect', { e: String(e) });
       return () => clearAll();
     }
-  }, [finalSrc, log]); // <-- log incluido, ESLint feliz
+  }, [finalSrc, log]);
 
   return (
     <div className="fixed inset-0 z-[999] flex items-start md:items-center justify-center bg-black/80 p-4">
@@ -203,18 +197,18 @@ export default function VideoPlayer({ title = 'Reproductor', src, onClose }) {
           )}
         </div>
 
-        {/* Error (sin mostrar la URL) */}
+        {/* Error sin exponer fuente */}
         {errorMsg && (
           <div className="px-4 py-3 text-sm text-red-400 border-t border-white/10">
             {errorMsg}
           </div>
         )}
 
-        {/* Panel debug opcional con ?debug=1 */}
+        {/* Debug opcional */}
         {debug && (
           <div className="px-4 py-3 text-xs text-white/70 border-t border-white/10 space-y-1 max-h-40 overflow-auto">
             <div className="font-semibold text-white/80">DEBUG</div>
-            <div>src normalizado (proxificado): (oculto)</div>
+            <div>src (oculto)</div>
             {steps.map((s, i) => (
               <div key={i}>
                 • [{s.t}] {s.msg} {s.extra ? `| ${JSON.stringify(s.extra)}` : ''}
