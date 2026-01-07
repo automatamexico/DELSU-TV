@@ -1,5 +1,5 @@
 // src/components/VideoPlayer.js
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Hls from 'hls.js';
 import { X } from 'lucide-react';
 
@@ -10,22 +10,27 @@ export default function VideoPlayer({ title = 'Reproductor', src, onClose }) {
   const [errorMsg, setErrorMsg] = useState('');
   const [steps, setSteps] = useState([]);
 
+  // --- DEBUG toggle con ?debug=1 ---
   const debug = useMemo(() => {
     try { return new URLSearchParams(window.location.search).get('debug') === '1'; }
     catch { return false; }
   }, []);
 
-  const log = (msg, extra) => {
-    if (!debug) return;
-    setSteps(s => [...s, { t: new Date().toISOString(), msg, extra }]);
-  };
+  // --- logger memorizado para pasar a efectos sin romper ESLint ---
+  const log = useCallback(
+    (msg, extra) => {
+      if (!debug) return;
+      setSteps(s => [...s, { t: new Date().toISOString(), msg, extra }]);
+    },
+    [debug]
+  );
 
-  // Normaliza: siempre pasamos por /hls/host/...
+  // --- Normaliza a nuestro proxy /hls/... ---
   const finalSrc = useMemo(() => {
     if (!src) return '';
     if (src.startsWith('/hls/')) return src;
     if (/^https?:\/\//i.test(src)) return '/hls/' + src.replace(/^https?:\/\//i, '');
-    return '/hls/' + src; // por si te llega “host/ruta.m3u8”
+    return '/hls/' + src;
   }, [src]);
 
   useEffect(() => {
@@ -46,27 +51,23 @@ export default function VideoPlayer({ title = 'Reproductor', src, onClose }) {
           hlsRef.current = null;
         }
       } catch {}
-      if (video) {
+      try {
         video.pause?.();
-        // Limpieza segura
-        try {
-          video.removeAttribute('src');
-          video.load?.();
-        } catch {}
-      }
+        video.removeAttribute('src');
+        video.load?.();
+      } catch {}
     };
 
     const startTimeout = () => {
       timeoutId = setTimeout(() => {
         setErrorMsg('No se pudo iniciar la reproducción (timeout).');
         setLoading(false);
-        log('⏱ Timeout de arranque', { finalSrc });
+        log('⏱ Timeout de arranque', { finalSrc: '(oculto)' });
       }, 12000);
     };
 
     const tryAutoplay = async () => {
       try {
-        // Algunos navegadores requieren muted para autoplay
         video.muted = true;
         await video.play();
       } catch (e) {
@@ -74,21 +75,23 @@ export default function VideoPlayer({ title = 'Reproductor', src, onClose }) {
       }
     };
 
-    // Nativo (Safari) o MSE
     try {
+      // Safari / iOS: HLS nativo
       if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        log('HLS nativo', { finalSrc });
+        log('HLS nativo', {});
         startTimeout();
         video.src = finalSrc;
+
         const onLoaded = () => {
           setLoading(false);
-          tryAutoplay();
           if (timeoutId) clearTimeout(timeoutId);
+          tryAutoplay();
         };
         const onErr = () => {
           setErrorMsg('No se pudo iniciar la reproducción.');
           setLoading(false);
         };
+
         video.addEventListener('loadeddata', onLoaded);
         video.addEventListener('error', onErr);
 
@@ -99,9 +102,11 @@ export default function VideoPlayer({ title = 'Reproductor', src, onClose }) {
         };
       }
 
+      // Otros navegadores: Hls.js
       if (Hls.isSupported()) {
-        log('Hls.js cargado', { finalSrc });
+        log('Hls.js cargado', {});
         startTimeout();
+
         const hls = new Hls({
           enableWorker: true,
           lowLatencyMode: true,
@@ -120,11 +125,9 @@ export default function VideoPlayer({ title = 'Reproductor', src, onClose }) {
           }
         });
 
-        hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-          log('MEDIA_ATTACHED');
-        });
+        hls.on(Hls.Events.MEDIA_ATTACHED, () => log('MEDIA_ATTACHED', {}));
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          log('MANIFEST_PARSED');
+          log('MANIFEST_PARSED', {});
           setLoading(false);
           if (timeoutId) clearTimeout(timeoutId);
           tryAutoplay();
@@ -136,24 +139,24 @@ export default function VideoPlayer({ title = 'Reproductor', src, onClose }) {
         hls.attachMedia(video);
         hls.loadSource(finalSrc);
 
-        return () => {
-          clearAll();
-        };
+        return () => clearAll();
       }
 
       // Fallback
-      log('Fallback simple', { finalSrc });
+      log('Fallback simple', {});
       startTimeout();
       video.src = finalSrc;
+
       const onLoaded = () => {
         setLoading(false);
-        tryAutoplay();
         if (timeoutId) clearTimeout(timeoutId);
+        tryAutoplay();
       };
       const onErr = () => {
         setErrorMsg('No se pudo iniciar la reproducción.');
         setLoading(false);
       };
+
       video.addEventListener('loadeddata', onLoaded);
       video.addEventListener('error', onErr);
 
@@ -168,7 +171,7 @@ export default function VideoPlayer({ title = 'Reproductor', src, onClose }) {
       log('Excepción useEffect', { e: String(e) });
       return () => clearAll();
     }
-  }, [finalSrc, debug]);
+  }, [finalSrc, log]); // <-- log incluido, ESLint feliz
 
   return (
     <div className="fixed inset-0 z-[999] flex items-start md:items-center justify-center bg-black/80 p-4">
@@ -200,18 +203,18 @@ export default function VideoPlayer({ title = 'Reproductor', src, onClose }) {
           )}
         </div>
 
-        {/* Mensaje de error (sin mostrar URL de la fuente) */}
+        {/* Error (sin mostrar la URL) */}
         {errorMsg && (
           <div className="px-4 py-3 text-sm text-red-400 border-t border-white/10">
             {errorMsg}
           </div>
         )}
 
-        {/* Depuración opcional con ?debug=1 (no muestra la URL exacta del canal) */}
+        {/* Panel debug opcional con ?debug=1 */}
         {debug && (
           <div className="px-4 py-3 text-xs text-white/70 border-t border-white/10 space-y-1 max-h-40 overflow-auto">
             <div className="font-semibold text-white/80">DEBUG</div>
-            <div>src normalizado (proxificado): {finalSrc ? '(oculto)' : '(vacío)'}</div>
+            <div>src normalizado (proxificado): (oculto)</div>
             {steps.map((s, i) => (
               <div key={i}>
                 • [{s.t}] {s.msg} {s.extra ? `| ${JSON.stringify(s.extra)}` : ''}
