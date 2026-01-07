@@ -27,15 +27,15 @@ export default function ChannelCard({ channel, onClick }) {
       onClick={() => onClick?.(channel)}
       className="group w-full text-left rounded-xl overflow-hidden bg-gray-900/40 border border-gray-800 hover:border-gray-700 focus:outline-none focus:ring-2 focus:ring-rose-500/40 transition"
     >
-      {/* Poster alto (vertical) */}
+      {/* Poster alto (centrado y sin importar tamaño de la imagen) */}
       <div className="relative">
         {/* 3/4 en móviles, 2/3 desde md */}
-        <div className="aspect-[3/4] md:aspect-[2/3] w-full overflow-hidden bg-gray-800">
+        <div className="aspect-[3/4] md:aspect-[2/3] w-full bg-gray-800 overflow-hidden flex items-center justify-center">
           <img
             src={poster}
             alt={title}
             loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+            className="max-h-full max-w-full object-contain object-center transition-transform duration-300 group-hover:scale-[1.02]"
           />
         </div>
 
@@ -53,9 +53,7 @@ export default function ChannelCard({ channel, onClick }) {
           {title}
         </h3>
 
-        <div className="text-[12px] text-gray-400">
-          {country}
-        </div>
+        <div className="text-[12px] text-gray-400">{country}</div>
 
         {description ? (
           <p className="text-[12px] leading-4 text-gray-400 line-clamp-2 mt-1.5">
