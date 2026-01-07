@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Hls from "hls.js";
 
 /**
  * Props:
- *  - src: string  (URL .m3u8 tal como viene de tu BD)
+ *  - src: string  (URL .m3u8)
  *  - title?: string
  *  - poster?: string
  *  - debug?: boolean
@@ -14,15 +14,19 @@ export default function VideoPlayer({ src, title = "Reproductor", poster, debug 
   const [status, setStatus] = useState("idle"); // idle | loading | playing | error
   const [logLines, setLogLines] = useState([]);
 
-  const log = (tag, payload) => {
-    if (!debug) return;
-    const line = `[${new Date().toLocaleTimeString()}] ${tag} ${
-      payload ? JSON.stringify(payload) : ""
-    }`;
-    setLogLines((ls) => [...ls.slice(-200), line]);
-  };
+  // Logger estable para pasar a deps
+  const log = useCallback(
+    (tag, payload) => {
+      if (!debug) return;
+      const line = `[${new Date().toLocaleTimeString()}] ${tag} ${
+        payload ? JSON.stringify(payload) : ""
+      }`;
+      setLogLines((ls) => [...ls.slice(-200), line]);
+    },
+    [debug]
+  );
 
-  // No tocamos el path. Solo proxificamos si es streamhoster.
+  // Proxifica streamhoster -> /hls/…; otros se dejan igual
   const finalSrc = useMemo(() => {
     try {
       const u = new URL(src);
@@ -31,12 +35,12 @@ export default function VideoPlayer({ src, title = "Reproductor", poster, debug 
         log("SRC_PROXY", { original: src, final: proxied });
         return proxied;
       }
-    } catch (_) {
-      // src puede ser relativo; lo dejamos como está
+    } catch {
+      // src relativo; lo dejamos
     }
     log("SRC_DIRECT", { final: src });
     return src;
-  }, [src]); // <- log no es dependencia intencionalmente
+  }, [src, log]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -45,7 +49,7 @@ export default function VideoPlayer({ src, title = "Reproductor", poster, debug 
     let destroyed = false;
     setStatus("loading");
 
-    // *** IMPORTANTE: no usar nombre que empiece con "use" para evitar la regla de hooks
+    // No llamar hooks aquí (el nombre NO inicia con "use")
     const playNative = () => {
       log("NATIVE_START", { src: finalSrc });
       video.src = finalSrc;
@@ -107,13 +111,11 @@ export default function VideoPlayer({ src, title = "Reproductor", poster, debug 
       hls.on(Hls.Events.ERROR, (_, data) => {
         log("HLS_ERROR", { type: data?.type, details: data?.details, fatal: data?.fatal });
         if (data?.fatal) {
-          // Destruye Hls y cae a nativo
           try {
             hls.destroy();
           } catch {}
           hlsRef.current = null;
           const cleanupNative = playNative();
-          // devolvemos limpieza nativa desde aquí
           return cleanupNative;
         }
       });
@@ -129,13 +131,12 @@ export default function VideoPlayer({ src, title = "Reproductor", poster, debug 
       };
     }
 
-    // Fallback nativo (dispositivos iOS o si HLS.js no se usa)
     const cleanup = playNative();
     return () => {
       destroyed = true;
       cleanup?.();
     };
-  }, [finalSrc]); // <- log no es dependencia para no re-ejecutar en cada línea
+  }, [finalSrc, log]);
 
   return (
     <div className="w-full">
