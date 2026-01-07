@@ -1,170 +1,118 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+// src/components/VideoPlayer.js
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Hls from "hls.js";
 
-/**
- * Props:
- *  - src: string  (URL .m3u8)
- *  - title?: string
- *  - poster?: string
- *  - debug?: boolean
- */
-export default function VideoPlayer({ src, title = "Reproductor", poster, debug = false }) {
+export default function VideoPlayer({ src = "", title = "Reproductor", poster, hideSource = false }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
   const [status, setStatus] = useState("idle"); // idle | loading | playing | error
-  const [logLines, setLogLines] = useState([]);
+  const [errorMsg, setErrorMsg] = useState("");
 
-  // Logger estable para pasar a deps
-  const log = useCallback(
-    (tag, payload) => {
-      if (!debug) return;
-      const line = `[${new Date().toLocaleTimeString()}] ${tag} ${
-        payload ? JSON.stringify(payload) : ""
-      }`;
-      setLogLines((ls) => [...ls.slice(-200), line]);
-    },
-    [debug]
-  );
-
-  // Proxifica streamhoster -> /hls/…; otros se dejan igual
-  const finalSrc = useMemo(() => {
-    try {
-      const u = new URL(src);
-      if (u.hostname.endsWith("streamhoster.com")) {
-        const proxied = `/hls${u.pathname}${u.search || ""}`;
-        log("SRC_PROXY", { original: src, final: proxied });
-        return proxied;
-      }
-    } catch {
-      // src relativo; lo dejamos
-    }
-    log("SRC_DIRECT", { final: src });
-    return src;
-  }, [src, log]);
+  const isHlsSrc = useMemo(() => typeof src === "string" && src.toLowerCase().includes(".m3u8"), [src]);
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !finalSrc) return;
-
-    let destroyed = false;
     setStatus("loading");
+    setErrorMsg("");
 
-    // No llamar hooks aquí (el nombre NO inicia con "use")
-    const playNative = () => {
-      log("NATIVE_START", { src: finalSrc });
-      video.src = finalSrc;
-      video.load();
+    // Limpieza previa
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+    if (!video) return;
 
-      const onCanPlay = () => {
-        if (destroyed) return;
-        setStatus("playing");
-        log("NATIVE_PLAYING");
-        video.play().catch((e) => log("NATIVE_PLAY_ERR", { e: String(e) }));
-      };
-      const onError = () => {
-        if (destroyed) return;
-        setStatus("error");
-        log("NATIVE_ERROR", { code: video.error?.code, msg: video.error?.message });
-      };
-
-      video.addEventListener("canplay", onCanPlay);
-      video.addEventListener("error", onError);
-
-      return () => {
-        video.removeEventListener("canplay", onCanPlay);
-        video.removeEventListener("error", onError);
-        try {
-          video.pause();
-        } catch {}
-        video.removeAttribute("src");
-        video.load();
-      };
+    const onPlaying = () => setStatus("playing");
+    const onError = () => {
+      setStatus("error");
+      setErrorMsg("No se pudo iniciar la reproducción.");
     };
 
-    const isHls = /\.m3u8(\?|$)/i.test(finalSrc);
+    video.addEventListener("playing", onPlaying);
+    video.addEventListener("error", onError);
 
-    if (Hls.isSupported() && isHls) {
+    const startNative = () => {
+      try {
+        video.src = src;
+        video.load();
+        video.play().catch(() => setStatus("error"));
+      } catch {
+        setStatus("error");
+      }
+    };
+
+    if (isHlsSrc && Hls.isSupported()) {
       const hls = new Hls({
-        manifestLoadingTimeOut: 20000,
-        manifestLoadingMaxRetry: 3,
-        manifestLoadingRetryDelay: 800,
-        xhrSetup: (xhr) => {
-          xhr.setRequestHeader("Cache-Control", "no-cache");
-        },
+        lowLatencyMode: true,
+        backBufferLength: 60,
+        enableWorker: true,
       });
       hlsRef.current = hls;
 
-      log("HLS_START", { src: finalSrc });
-      hls.attachMedia(video);
-
-      hls.on(Hls.Events.MEDIA_ATTACHED, () => log("MEDIA_ATTACHED"));
-      hls.on(Hls.Events.MANIFEST_LOADING, () => log("MANIFEST_LOADING"));
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        log("MANIFEST_PARSED");
-        setStatus("playing");
-        video.play().catch((e) => log("AUTO_PLAY_ERR", { e: String(e) }));
-      });
-      hls.on(Hls.Events.LEVEL_LOADED, (_, data) =>
-        log("LEVEL_LOADED", { t: data?.details?.totalduration })
-      );
-
-      hls.on(Hls.Events.ERROR, (_, data) => {
-        log("HLS_ERROR", { type: data?.type, details: data?.details, fatal: data?.fatal });
+      hls.on(Hls.Events.ERROR, (_e, data) => {
         if (data?.fatal) {
-          try {
-            hls.destroy();
-          } catch {}
-          hlsRef.current = null;
-          const cleanupNative = playNative();
-          return cleanupNative;
+          setStatus("error");
+          setErrorMsg("Error HLS: " + (data?.details || "fatal"));
+          try { hls.destroy(); } catch {}
         }
       });
 
-      hls.loadSource(finalSrc);
-
-      return () => {
-        destroyed = true;
-        try {
-          hls.destroy();
-        } catch {}
-        hlsRef.current = null;
-      };
+      try {
+        hls.loadSource(src);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          video.play().catch(() => setStatus("error"));
+        });
+      } catch {
+        setStatus("error");
+        setErrorMsg("No se pudo cargar el manifiesto HLS.");
+      }
+    } else {
+      // Safari/Android con soporte nativo
+      startNative();
     }
 
-    const cleanup = playNative();
     return () => {
-      destroyed = true;
-      cleanup?.();
+      video.removeEventListener("playing", onPlaying);
+      video.removeEventListener("error", onError);
+      try {
+        if (hlsRef.current) hlsRef.current.destroy();
+      } catch {}
+      hlsRef.current = null;
     };
-  }, [finalSrc, log]);
+  }, [src, isHlsSrc]);
 
   return (
-    <div className="w-full">
-      <div className="mb-2 text-white/90 font-semibold">{title}</div>
+    <div className="bg-black">
+      <div className="px-4 py-2 text-white/90 text-sm bg-gray-800 border-b border-gray-700">
+        {title}
+      </div>
 
-      <video
-        ref={videoRef}
-        poster={poster}
-        controls
-        playsInline
-        className="w-full rounded-xl bg-black"
-        preload="auto"
-      />
+      <div className="relative">
+        <video
+          ref={videoRef}
+          poster={poster}
+          controls
+          playsInline
+          preload="metadata"
+          className="w-full aspect-video bg-black"
+        />
+        {status === "loading" && (
+          <div className="absolute inset-0 flex items-center justify-center text-gray-300 text-sm">
+            Cargando video…
+          </div>
+        )}
+      </div>
 
-      {debug && (
-        <div className="mt-3 text-xs text-gray-300 bg-black/60 border border-white/10 rounded-lg p-3 overflow-auto max-h-60">
-          <div className="text-red-300 mb-1">
-            {status === "error"
-              ? "No se pudo cargar el manifiesto HLS. Revisa el proxy /hls/ y la CSP."
-              : status === "loading"
-              ? "Cargando video…"
-              : null}
-          </div>
-          <div className="font-mono whitespace-pre-wrap">
-            {logLines.map((l, i) => (
-              <div key={i}>{l}</div>
-            ))}
-          </div>
+      {status === "error" && (
+        <div className="text-red-400 text-xs px-4 py-2 border-t border-gray-700">
+          {errorMsg || "Error de reproducción."}
+        </div>
+      )}
+
+      {!hideSource && (
+        <div className="text-gray-500 text-[11px] px-4 py-2 border-t border-gray-800 truncate">
+          Fuente: {src || "—"}
         </div>
       )}
     </div>
