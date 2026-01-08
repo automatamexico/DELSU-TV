@@ -33,12 +33,12 @@ export default function ChannelCard({ channel, onClick }) {
       {/* Poster alto (vertical) */}
       <div className="relative">
         {/* 3/4 en móviles, 2/3 desde md */}
-        <div className="aspect-[3/4] md:aspect-[2/3] w-full overflow-hidden bg-gray-800">
+        <div className="relative aspect-[3/4] md:aspect-[2/3] w-full overflow-hidden bg-gray-800">
           <img
             src={poster}
             alt={title}
             loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
           />
         </div>
 
