@@ -2,20 +2,14 @@
 import React from "react";
 import ChannelCard from "./ChannelCard";
 
-export default function ChannelGrid({ channels = [], onChannelClick }) {
-  if (!channels?.length) {
-    return (
-      <div className="p-6 text-center text-gray-400">
-        No hay canales para mostrar.
-      </div>
-    );
-  }
-
+function ChannelGridBase({ channels, onChannelClick }) {
   return (
-    <div className="p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 p-4">
       {channels.map((ch) => (
-        <ChannelCard key={ch.id || ch.slug || ch.name} channel={ch} onClick={onChannelClick} />
+        <ChannelCard key={ch.id || ch.slug || ch.title} channel={ch} onClick={onChannelClick} />
       ))}
     </div>
   );
 }
+
+export default React.memo(ChannelGridBase);
