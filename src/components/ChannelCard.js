@@ -75,7 +75,7 @@ export default function ChannelCard({ channel, onClick }) {
           {rokuUrl && (
             <div className="shrink-0 text-right">
               <div className="text-[11px] text-gray-300 mb-1">
-                Disponible en:
+                Tambien disponible en:
               </div>
 
               {/* Contenedor con proporción 64:29 (640x290) y tamaño responsivo */}
