@@ -4,9 +4,10 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function ProtectedRoute({ children }) {
-  const { user, loading } = useAuth?.() || {};
+  // Hooks SIEMPRE arriba, nunca dentro de condicionales
+  const location = useLocation();
+  const { user, loading } = useAuth();
 
-  // Mientras AuthContext resuelve sesión, no parpadees la UI.
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-gray-300">
@@ -15,10 +16,8 @@ export default function ProtectedRoute({ children }) {
     );
   }
 
-  const location = useLocation();
-
-  // Si no hay sesión, manda al login de la app
   if (!user) {
+    // no hay sesión → al login de la app
     return <Navigate to="/app" replace state={{ from: location }} />;
   }
 
