@@ -1,25 +1,14 @@
 // src/routes/ProtectedRoute.jsx
 import React from "react";
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-export default function ProtectedRoute({ children }) {
-  // Hooks SIEMPRE arriba, nunca dentro de condicionales
+export default function ProtectedRoute() {
   const location = useLocation();
   const { user, loading } = useAuth();
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-gray-300">
-        Cargando…
-      </div>
-    );
-  }
+  if (loading) return <div className="min-h-screen grid place-items-center text-white">Cargando…</div>;
+  if (!user) return <Navigate to="/login" replace state={{ from: location }} />;
 
-  if (!user) {
-    // no hay sesión → al login de la app
-    return <Navigate to="/app" replace state={{ from: location }} />;
-  }
-
-  return children;
+  return <Outlet />;
 }
