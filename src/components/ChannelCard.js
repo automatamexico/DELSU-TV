@@ -33,26 +33,33 @@ export default function ChannelCard({ channel, onClick }) {
     channel?.rokuLinkUrl ||
     "";
 
-  // Cache-busting ligero (para cuando cambies imágenes en Supabase)
-  const versionTag =
+  // Cache-busting base (póster y roku)
+  const baseVersion =
     channel?.poster_version ||
     channel?.icon_version ||
     channel?.updated_at ||
     channel?.last_modified ||
     Date.now();
 
-  const withBust = (url) => {
+  const withBust = (url, ver) => {
     if (!url) return url;
     const sep = url.includes("?") ? "&" : "?";
-    return `${url}${sep}v=${encodeURIComponent(String(versionTag))}`;
-    };
+    return `${url}${sep}v=${encodeURIComponent(String(ver))}`;
+  };
 
-  const posterSrc = withBust(poster);
-  const rokuIconSrc = withBust(rokuIcon);
+  const posterSrc = withBust(poster, baseVersion);
+  const rokuIconSrc = withBust(rokuIcon, baseVersion);
   const hasRoku = Boolean(rokuIcon);
 
-  // Redes sociales (sin tocar tu lógica actual)
-  const socials = [
+  // Redes sociales
+  // >>> Ajuste: usamos un "version" específico para redes (si existe 'socials_version' o 'updated_at')
+  // y además forzamos remonte del <img> cambiando su key cuando cambia la URL con bust.
+  const socialsVersion =
+    channel?.socials_version ||
+    channel?.updated_at ||
+    Date.now();
+
+  const socialsRaw = [
     {
       key: "facebook",
       url: channel?.facebook_url || channel?.facebookUrl,
@@ -77,9 +84,15 @@ export default function ChannelCard({ channel, onClick }) {
       icon: channel?.website_icon_url || channel?.websiteIconUrl,
       label: "Sitio",
     },
-  ]
-    .map((s) => (s.icon ? { ...s, icon: withBust(s.icon) } : s))
-    .filter((s) => s.url && s.icon);
+  ];
+
+  // Aplica bust SOLO a iconos de redes y prepara key única por cambio
+  const socials = socialsRaw
+    .filter((s) => s.url && s.icon)
+    .map((s) => {
+      const iconBusted = withBust(s.icon, socialsVersion);
+      return { ...s, iconBusted, keyRender: `${s.key}-${iconBusted}` };
+    });
 
   const openPopup = (href) => {
     if (!href) return;
@@ -98,11 +111,9 @@ export default function ChannelCard({ channel, onClick }) {
       onClick={() => onClick?.(channel)}
       className="group w-full text-left rounded-xl overflow-hidden bg-gray-900/40 border border-gray-800 hover:border-gray-700 focus:outline-none focus:ring-2 focus:ring-rose-500/40 transition"
     >
-      {/* Poster: SIN DEFORMARSE (object-contain), centrado, con relación fija vertical */}
+      {/* Poster vertical, sin deformar */}
       <div className="relative">
-        {/* Más alto que ancho: 3/4 */}
         <div className="relative w-full aspect-[3/4] overflow-hidden bg-gray-800">
-          {/* padding leve para que no “pegue” a los bordes y nunca se recorte */}
           <img
             key={posterSrc}
             src={posterSrc}
@@ -123,7 +134,7 @@ export default function ChannelCard({ channel, onClick }) {
 
       {/* Texto + Roku + Redes */}
       <div className="p-3 space-y-2">
-        {/* Título / País + Roku a la derecha */}
+        {/* Título / País + Roku */}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 className="text-[15px] font-semibold text-white line-clamp-1">
@@ -132,11 +143,10 @@ export default function ChannelCard({ channel, onClick }) {
             <div className="text-[12px] text-gray-400">{country}</div>
           </div>
 
-          {/* ROKU (clic → abre link si existe) */}
           {hasRoku && (
             <div className="shrink-0 text-right">
               <div className="text-[10px] text-gray-400 mb-1">
-                Disponible en:
+                Disponible también en:
               </div>
               <div className="flex justify-end">
                 <img
@@ -163,7 +173,7 @@ export default function ChannelCard({ channel, onClick }) {
           </p>
         ) : null}
 
-        {/* Footer: Síguenos en + redes */}
+        {/* Footer redes: “Síguenos en” + iconos (con bust y key para remonte) */}
         {socials.length > 0 && (
           <div className="pt-1">
             <div className="text-[12px] font-semibold text-gray-200 mb-1">
@@ -172,8 +182,8 @@ export default function ChannelCard({ channel, onClick }) {
             <div className="flex flex-wrap items-center gap-2">
               {socials.map((s) => (
                 <img
-                  key={s.key}
-                  src={s.icon}
+                  key={s.keyRender}
+                  src={s.iconBusted}
                   alt={s.label}
                   title={s.label}
                   className="h-6 w-6 object-contain rounded-md bg-gray-800/60 p-[2px] hover:bg-gray-700/70 transition cursor-pointer"
