@@ -1,4 +1,3 @@
-// src/components/CategoryFilter.jsx
 import React, { useState, useMemo } from "react";
 
 export default function CategoryFilter({
@@ -10,11 +9,12 @@ export default function CategoryFilter({
   onCountryChange,
   countryItems = [],
 }) {
-  // Evita “Todos” duplicado si ya viene en categories
+  // Normaliza categorías y evita duplicado de "Todos"
   const categoryList = useMemo(() => {
     const base = Array.isArray(categories) ? categories : [];
-    const set = new Set(base.map((c) => (typeof c === "string" ? c : c?.name).trim()));
-    // Asegura que “Todos” exista una sola vez y al inicio
+    const set = new Set(
+      base.map((c) => (typeof c === "string" ? c : c?.name).trim())
+    );
     set.delete("Todos");
     return ["Todos", ...Array.from(set)];
   }, [categories]);
@@ -23,6 +23,8 @@ export default function CategoryFilter({
 
   const handleCategoryClick = (cat) => {
     if (onCategoryChange) onCategoryChange(cat);
+    // Cerrar dropdown país si estaba abierto
+    if (showCountries) setShowCountries(false);
   };
 
   const handleCountryToggle = () => setShowCountries((s) => !s);
@@ -33,9 +35,9 @@ export default function CategoryFilter({
   };
 
   return (
-    <div className="px-4 pt-3">
-      {/* Barra de categorías */}
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-2">
+    <div className="px-4 pt-3 relative">
+      {/* Barra de categorías centrada */}
+      <div className="flex flex-wrap justify-center items-center gap-2 pb-2">
         {categoryList.map((cat) => {
           const isActive = selectedCategory === cat;
           return (
@@ -67,9 +69,17 @@ export default function CategoryFilter({
             {selectedCountry ? `País: ${selectedCountry}` : "País"}
           </button>
 
-          {/* Dropdown de países */}
+          {/* Dropdown País sin scroll: overlay centrado bajo el botón */}
           {showCountries && (
-            <div className="absolute z-20 mt-2 w-56 max-h-72 overflow-auto rounded-lg border border-gray-700 bg-black/90 backdrop-blur p-2 shadow-xl">
+            <div
+              className="
+                absolute left-1/2 -translate-x-1/2 z-40 mt-2
+                w-[min(90vw,560px)]
+                rounded-lg border border-gray-700 bg-black/90 backdrop-blur
+                p-2 shadow-2xl
+                max-h-none overflow-visible
+              "
+            >
               <button
                 onClick={() => handleCountrySelect("")}
                 className={`w-full flex items-center gap-2 px-2 py-2 rounded text-sm ${
@@ -82,30 +92,33 @@ export default function CategoryFilter({
                 Todos los países
               </button>
 
-              {countryItems.map(({ country, flagUrl }) => (
-                <button
-                  key={country}
-                  onClick={() => handleCountrySelect(country)}
-                  className={`w-full flex items-center gap-2 px-2 py-2 rounded text-sm mt-1 ${
-                    selectedCountry === country
-                      ? "bg-gray-800 text-white"
-                      : "text-gray-200 hover:bg-gray-800"
-                  }`}
-                  title={country}
-                >
-                  {flagUrl ? (
-                    <img
-                      src={flagUrl}
-                      alt={country}
-                      className="w-5 h-5 object-contain rounded"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <span className="inline-block w-5 h-5 rounded bg-gray-700" />
-                  )}
-                  <span className="truncate">{country}</span>
-                </button>
-              ))}
+              {/* Lista completa sin scroll (se superpone sobre el contenido) */}
+              <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-1">
+                {countryItems.map(({ country, flagUrl }) => (
+                  <button
+                    key={country}
+                    onClick={() => handleCountrySelect(country)}
+                    className={`w-full flex items-center gap-2 px-2 py-2 rounded text-sm ${
+                      selectedCountry === country
+                        ? "bg-gray-800 text-white"
+                        : "text-gray-200 hover:bg-gray-800"
+                    }`}
+                    title={country}
+                  >
+                    {flagUrl ? (
+                      <img
+                        src={flagUrl}
+                        alt={country}
+                        className="w-5 h-5 object-contain rounded"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <span className="inline-block w-5 h-5 rounded bg-gray-700" />
+                    )}
+                    <span className="truncate">{country}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
