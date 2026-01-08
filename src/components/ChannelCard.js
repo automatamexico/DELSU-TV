@@ -53,7 +53,7 @@ export default function ChannelCard({ channel, onClick }) {
         </div>
       </div>
 
-      {/* Texto + “Disponible en” */}
+      {/* Texto + “Tambien disponible en” */}
       <div className="p-3">
         <div className="flex items-start gap-3">
           {/* Bloque de textos */}
