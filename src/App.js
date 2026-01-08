@@ -1,60 +1,54 @@
 // src/App.js
 import React from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+
+// Páginas (ajusta si tus nombres difieren)
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import AdminLoginPage from "./pages/AdminLoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import ProfilePage from "./pages/ProfilePage";
 
-// Si ya tienes estos wrappers, mantenlos.
-// Protege rutas para usuarios logueados y para admins.
+// Rutas protegidas
 import ProtectedRoute from "./routes/ProtectedRoute";
 import ProtectedRouteAdmin from "./routes/ProtectedRouteAdmin";
 
+// Error boundary
+import ErrorBoundary from "./components/ErrorBoundary";
+
 export default function App() {
+  // Pequeño diagnóstico al montar la app
+  React.useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log("[App] Montada. Si ves pantalla en blanco, revisa la consola por errores.");
+  }, []);
+
   return (
-    <AuthProvider>
-      <Router>
-        <Routes>
-          {/* Público: login de la app y home (home pide login si usas ProtectedRoute en HomePage) */}
-          <Route path="/app" element={<LoginPage />} />
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <HomePage />
-              </ProtectedRoute>
-            }
-          />
+    <ErrorBoundary>
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* Público */}
+            <Route path="/" element={<HomePage />} />
+            <Route path="/login" element={<LoginPage />} />
 
-          {/* Admin: login y dashboard protegido por rol */}
-          <Route path="/admin" element={<AdminLoginPage />} />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRouteAdmin>
-                <DashboardPage />
-              </ProtectedRouteAdmin>
-            }
-          />
+            {/* Perfil requiere sesión */}
+            <Route element={<ProtectedRoute />}>
+              <Route path="/profile" element={<ProfilePage />} />
+            </Route>
 
-          {/* Perfil: requiere estar autenticado (cualquier rol) */}
-          <Route
-            path="/profile"
-            element={
-              <ProtectedRoute>
-                <ProfilePage />
-              </ProtectedRoute>
-            }
-          />
+            {/* Admin */}
+            <Route path="/admin" element={<AdminLoginPage />} />
+            <Route element={<ProtectedRouteAdmin />}>
+              <Route path="/dashboard" element={<DashboardPage />} />
+            </Route>
 
-          {/* Catch-all */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Router>
-    </AuthProvider>
+            {/* Fallback */}
+            <Route path="*" element={<HomePage />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
