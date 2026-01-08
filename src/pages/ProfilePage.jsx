@@ -1,145 +1,199 @@
 // src/pages/ProfilePage.jsx
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import React, { useEffect, useMemo, useState } from "react";
+import { supabase } from "../supabaseClient";
+import { useAuth } from "../context/AuthContext";
+
+const AVATAR_BUCKET = "avatars";
+
+function classNames(...c) {
+  return c.filter(Boolean).join(" ");
+}
 
 export default function ProfilePage() {
-  const { user, profile, uploadAvatar, updateProfile, loading } = useAuth();
-  const [fullName, setFullName] = useState('');
-  const [country, setCountry] = useState('');
+  const { user, profile } = useAuth(); // profile: { display_name, country, avatar_url, ... }
+  const [displayName, setDisplayName] = useState(profile?.display_name || "");
+  const [country, setCountry] = useState(profile?.country || "");
+  const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || "");
+  const [email] = useState(user?.email || "");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const navigate = useNavigate();
+  const [msg, setMsg] = useState("");
 
-  // Sincroniza formularios cuando cambie el perfil
+  const initials = useMemo(() => {
+    if (displayName?.trim()) {
+      const parts = displayName.trim().split(/\s+/).slice(0, 2);
+      return parts.map((p) => p[0]?.toUpperCase() || "").join("");
+    }
+    if (email) return email[0]?.toUpperCase() || "U";
+    return "U";
+  }, [displayName, email]);
+
+  // Refresca campos locales cuando cambie el perfil del contexto
   useEffect(() => {
-    setFullName(profile?.full_name || '');
-    setCountry(profile?.country || '');
-  }, [profile?.full_name, profile?.country]);
+    setDisplayName(profile?.display_name || "");
+    setCountry(profile?.country || "");
+    setAvatarUrl(profile?.avatar_url || "");
+  }, [profile]);
 
-  const handleAvatarChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleUpload = async (file) => {
+    if (!user?.id || !file) return;
     try {
       setUploading(true);
-      await uploadAvatar(file);
-      alert('Avatar actualizado.');
-    } catch (err) {
-      console.error('[UI] upload avatar:', err);
-      alert('Error al subir avatar: ' + (err?.message || String(err)));
+      setMsg("");
+
+      // 1) Subir al bucket
+      const path = `${user.id}/${Date.now()}_${file.name}`.replace(/\s+/g, "_");
+      const { error: upErr } = await supabase.storage
+        .from(AVATAR_BUCKET)
+        .upload(path, file, { cacheControl: "3600", upsert: true });
+      if (upErr) throw upErr;
+
+      // 2) Obtener URL pública
+      const { data: pub } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path);
+      const publicUrl = pub?.publicUrl || "";
+
+      // 3) Persistir en tabla user_profiles
+      const { error: updErr } = await supabase
+        .from("user_profiles")
+        .update({ avatar_url: publicUrl })
+        .eq("user_id", user.id);
+      if (updErr) throw updErr;
+
+      setAvatarUrl(publicUrl);
+      setMsg("✅ Avatar actualizado.");
+    } catch (e) {
+      setMsg("⚠️ No se pudo subir el avatar: " + (e?.message || e));
     } finally {
       setUploading(false);
     }
   };
 
-  const handleSave = async (e) => {
+  const onSelectFile = (e) => {
+    const f = e.target.files?.[0];
+    if (f) handleUpload(f);
+  };
+
+  const handleSaveInfo = async (e) => {
     e.preventDefault();
+    if (!user?.id) return;
     try {
       setSaving(true);
-      await updateProfile({ fullName, country });
-      alert('Perfil actualizado.');
-    } catch (err) {
-      console.error('[UI] update profile:', err);
-      alert('Error al guardar: ' + (err?.message || String(err)));
+      setMsg("");
+
+      const payload = {
+        display_name: displayName || null,
+        country: country || null,
+      };
+
+      const { error } = await supabase
+        .from("user_profiles")
+        .update(payload)
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+
+      setMsg("✅ Datos guardados.");
+    } catch (e) {
+      setMsg("⚠️ No se pudieron guardar los datos: " + (e?.message || e));
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center text-white">Cargando perfil…</div>;
-  }
-
-  const avatarSrc =
-    profile?.avatar_url ||
-    `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(profile?.full_name || user?.email || 'U')}`;
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white">
-      <div className="max-w-2xl mx-auto p-6">
-        {/* Encabezado con botón Regresar al inicio */}
-        <div className="flex items-center justify-between mb-6">
-          <motion.h1
-            className="text-3xl font-bold"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            Mi Perfil
-          </motion.h1>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 px-4 py-8">
+      <div className="max-w-3xl mx-auto">
+        <h1 className="text-2xl font-bold text-white mb-6">Perfil</h1>
 
-          <motion.button
-            onClick={() => navigate('/')}
-            className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700 text-sm"
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            ← Regresar al inicio
-          </motion.button>
-        </div>
+        {/* Tarjeta principal */}
+        <div className="bg-gray-900/60 border border-gray-800 rounded-2xl overflow-hidden">
+          {/* Encabezado con avatar */}
+          <div className="p-6 flex flex-col sm:flex-row gap-6 items-center sm:items-start">
+            {/* Avatar */}
+            <div className="relative">
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt="Avatar"
+                  className="w-28 h-28 rounded-full object-cover ring-2 ring-gray-700"
+                />
+              ) : (
+                <div className="w-28 h-28 rounded-full bg-rose-600/20 ring-2 ring-gray-700 grid place-items-center">
+                  <span className="text-3xl font-bold text-rose-300">{initials}</span>
+                </div>
+              )}
+              <label
+                className={classNames(
+                  "absolute -bottom-2 -right-2 cursor-pointer text-xs",
+                  "px-3 py-1.5 rounded-full bg-rose-600 hover:bg-rose-500",
+                  "text-white shadow transition"
+                )}
+              >
+                {uploading ? "Subiendo…" : "Cambiar"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={onSelectFile}
+                  disabled={uploading}
+                />
+              </label>
+            </div>
 
-        <div className="bg-gray-800/60 border border-gray-700 rounded-2xl p-6">
-          <div className="flex items-center gap-6 mb-6">
-            <img
-              src={avatarSrc}
-              alt="Avatar"
-              className="w-20 h-20 rounded-full object-cover border border-gray-700"
-            />
-            <div>
-              <div className="text-sm text-gray-400">Correo</div>
-              <div className="font-medium">{user?.email}</div>
+            {/* Datos básicos */}
+            <div className="flex-1 w-full">
+              <div className="text-white text-lg font-semibold">
+                {displayName || "Sin nombre"}
+              </div>
+              <div className="text-gray-300">{email}</div>
+              <div className="text-gray-400 text-sm">{country || "—"}</div>
             </div>
           </div>
 
-          <form onSubmit={handleSave} className="space-y-5">
+          <div className="h-px bg-gray-800" />
+
+          {/* Formulario de edición (nombre / país) */}
+          <form className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4" onSubmit={handleSaveInfo}>
             <div>
-              <label className="block text-sm text-gray-300 mb-1">Nombre</label>
+              <label className="block text-sm text-gray-400 mb-1">Nombre</label>
               <input
                 type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                className="w-full bg-black/40 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-rose-500/40"
                 placeholder="Tu nombre"
               />
             </div>
-
             <div>
-              <label className="block text-sm text-gray-300 mb-1">País</label>
+              <label className="block text-sm text-gray-400 mb-1">País</label>
               <input
                 type="text"
                 value={country}
                 onChange={(e) => setCountry(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500"
-                placeholder="México"
+                className="w-full bg-black/40 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-rose-500/40"
+                placeholder="México, Colombia, …"
               />
             </div>
 
-            <div>
-              <label className="block text-sm text-gray-300 mb-2">Avatar</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleAvatarChange}
-                disabled={uploading}
-                className="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-red-600 file:text-white hover:file:bg-red-700"
-              />
-              {uploading && <div className="text-xs text-gray-400 mt-1">Subiendo avatar…</div>}
-            </div>
-
-            <div className="flex items-center gap-3 pt-2">
+            <div className="sm:col-span-2 flex items-center justify-between mt-2">
+              <div className="text-sm text-gray-400">{msg}</div>
               <button
                 type="submit"
                 disabled={saving}
-                className="bg-red-600 hover:bg-red-700 px-5 py-2 rounded-lg font-semibold disabled:opacity-60"
+                className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white transition disabled:opacity-60"
               >
-                {saving ? 'Guardando…' : 'Guardar cambios'}
+                {saving ? "Guardando…" : "Guardar cambios"}
               </button>
             </div>
           </form>
         </div>
+
+        {/* Tip: muestra ayuda del bucket si no existe */}
+        <p className="text-xs text-gray-500 mt-4">
+          Nota: asegúrate de tener un bucket público llamado <code>avatars</code> en Supabase
+          y una columna <code>avatar_url</code> en <code>user_profiles</code>.
+        </p>
       </div>
     </div>
   );
 }
-
-
