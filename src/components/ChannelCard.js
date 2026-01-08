@@ -22,17 +22,32 @@ export default function ChannelCard({ channel, onClick }) {
   const description =
     channel?.description || channel?.descripcion || channel?.about || "";
 
-  // --- ROKU (conserva el comportamiento previo) ---
-  // Puedes guardar directamente el URL del icono en `roku` o en `roku_icon_url`.
+  // ROKU (URL del ícono)
   const rokuIcon =
     channel?.roku_icon_url ||
     channel?.rokuIconUrl ||
-    channel?.roku || // si guardas directamente el URL en 'roku'
-    ""; // si viene vacío, no se muestra
+    channel?.roku ||
+    "";
 
+  // -------- Cache busting para que siempre muestre la versión más reciente --------
+  const versionTag =
+    channel?.icon_version ||
+    channel?.poster_version ||
+    channel?.updated_at ||
+    channel?.last_modified ||
+    Date.now();
+
+  const withBust = (url) => {
+    if (!url) return url;
+    const sep = url.includes("?") ? "&" : "?";
+    return `${url}${sep}v=${encodeURIComponent(String(versionTag))}`;
+  };
+
+  const posterSrc = withBust(poster);
+  const rokuIconSrc = withBust(rokuIcon);
   const hasRoku = Boolean(rokuIcon);
 
-  // --- Redes sociales (sin quitar Roku y en un footer aparte) ---
+  // Redes sociales (sin cambios funcionales)
   const socials = [
     {
       key: "facebook",
@@ -58,11 +73,14 @@ export default function ChannelCard({ channel, onClick }) {
       icon: channel?.website_icon_url || channel?.websiteIconUrl,
       label: "Sitio",
     },
-  ].filter(s => s.url && s.icon);
+  ]
+    .map((s) => (s.icon ? { ...s, icon: withBust(s.icon) } : s))
+    .filter((s) => s.url && s.icon);
 
   const openPopup = (href) => {
     if (!href) return;
-    const w = 520, h = 720;
+    const w = 520,
+      h = 720;
     const left = window.screenX + Math.max(0, (window.outerWidth - w) / 2);
     const top = window.screenY + Math.max(0, (window.outerHeight - h) / 2);
     window.open(
@@ -77,15 +95,17 @@ export default function ChannelCard({ channel, onClick }) {
       onClick={() => onClick?.(channel)}
       className="group w-full text-left rounded-xl overflow-hidden bg-gray-900/40 border border-gray-800 hover:border-gray-700 focus:outline-none focus:ring-2 focus:ring-rose-500/40 transition"
     >
-      {/* Poster alto (vertical) perfectamente ajustado */}
+      {/* Poster: ocupa SIEMPRE el ancho del card, altura controlada por la relación */}
       <div className="relative">
-        {/* Caja con relación de aspecto. Imagen absoluta para cubrir sin deformar */}
-        <div className="relative w-full aspect-[3/4] md:aspect-[2/3] overflow-hidden bg-gray-800">
+        {/* Relación fija uniforme en todos los breakpoints para evitar “desajuste” */}
+        <div className="relative w-full aspect-[2/3] overflow-hidden bg-gray-800">
           <img
-            src={poster}
+            key={posterSrc}              // fuerza re-render cuando cambie la URL
+            src={posterSrc}
             alt={title}
             loading="lazy"
-            className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-[1.03]"
+            draggable={false}
+            className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-[1.03] block"
           />
         </div>
 
@@ -97,7 +117,7 @@ export default function ChannelCard({ channel, onClick }) {
         </div>
       </div>
 
-      {/* Texto + Roku + footer redes */}
+      {/* Texto + Roku + footer redes (sin tocar lógicas previas) */}
       <div className="p-3 space-y-2">
         {/* Título / País + Roku a la derecha */}
         <div className="flex items-start justify-between gap-3">
@@ -108,19 +128,21 @@ export default function ChannelCard({ channel, onClick }) {
             <div className="text-[12px] text-gray-400">{country}</div>
           </div>
 
-          {/* ROKU (se mantiene como antes) */}
+          {/* ROKU */}
           {hasRoku && (
             <div className="shrink-0 text-right">
               <div className="text-[10px] text-gray-400 mb-1">
-                Disponible también en:
+                Disponible en:
               </div>
               <div className="flex justify-end">
                 <img
-                  src={rokuIcon}
+                  key={rokuIconSrc}         // cache-bust para ícono
+                  src={rokuIconSrc}
                   alt="Roku"
                   title="Roku"
                   className="h-7 w-auto object-contain rounded-md bg-gray-800/60 p-[2px]"
                   onClick={(e) => e.stopPropagation()}
+                  draggable={false}
                 />
               </div>
             </div>
@@ -149,9 +171,10 @@ export default function ChannelCard({ channel, onClick }) {
                   title={s.label}
                   className="h-6 w-6 object-contain rounded-md bg-gray-800/60 p-[2px] hover:bg-gray-700/70 transition"
                   onClick={(e) => {
-                    e.stopPropagation(); // evita abrir el modal del canal
+                    e.stopPropagation();
                     openPopup(s.url);
                   }}
+                  draggable={false}
                 />
               ))}
             </div>
