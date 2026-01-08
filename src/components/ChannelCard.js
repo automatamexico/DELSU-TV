@@ -22,17 +22,21 @@ export default function ChannelCard({ channel, onClick }) {
   const description =
     channel?.description || channel?.descripcion || channel?.about || "";
 
-  // ROKU (URL del ícono)
+  // ROKU (ícono y link)
   const rokuIcon =
     channel?.roku_icon_url ||
     channel?.rokuIconUrl ||
     channel?.roku ||
     "";
+  const rokuLink =
+    channel?.roku_link_url ||
+    channel?.rokuLinkUrl ||
+    "";
 
-  // -------- Cache busting para que siempre muestre la versión más reciente --------
+  // Cache-busting ligero (para cuando cambies imágenes en Supabase)
   const versionTag =
-    channel?.icon_version ||
     channel?.poster_version ||
+    channel?.icon_version ||
     channel?.updated_at ||
     channel?.last_modified ||
     Date.now();
@@ -41,13 +45,13 @@ export default function ChannelCard({ channel, onClick }) {
     if (!url) return url;
     const sep = url.includes("?") ? "&" : "?";
     return `${url}${sep}v=${encodeURIComponent(String(versionTag))}`;
-  };
+    };
 
   const posterSrc = withBust(poster);
   const rokuIconSrc = withBust(rokuIcon);
   const hasRoku = Boolean(rokuIcon);
 
-  // Redes sociales (sin cambios funcionales)
+  // Redes sociales (sin tocar tu lógica actual)
   const socials = [
     {
       key: "facebook",
@@ -79,8 +83,7 @@ export default function ChannelCard({ channel, onClick }) {
 
   const openPopup = (href) => {
     if (!href) return;
-    const w = 520,
-      h = 720;
+    const w = 520, h = 720;
     const left = window.screenX + Math.max(0, (window.outerWidth - w) / 2);
     const top = window.screenY + Math.max(0, (window.outerHeight - h) / 2);
     window.open(
@@ -95,17 +98,18 @@ export default function ChannelCard({ channel, onClick }) {
       onClick={() => onClick?.(channel)}
       className="group w-full text-left rounded-xl overflow-hidden bg-gray-900/40 border border-gray-800 hover:border-gray-700 focus:outline-none focus:ring-2 focus:ring-rose-500/40 transition"
     >
-      {/* Poster: ocupa SIEMPRE el ancho del card, altura controlada por la relación */}
+      {/* Poster: SIN DEFORMARSE (object-contain), centrado, con relación fija vertical */}
       <div className="relative">
-        {/* Relación fija uniforme en todos los breakpoints para evitar “desajuste” */}
-        <div className="relative w-full aspect-[2/3] overflow-hidden bg-gray-800">
+        {/* Más alto que ancho: 3/4 */}
+        <div className="relative w-full aspect-[3/4] overflow-hidden bg-gray-800">
+          {/* padding leve para que no “pegue” a los bordes y nunca se recorte */}
           <img
-            key={posterSrc}              // fuerza re-render cuando cambie la URL
+            key={posterSrc}
             src={posterSrc}
             alt={title}
             loading="lazy"
             draggable={false}
-            className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-[1.03] block"
+            className="absolute inset-0 w-full h-full object-contain object-center p-1 block"
           />
         </div>
 
@@ -117,7 +121,7 @@ export default function ChannelCard({ channel, onClick }) {
         </div>
       </div>
 
-      {/* Texto + Roku + footer redes (sin tocar lógicas previas) */}
+      {/* Texto + Roku + Redes */}
       <div className="p-3 space-y-2">
         {/* Título / País + Roku a la derecha */}
         <div className="flex items-start justify-between gap-3">
@@ -128,7 +132,7 @@ export default function ChannelCard({ channel, onClick }) {
             <div className="text-[12px] text-gray-400">{country}</div>
           </div>
 
-          {/* ROKU */}
+          {/* ROKU (clic → abre link si existe) */}
           {hasRoku && (
             <div className="shrink-0 text-right">
               <div className="text-[10px] text-gray-400 mb-1">
@@ -136,12 +140,15 @@ export default function ChannelCard({ channel, onClick }) {
               </div>
               <div className="flex justify-end">
                 <img
-                  key={rokuIconSrc}         // cache-bust para ícono
+                  key={rokuIconSrc}
                   src={rokuIconSrc}
                   alt="Roku"
                   title="Roku"
-                  className="h-7 w-auto object-contain rounded-md bg-gray-800/60 p-[2px]"
-                  onClick={(e) => e.stopPropagation()}
+                  className="h-7 w-auto object-contain rounded-md bg-gray-800/60 p-[2px] cursor-pointer hover:bg-gray-700/60 transition"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (rokuLink) openPopup(rokuLink);
+                  }}
                   draggable={false}
                 />
               </div>
@@ -156,7 +163,7 @@ export default function ChannelCard({ channel, onClick }) {
           </p>
         ) : null}
 
-        {/* Footer de redes */}
+        {/* Footer: Síguenos en + redes */}
         {socials.length > 0 && (
           <div className="pt-1">
             <div className="text-[12px] font-semibold text-gray-200 mb-1">
@@ -169,7 +176,7 @@ export default function ChannelCard({ channel, onClick }) {
                   src={s.icon}
                   alt={s.label}
                   title={s.label}
-                  className="h-6 w-6 object-contain rounded-md bg-gray-800/60 p-[2px] hover:bg-gray-700/70 transition"
+                  className="h-6 w-6 object-contain rounded-md bg-gray-800/60 p-[2px] hover:bg-gray-700/70 transition cursor-pointer"
                   onClick={(e) => {
                     e.stopPropagation();
                     openPopup(s.url);
