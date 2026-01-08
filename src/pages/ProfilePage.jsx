@@ -1,198 +1,244 @@
 // src/pages/ProfilePage.jsx
-import React, { useEffect, useMemo, useState } from "react";
-import { supabase } from "../supabaseClient";
+import React, { useEffect, useState, useRef } from "react";
+import { motion } from "framer-motion";
+import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 
-const AVATAR_BUCKET = "avatars";
-
-function classNames(...c) {
-  return c.filter(Boolean).join(" ");
-}
-
 export default function ProfilePage() {
-  const { user, profile } = useAuth(); // profile: { display_name, country, avatar_url, ... }
-  const [displayName, setDisplayName] = useState(profile?.display_name || "");
-  const [country, setCountry] = useState(profile?.country || "");
-  const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || "");
-  const [email] = useState(user?.email || "");
+  const { user } = useAuth(); // asume { user } viene de AuthContext (auth.user)
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [msg, setMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [okMsg, setOkMsg] = useState("");
 
-  const initials = useMemo(() => {
-    if (displayName?.trim()) {
-      const parts = displayName.trim().split(/\s+/).slice(0, 2);
-      return parts.map((p) => p[0]?.toUpperCase() || "").join("");
-    }
-    if (email) return email[0]?.toUpperCase() || "U";
-    return "U";
-  }, [displayName, email]);
+  const [fullName, setFullName] = useState("");
+  const [country, setCountry] = useState("México");
+  const [avatarUrl, setAvatarUrl] = useState("");
 
-  // Refresca campos locales cuando cambie el perfil del contexto
+  const fileRef = useRef(null);
+
+  // Carga el perfil
   useEffect(() => {
-    setDisplayName(profile?.display_name || "");
-    setCountry(profile?.country || "");
-    setAvatarUrl(profile?.avatar_url || "");
-  }, [profile]);
+    let ignore = false;
+    async function load() {
+      if (!user?.id) return;
+      setLoading(true);
+      setErrorMsg("");
+      const { data, error } = await supabase
+        .from("user_profiles")        // <-- nombre tabla
+        .select("full_name, country, avatar_url")
+        .eq("id", user.id)            // <-- PK = id (NO user_id)
+        .single();
 
-  const handleUpload = async (file) => {
-    if (!user?.id || !file) return;
+      if (!ignore) {
+        if (error && error.code !== "PGRST116") {
+          setErrorMsg("No se pudo cargar el perfil.");
+        } else if (data) {
+          setFullName(data.full_name || "");
+          setCountry(data.country || "México");
+          setAvatarUrl(data.avatar_url || "");
+        }
+        setLoading(false);
+      }
+    }
+    load();
+    return () => { ignore = true; };
+  }, [user?.id]);
+
+  const onPickFile = () => fileRef.current?.click();
+
+  // Subir avatar al bucket 'avatars' y actualizar avatar_url
+  const onFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !user?.id) return;
+
+    setErrorMsg("");
+    setOkMsg("");
+    setSaving(true);
     try {
-      setUploading(true);
-      setMsg("");
+      // ruta única: <uid>/avatar_<timestamp>.<ext>
+      const ext = file.name.split(".").pop() || "jpg";
+      const path = `${user.id}/avatar_${Date.now()}.${ext}`;
 
-      // 1) Subir al bucket
-      const path = `${user.id}/${Date.now()}_${file.name}`.replace(/\s+/g, "_");
-      const { error: upErr } = await supabase.storage
-        .from(AVATAR_BUCKET)
-        .upload(path, file, { cacheControl: "3600", upsert: true });
+      const { error: upErr } = await supabase
+        .storage
+        .from("avatars")
+        .upload(path, file, {
+          upsert: true,
+          cacheControl: "3600",
+          contentType: file.type || "image/jpeg",
+        });
+
       if (upErr) throw upErr;
 
-      // 2) Obtener URL pública
-      const { data: pub } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path);
-      const publicUrl = pub?.publicUrl || "";
+      // URL pública (si tu bucket no es público, usa createSignedUrl)
+      const { data: urlData } = supabase
+        .storage
+        .from("avatars")
+        .getPublicUrl(path);
 
-      // 3) Persistir en tabla user_profiles
-      const { error: updErr } = await supabase
+      const publicUrl = urlData?.publicUrl || "";
+
+      // upsert en perfiles (usa id, NO user_id)
+      const { error: upsertErr } = await supabase
         .from("user_profiles")
-        .update({ avatar_url: publicUrl })
-        .eq("user_id", user.id);
-      if (updErr) throw updErr;
+        .upsert(
+          {
+            id: user.id,                // clave
+            avatar_url: publicUrl,
+            full_name: fullName || null,
+            country: country || null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "id" }          // conflicto por id
+        );
+
+      if (upsertErr) throw upsertErr;
 
       setAvatarUrl(publicUrl);
-      setMsg("✅ Avatar actualizado.");
-    } catch (e) {
-      setMsg("⚠️ No se pudo subir el avatar: " + (e?.message || e));
+      setOkMsg("Avatar actualizado.");
+    } catch (err) {
+      setErrorMsg(
+        "No se pudo subir el avatar: " +
+          (err?.message || "error desconocido")
+      );
     } finally {
-      setUploading(false);
+      setSaving(false);
+      if (fileRef.current) fileRef.current.value = "";
     }
   };
 
-  const onSelectFile = (e) => {
-    const f = e.target.files?.[0];
-    if (f) handleUpload(f);
-  };
-
-  const handleSaveInfo = async (e) => {
+  const onSave = async (e) => {
     e.preventDefault();
     if (!user?.id) return;
+
+    setSaving(true);
+    setErrorMsg("");
+    setOkMsg("");
     try {
-      setSaving(true);
-      setMsg("");
-
-      const payload = {
-        display_name: displayName || null,
-        country: country || null,
-      };
-
       const { error } = await supabase
         .from("user_profiles")
-        .update(payload)
-        .eq("user_id", user.id);
+        .upsert(
+          {
+            id: user.id,               // clave
+            full_name: fullName || null,
+            country: country || null,
+            avatar_url: avatarUrl || null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "id" }
+        );
 
       if (error) throw error;
-
-      setMsg("✅ Datos guardados.");
-    } catch (e) {
-      setMsg("⚠️ No se pudieron guardar los datos: " + (e?.message || e));
+      setOkMsg("Perfil actualizado.");
+    } catch (err) {
+      setErrorMsg("No se pudo guardar el perfil.");
     } finally {
       setSaving(false);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 px-4 py-8">
-      <div className="max-w-3xl mx-auto">
-        <h1 className="text-2xl font-bold text-white mb-6">Perfil</h1>
+  const displayName = fullName?.trim() || "Sin nombre";
 
-        {/* Tarjeta principal */}
-        <div className="bg-gray-900/60 border border-gray-800 rounded-2xl overflow-hidden">
-          {/* Encabezado con avatar */}
-          <div className="p-6 flex flex-col sm:flex-row gap-6 items-center sm:items-start">
-            {/* Avatar */}
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 p-4">
+      <div className="max-w-4xl mx-auto space-y-4">
+        <motion.h1
+          className="text-2xl font-bold text-white"
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          Perfil
+        </motion.h1>
+
+        <motion.div
+          className="rounded-2xl border border-gray-800 bg-gray-900/50 overflow-hidden"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          {/* Cabecera */}
+          <div className="p-4 sm:p-6 flex gap-4">
             <div className="relative">
-              {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt="Avatar"
-                  className="w-28 h-28 rounded-full object-cover ring-2 ring-gray-700"
-                />
-              ) : (
-                <div className="w-28 h-28 rounded-full bg-rose-600/20 ring-2 ring-gray-700 grid place-items-center">
-                  <span className="text-3xl font-bold text-rose-300">{initials}</span>
-                </div>
-              )}
-              <label
-                className={classNames(
-                  "absolute -bottom-2 -right-2 cursor-pointer text-xs",
-                  "px-3 py-1.5 rounded-full bg-rose-600 hover:bg-rose-500",
-                  "text-white shadow transition"
-                )}
+              <img
+                src={
+                  avatarUrl ||
+                  "https://api.dicebear.com/7.x/initials/svg?seed=" +
+                    encodeURIComponent(user?.email || "U")
+                }
+                alt="avatar"
+                className="h-24 w-24 sm:h-28 sm:w-28 rounded-full object-cover border border-gray-700"
+              />
+              <button
+                type="button"
+                onClick={onPickFile}
+                disabled={saving}
+                className="absolute -bottom-2 left-1/2 -translate-x-1/2 text-xs bg-rose-600 hover:bg-rose-500 text-white px-3 py-1 rounded-full shadow disabled:opacity-60"
               >
-                {uploading ? "Subiendo…" : "Cambiar"}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={onSelectFile}
-                  disabled={uploading}
-                />
-              </label>
+                Cambiar
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={onFileChange}
+              />
             </div>
 
-            {/* Datos básicos */}
-            <div className="flex-1 w-full">
-              <div className="text-white text-lg font-semibold">
-                {displayName || "Sin nombre"}
+            <div className="flex-1 min-w-0">
+              <div className="text-white font-semibold text-lg truncate">
+                {displayName}
               </div>
-              <div className="text-gray-300">{email}</div>
-              <div className="text-gray-400 text-sm">{country || "—"}</div>
+              <div className="text-sm text-gray-300 truncate">
+                {user?.email}
+              </div>
+              <div className="text-sm text-gray-400 mt-1">{country || "—"}</div>
             </div>
           </div>
 
-          <div className="h-px bg-gray-800" />
-
-          {/* Formulario de edición (nombre / país) */}
-          <form className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4" onSubmit={handleSaveInfo}>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Nombre</label>
-              <input
-                type="text"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                className="w-full bg-black/40 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-rose-500/40"
-                placeholder="Tu nombre"
-              />
+          {/* Formulario */}
+          <form onSubmit={onSave} className="p-4 sm:p-6 border-t border-gray-800">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Nombre</label>
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Tu nombre"
+                  className="w-full rounded-lg bg-gray-800 border border-gray-700 text-gray-100 px-3 py-2 outline-none focus:border-rose-500/60"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">País</label>
+                <input
+                  type="text"
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  placeholder="México"
+                  className="w-full rounded-lg bg-gray-800 border border-gray-700 text-gray-100 px-3 py-2 outline-none focus:border-rose-500/60"
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">País</label>
-              <input
-                type="text"
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
-                className="w-full bg-black/40 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-rose-500/40"
-                placeholder="México, Colombia, …"
-              />
-            </div>
 
-            <div className="sm:col-span-2 flex items-center justify-between mt-2">
-              <div className="text-sm text-gray-400">{msg}</div>
+            <div className="mt-4 flex items-center gap-3">
               <button
                 type="submit"
-                disabled={saving}
-                className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white transition disabled:opacity-60"
+                disabled={saving || loading}
+                className="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-lg disabled:opacity-60"
               >
-                {saving ? "Guardando…" : "Guardar cambios"}
+                {saving ? "Guardando..." : "Guardar cambios"}
               </button>
+
+              {okMsg && (
+                <span className="text-green-400 text-sm">{okMsg}</span>
+              )}
+              {errorMsg && (
+                <span className="text-amber-400 text-sm">{errorMsg}</span>
+              )}
             </div>
           </form>
-        </div>
-
-        {/* Tip: muestra ayuda del bucket si no existe */}
-        <p className="text-xs text-gray-500 mt-4">
-          Nota: asegúrate de tener un bucket público llamado <code>avatars</code> en Supabase
-          y una columna <code>avatar_url</code> en <code>user_profiles</code>.
-        </p>
+        </motion.div>
       </div>
     </div>
   );
