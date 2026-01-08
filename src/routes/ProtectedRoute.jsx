@@ -1,27 +1,26 @@
-import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+// src/routes/ProtectedRoute.jsx
+import React from "react";
+import { Navigate, useLocation } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 export default function ProtectedRoute({ children }) {
-  const { user, loading, authError } = useAuth();
-  const location = useLocation();
+  const { user, loading } = useAuth?.() || {};
 
+  // Mientras AuthContext resuelve sesión, no parpadees la UI.
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-white">
-        Cargando sesión…
+      <div className="min-h-screen flex items-center justify-center text-gray-300">
+        Cargando…
       </div>
     );
   }
 
-  if (authError) {
-    return <Navigate to="/login" replace state={{ from: location, reason: 'auth_error' }} />;
-  }
+  const location = useLocation();
 
+  // Si no hay sesión, manda al login de la app
   if (!user) {
-    return <Navigate to="/login" replace state={{ from: location, reason: 'no_user' }} />;
+    return <Navigate to="/app" replace state={{ from: location }} />;
   }
 
   return children;
 }
-
