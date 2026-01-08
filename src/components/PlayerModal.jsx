@@ -1,41 +1,47 @@
 // src/components/PlayerModal.jsx
-import React, { useEffect } from "react";
+import React from "react";
 import { X } from "lucide-react";
 import VideoPlayer from "./VideoPlayer";
 
 export default function PlayerModal({ open, onClose, channel }) {
-  useEffect(() => {
-    const onEsc = (e) => e.key === "Escape" && open && onClose?.();
-    window.addEventListener("keydown", onEsc);
-    return () => window.removeEventListener("keydown", onEsc);
-  }, [open, onClose]);
-
   if (!open || !channel) return null;
 
-  const src = channel.m3u8Url || channel.streamUrl || channel.url || "";
-  const title = channel.name || "Reproductor";
-  const poster =
-    channel.poster ||
-    channel.image ||
-    channel.thumbnail ||
-    "https://images.unsplash.com/photo-1511379938547-c1f69419868d?q=80&w=1200&auto=format&fit=crop";
+  const title =
+    channel?.title ||
+    channel?.name ||
+    channel?.channel_name ||
+    "Canal";
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center" aria-modal="true" role="dialog">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-[101] w-[95vw] max-w-6xl bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 bg-gray-800 border-b border-gray-700">
-          <h3 className="text-white font-semibold truncate">{title}</h3>
+    <div className="fixed inset-0 z-50">
+      {/* Fondo */}
+      <div
+        className="absolute inset-0 bg-black/70"
+        onClick={onClose}
+      />
+
+      {/* Contenedor del modal */}
+      <div className="relative mx-auto my-8 w-[95%] max-w-6xl rounded-2xl overflow-hidden bg-[#0b1016] ring-1 ring-white/10">
+        {/* Header: título ÚNICO + botón cerrar */}
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 bg-[#121821] border-b border-white/10">
+          <h2 className="text-sm sm:text-base font-semibold text-white truncate">
+            {title}
+          </h2>
           <button
-            type="button"
             onClick={onClose}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-gray-700 hover:bg-gray-600 text-white text-sm"
+            className="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm bg-white/10 hover:bg-white/15 text-white"
           >
-            <X className="w-4 h-4" /> Cerrar
+            <X className="h-4 w-4" />
+            <span>Cerrar</span>
           </button>
         </div>
 
-        <VideoPlayer src={src} title={title} poster={poster} hideSource />
+        {/* ⚠️ Eliminado el subtítulo que duplicaba el nombre */}
+
+        {/* Cuerpo: reproductor */}
+        <div className="bg-black">
+          <VideoPlayer channel={channel} onClose={onClose} />
+        </div>
       </div>
     </div>
   );
