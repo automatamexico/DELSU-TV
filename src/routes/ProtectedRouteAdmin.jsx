@@ -4,7 +4,9 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function ProtectedRouteAdmin({ children }) {
-  const { user, profile, loading } = useAuth?.() || {};
+  // Hooks SIEMPRE arriba
+  const location = useLocation();
+  const { user, profile, loading } = useAuth();
 
   if (loading) {
     return (
@@ -14,16 +16,14 @@ export default function ProtectedRouteAdmin({ children }) {
     );
   }
 
-  const location = useLocation();
-
-  // No logueado → al login admin
   if (!user) {
+    // no logueado → al login admin
     return <Navigate to="/admin" replace state={{ from: location }} />;
   }
 
-  // Logueado pero sin rol admin → a Home
   const role = profile?.role || "user";
   if (role !== "admin") {
+    // logueado pero sin permisos
     return <Navigate to="/" replace />;
   }
 
