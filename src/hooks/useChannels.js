@@ -1,53 +1,95 @@
-// src/hooks/useChannels.js
-import { useEffect, useState } from 'react';
-import { supabase } from '../supabaseClient';
+// Hook de canales con búsqueda y filtro por categoría
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "../supabaseClient"; // tu cliente ya existente
 
-/**
- * Hook de canales: lee de Supabase y normaliza campos.
- * - Convierte stream_url (DB) -> streamUrl (UI)
- */
-export function useChannels(userRole) {
-  const [channels, setChannels] = useState([]);
+// util: normaliza strings para búsquedas (acentos, mayúsculas, espacios)
+const norm = (s) =>
+  (s || "")
+    .toString()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .trim();
+
+export function useChannels(userRole = "user") {
+  const [allChannels, setAllChannels] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
 
-  // filtros básicos que ya usas en HomePage/Header
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('Todos');
+  // controles UI
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("Todos");
+
+  // si usas filtros extra, los preservo aunque no los necesitamos aquí
   const [filters, setFilters] = useState({});
+  const handleFilterChange = (next) => setFilters((prev) => ({ ...prev, ...next }));
 
-  const handleFilterChange = (f) => setFilters((prev) => ({ ...prev, ...f }));
-
+  // carga de canales (sin tocar tu esquema; si ya los cargas en otro sitio, esto no choca)
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('channels')
-        .select('id,name,country,description,poster,stream_url,category,language,created_at')
-        .order('created_at', { ascending: false });
+    let mounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+        setErrorMsg("");
 
-      if (error) {
-        console.error('[useChannels] Error:', error);
-        setChannels([]);
-      } else {
-        const mapped = (data || []).map((r) => ({
-          ...r,
-          // normalización clave:
-          streamUrl: r.stream_url ?? '', // <- lo que usará el player
-        }));
-        setChannels(mapped);
+        const { data, error } = await supabase
+          .from("channels")
+          .select("*")
+          .order("id", { ascending: true });
+
+        if (error) throw error;
+        if (!mounted) return;
+
+        setAllChannels(Array.isArray(data) ? data : []);
+      } catch (e) {
+        if (!mounted) return;
+        // si falla, no rompemos la UI
+        setErrorMsg("No se pudieron cargar los canales.");
+        setAllChannels((v) => v || []);
+      } finally {
+        if (mounted) setLoading(false);
       }
-      setLoading(false);
+    })();
+    return () => {
+      mounted = false;
     };
-    load();
   }, [userRole]);
+
+  // derivado: aplica búsqueda + categoría
+  const channels = useMemo(() => {
+    const q = norm(searchTerm);
+    const cat = norm(selectedCategory);
+
+    return (allChannels || []).filter((ch) => {
+      // categoría
+      if (cat && cat !== "todos") {
+        const chCat = norm(ch?.category || ch?.categoria || ch?.genre);
+        if (!chCat || chCat !== cat) return false;
+      }
+      // búsqueda (en varios campos habituales)
+      if (!q) return true;
+
+      const hay =
+        norm(ch?.title || ch?.name || ch?.channel_name).includes(q) ||
+        norm(ch?.description || ch?.descripcion || ch?.about).includes(q) ||
+        norm(ch?.country || ch?.pais).includes(q);
+
+      return hay;
+    });
+  }, [allChannels, searchTerm, selectedCategory]);
 
   return {
     channels,
     loading,
+    errorMsg,
+
+    // controles expuestos para Header/CategoryFilter
     searchTerm,
     setSearchTerm,
     selectedCategory,
     setSelectedCategory,
+
+    // por compatibilidad con tu UI actual
     filters,
     handleFilterChange,
   };
