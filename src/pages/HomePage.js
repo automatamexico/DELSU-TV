@@ -1,5 +1,5 @@
 // src/pages/HomePage.jsx
-import React, { useState, Suspense, lazy } from "react";
+import React, { useState, useMemo, Suspense, lazy } from "react";
 import { motion } from "framer-motion";
 import Header from "../components/Header";
 import CategoryFilter from "../components/CategoryFilter";
@@ -42,8 +42,39 @@ export default function HomePage() {
     handleFilterChange,
   } = useChannels(userRole);
 
-  const [selectedChannel, setSelectedChannel] = useState(null);
+  // === NUEVO: filtro por país ===
+  const [selectedCountry, setSelectedCountry] = useState("");
 
+  // Países únicos + bandera desde la data actual
+  const countryItems = useMemo(() => {
+    const map = new Map();
+    (channels || []).forEach((ch) => {
+      const country = ch?.pais || ch?.country || "";
+      if (!country) return;
+      const flag =
+        ch?.url_bandera || ch?.bandera_url || ch?.flag_url || "";
+      if (!map.has(country)) {
+        map.set(country, { country, flagUrl: flag || "" });
+      } else if (!map.get(country).flagUrl && flag) {
+        map.set(country, { country, flagUrl: flag });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) =>
+      a.country.localeCompare(b.country)
+    );
+  }, [channels]);
+
+  // Aplica filtro de país sobre el arreglo ya gestionado por useChannels
+  const channelsByCountry = useMemo(() => {
+    if (!selectedCountry) return channels;
+    const ctry = selectedCountry.toLowerCase();
+    return (channels || []).filter((ch) => {
+      const c = (ch?.pais || ch?.country || "").toLowerCase();
+      return c === ctry;
+    });
+  }, [channels, selectedCountry]);
+
+  const [selectedChannel, setSelectedChannel] = useState(null);
   const handleChannelClick = (channel) => setSelectedChannel(channel);
   const handleClosePlayer = () => setSelectedChannel(null);
 
@@ -74,6 +105,10 @@ export default function HomePage() {
             categories={categories}
             selectedCategory={selectedCategory}
             onCategoryChange={setSelectedCategory}
+            // === NUEVO: props de país ===
+            selectedCountry={selectedCountry}
+            onCountryChange={setSelectedCountry}
+            countryItems={countryItems}
           />
 
           <motion.main
@@ -81,7 +116,10 @@ export default function HomePage() {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.35 }}
           >
-            <ChannelGrid channels={channels} onChannelClick={handleChannelClick} />
+            <ChannelGrid
+              channels={channelsByCountry}
+              onChannelClick={handleChannelClick}
+            />
           </motion.main>
         </>
       )}
