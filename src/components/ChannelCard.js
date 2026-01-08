@@ -33,10 +33,17 @@ export default function ChannelCard({ channel, onClick }) {
     channel?.rokuLinkUrl ||
     "";
 
-  // Cache-busting base (póster y roku)
+  // NUEVO: bandera (misma talla que iconos del footer)
+  const flagUrl =
+    channel?.url_bandera ||
+    channel?.bandera_url ||
+    ""; // soporta ambos nombres por si acaso
+
+  // Cache-busting base
   const baseVersion =
     channel?.poster_version ||
     channel?.icon_version ||
+    channel?.socials_version ||
     channel?.updated_at ||
     channel?.last_modified ||
     Date.now();
@@ -49,11 +56,12 @@ export default function ChannelCard({ channel, onClick }) {
 
   const posterSrc = withBust(poster, baseVersion);
   const rokuIconSrc = withBust(rokuIcon, baseVersion);
-  const hasRoku = Boolean(rokuIcon);
+  const flagSrc = withBust(flagUrl, baseVersion);
 
-  // Redes sociales
-  // >>> Ajuste: usamos un "version" específico para redes (si existe 'socials_version' o 'updated_at')
-  // y además forzamos remonte del <img> cambiando su key cuando cambia la URL con bust.
+  const hasRoku = Boolean(rokuIcon);
+  const hasFlag = Boolean(flagUrl);
+
+  // Redes sociales (con bust + key)
   const socialsVersion =
     channel?.socials_version ||
     channel?.updated_at ||
@@ -86,7 +94,6 @@ export default function ChannelCard({ channel, onClick }) {
     },
   ];
 
-  // Aplica bust SOLO a iconos de redes y prepara key única por cambio
   const socials = socialsRaw
     .filter((s) => s.url && s.icon)
     .map((s) => {
@@ -140,7 +147,21 @@ export default function ChannelCard({ channel, onClick }) {
             <h3 className="text-[15px] font-semibold text-white line-clamp-1">
               {title}
             </h3>
-            <div className="text-[12px] text-gray-400">{country}</div>
+
+            {/* País con bandera (misma talla que iconos del footer: h-6 w-6) */}
+            <div className="mt-0.5 flex items-center gap-2">
+              {hasFlag && (
+                <img
+                  key={flagSrc}
+                  src={flagSrc}
+                  alt={`Bandera ${country}`}
+                  title={country}
+                  className="h-6 w-6 object-contain rounded-sm bg-gray-800/60 p-[2px]"
+                  draggable={false}
+                />
+              )}
+              <span className="text-[12px] text-gray-400">{country}</span>
+            </div>
           </div>
 
           {hasRoku && (
@@ -173,7 +194,7 @@ export default function ChannelCard({ channel, onClick }) {
           </p>
         ) : null}
 
-        {/* Footer redes: “Síguenos en” + iconos (con bust y key para remonte) */}
+        {/* Footer redes */}
         {socials.length > 0 && (
           <div className="pt-1">
             <div className="text-[12px] font-semibold text-gray-200 mb-1">
