@@ -1,0 +1,22 @@
+/* Placeholder mínimo para satisfacer el import de src/index.js
+   No usa Tailwind ni PostCSS. Seguro para build en Netlify. */
+
+:root {
+  --app-ready: 1;
+}
+
+/* Opcional: color de fondo base para evitar “flash” blanco */
+html, body, #root {
+  height: 100%;
+  background: #000; /* tu app ya usa fondos oscuros */
+  margin: 0;
+}
+
+/* Suaviza scroll (cosmético) */
+html { scroll-behavior: smooth; }
+
+/* Tipografía base opcional */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
