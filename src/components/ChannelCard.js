@@ -22,7 +22,17 @@ export default function ChannelCard({ channel, onClick }) {
   const description =
     channel?.description || channel?.descripcion || channel?.about || "";
 
-  // --- NUEVO: redes sociales (acepta snake_case y camelCase) ---
+  // --- ROKU (conserva el comportamiento previo) ---
+  // Puedes guardar directamente el URL del icono en `roku` o en `roku_icon_url`.
+  const rokuIcon =
+    channel?.roku_icon_url ||
+    channel?.rokuIconUrl ||
+    channel?.roku || // si guardas directamente el URL en 'roku'
+    ""; // si viene vacío, no se muestra
+
+  const hasRoku = Boolean(rokuIcon);
+
+  // --- Redes sociales (sin quitar Roku y en un footer aparte) ---
   const socials = [
     {
       key: "facebook",
@@ -48,7 +58,7 @@ export default function ChannelCard({ channel, onClick }) {
       icon: channel?.website_icon_url || channel?.websiteIconUrl,
       label: "Sitio",
     },
-  ].filter(s => s.url && s.icon); // solo las que tengan ambos
+  ].filter(s => s.url && s.icon);
 
   const openPopup = (href) => {
     if (!href) return;
@@ -67,15 +77,15 @@ export default function ChannelCard({ channel, onClick }) {
       onClick={() => onClick?.(channel)}
       className="group w-full text-left rounded-xl overflow-hidden bg-gray-900/40 border border-gray-800 hover:border-gray-700 focus:outline-none focus:ring-2 focus:ring-rose-500/40 transition"
     >
-      {/* Poster alto (vertical) */}
+      {/* Poster alto (vertical) perfectamente ajustado */}
       <div className="relative">
-        {/* NO tocamos proporción: 3/4 en móviles, 2/3 en md+ */}
-        <div className="aspect-[3/4] md:aspect-[2/3] w-full overflow-hidden bg-gray-800">
+        {/* Caja con relación de aspecto. Imagen absoluta para cubrir sin deformar */}
+        <div className="relative w-full aspect-[3/4] md:aspect-[2/3] overflow-hidden bg-gray-800">
           <img
             src={poster}
             alt={title}
             loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+            className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-[1.03]"
           />
         </div>
 
@@ -87,8 +97,9 @@ export default function ChannelCard({ channel, onClick }) {
         </div>
       </div>
 
-      {/* Texto + footer */}
-      <div className="p-3 space-y-1.5">
+      {/* Texto + Roku + footer redes */}
+      <div className="p-3 space-y-2">
+        {/* Título / País + Roku a la derecha */}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 className="text-[15px] font-semibold text-white line-clamp-1">
@@ -97,36 +108,55 @@ export default function ChannelCard({ channel, onClick }) {
             <div className="text-[12px] text-gray-400">{country}</div>
           </div>
 
-          {/* NUEVO: bloque “Disponible en” con íconos si existen */}
-          {socials.length > 0 && (
+          {/* ROKU (se mantiene como antes) */}
+          {hasRoku && (
             <div className="shrink-0 text-right">
               <div className="text-[10px] text-gray-400 mb-1">
-                Disponible También en:
+                Disponible también en:
               </div>
-              <div className="flex items-center gap-2 justify-end">
-                {socials.map((s) => (
-                  <img
-                    key={s.key}
-                    src={s.icon}
-                    alt={s.label}
-                    title={s.label}
-                    className="h-6 w-6 object-contain rounded-md bg-gray-800/60 p-[2px] hover:bg-gray-700/70 transition"
-                    onClick={(e) => {
-                      e.stopPropagation(); // no abrir el modal del canal
-                      openPopup(s.url);
-                    }}
-                  />
-                ))}
+              <div className="flex justify-end">
+                <img
+                  src={rokuIcon}
+                  alt="Roku"
+                  title="Roku"
+                  className="h-7 w-auto object-contain rounded-md bg-gray-800/60 p-[2px]"
+                  onClick={(e) => e.stopPropagation()}
+                />
               </div>
             </div>
           )}
         </div>
 
+        {/* Descripción */}
         {description ? (
-          <p className="text-[12px] leading-4 text-gray-400 line-clamp-2 mt-1.5">
+          <p className="text-[12px] leading-4 text-gray-400 line-clamp-2">
             {description}
           </p>
         ) : null}
+
+        {/* Footer de redes */}
+        {socials.length > 0 && (
+          <div className="pt-1">
+            <div className="text-[12px] font-semibold text-gray-200 mb-1">
+              Síguenos en
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {socials.map((s) => (
+                <img
+                  key={s.key}
+                  src={s.icon}
+                  alt={s.label}
+                  title={s.label}
+                  className="h-6 w-6 object-contain rounded-md bg-gray-800/60 p-[2px] hover:bg-gray-700/70 transition"
+                  onClick={(e) => {
+                    e.stopPropagation(); // evita abrir el modal del canal
+                    openPopup(s.url);
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </button>
   );
