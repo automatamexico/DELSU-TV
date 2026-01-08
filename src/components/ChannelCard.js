@@ -22,7 +22,7 @@ export default function ChannelCard({ channel, onClick }) {
   const description =
     channel?.description || channel?.descripcion || channel?.about || "";
 
-  // URL del logo Roku desde la tabla (si no hay, no se muestra)
+  // URL del logo Roku desde la tabla ( si no hay, no se muestra)
   const rokuUrl = channel?.roku_url || channel?.roku || "";
 
   return (
