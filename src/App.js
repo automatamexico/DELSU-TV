@@ -13,6 +13,7 @@ import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import AdminLoginPage from './pages/AdminLoginPage';
 import DashboardPage from './pages/DashboardPage';
+import ProfilePage from "./pages/ProfilePage";
 
 export default function App() {
   return (
