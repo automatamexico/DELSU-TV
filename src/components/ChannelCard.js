@@ -34,12 +34,15 @@ export default function ChannelCard({ channel, onClick }) {
       <div className="relative">
         {/* 3/4 en móviles, 2/3 desde md */}
         <div className="relative aspect-[3/4] md:aspect-[2/3] w-full overflow-hidden bg-gray-800">
-          <img
-            src={poster}
-            alt={title}
-            loading="lazy"
-            className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-          />
+          {/* Contenedor centrado: asegura que la imagen se vea completa */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <img
+              src={poster}
+              alt={title}
+              loading="lazy"
+              className="max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-[1.02]"
+            />
+          </div>
         </div>
 
         {/* Etiqueta de categoría */}
