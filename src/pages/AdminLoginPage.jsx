@@ -7,7 +7,6 @@ import { supabase } from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
 
 // ========= ICONOS (AJUSTA ESTAS URLS A TU STORAGE) =========
-const BASE = 'https://uqzcnlmhmglzflkuzczk.supabase.co/storage/v1/object/public';
 const ICON_URLS = {
   roku:    'https://uqzcnlmhmglzflkuzczk.supabase.co/storage/v1/object/public/avatars/roku.png',
   youtube: 'https://uqzcnlmhmglzflkuzczk.supabase.co/storage/v1/object/public/avatars/logo_youtube.png',
@@ -692,5 +691,6 @@ export default function AdminLoginPage() {
     </div>
   );
 }
+
 
 
