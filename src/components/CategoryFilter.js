@@ -13,8 +13,7 @@ export default function CategoryFilter({
     const filtered = base.filter((c) => c !== "País");
     return filtered;
   }, [categories]);
-
-  const [showCountries, setShowCountries] = useState(false);
+const [showCountries, setShowCountries] = useState(false);
 
   const handleCategoryClick = (cat) => {
     if (onCategoryChange) onCategoryChange(cat);
@@ -29,121 +28,97 @@ export default function CategoryFilter({
     setShowCountries(false);
   };
 
-        return;
-      }
-
-      const uniq = new Map();
-      (data || []).forEach((row) => {
-        const name = String(row.country || "").trim();
-        if (!name) return;
-        if (!uniq.has(name)) {
-          uniq.set(name, { country: name, flag: row.url_bandera || null });
-        }
-      });
-      const arr = Array.from(uniq.values()).sort((a, b) =>
-        a.country.localeCompare(b.country)
-      );
-      setCountries(arr);
-    })();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const handlePickCategory = (cat) => onCategoryChange?.(cat);
-
-  // 🔧 ÚNICO CAMBIO: usar "País: " con acento
-  const handlePickCountry = (c) => {
-    onCategoryChange?.(`País: ${c.country}`);
-    setShowCountryMenu(false);
-  };
-
   return (
-    <div className="w-full">
-      <div className="w-full flex items-center justify-center gap-2 flex-wrap px-4 py-3">
-        {uiCategories.map((cat) => (
+    <div className="px-4 pt-3 relative">
+      {/* Barra de categorías centrada */}
+      <div className="flex flex-wrap justify-center items-center gap-2 pb-2">
+        {categoryList.map((cat) => {
+          const isActive = selectedCategory === cat;
+          return (
+            <button
+              key={cat}
+              onClick={() => handleCategoryClick(cat)}
+              className={`px-3 py-1.5 rounded-full text-sm border transition ${
+                isActive
+                  ? "bg-rose-600 text-white border-rose-500"
+                  : "bg-gray-900/40 text-gray-200 border-gray-700 hover:border-gray-500"
+              }`}
+            >
+              {cat}
+            </button>
+          );
+        })}
+
+        {/* Botón País */}
+        <div className="relative">
           <button
-            key={cat}
-            type="button"
-            onClick={() => handlePickCategory(cat)}
+            onClick={handleCountryToggle}
             className={`px-3 py-1.5 rounded-full text-sm border transition ${
-              selectedCategory === cat
-                ? "bg-rose-600 text-white border-rose-500"
-                : "bg-white/5 text-gray-200 border-white/10 hover:bg-white/10"
+              selectedCountry
+                ? "bg-indigo-600 text-white border-indigo-500"
+                : "bg-gray-900/40 text-gray-200 border-gray-700 hover:border-gray-500"
             }`}
+            title="Filtrar por país"
           >
-            {cat}
+            {selectedCountry ? `País: ${selectedCountry}` : "País"}
           </button>
-        ))}
 
-        <button
-          type="button"
-          onClick={() => setShowCountryMenu(true)}
-          className={`px-3 py-1.5 rounded-full text-sm border transition ${
-            typeof selectedCategory === "string" &&
-            selectedCategory.startsWith("País:")
-              ? "bg-rose-600 text-white border-rose-500"
-              : "bg-white/5 text-gray-200 border-white/10 hover:bg-white/10"
-          }`}
-        >
-          País
-        </button>
-      </div>
-
-      {showCountryMenu && (
-        <div
-          className="fixed inset-0 z-50"
-          aria-modal="true"
-          role="dialog"
-          onClick={() => setShowCountryMenu(false)}
-        >
-          <div className="absolute inset-0 bg-black/40" />
-          <div
-            className="absolute left-1/2 top-20 -translate-x-1/2 w-[92vw] max-w-2xl rounded-xl border border-white/10 bg-[#0b1016] p-4 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-white">Selecciona un país</h3>
+          {/* Dropdown País sin scroll: overlay centrado bajo el botón */}
+          {showCountries && (
+            <div
+              className="
+                absolute left-1/2 -translate-x-1/2 z-40 mt-2
+                w-[min(90vw,560px)]
+                rounded-lg border border-gray-700 bg-black/90 backdrop-blur
+                p-2 shadow-2xl
+                max-h-none overflow-visible
+              "
+            >
               <button
-                type="button"
-                onClick={() => setShowCountryMenu(false)}
-                className="text-xs text-gray-300 hover:text-white px-2 py-1 rounded bg-white/10"
+                onClick={() => handleCountrySelect("")}
+                className={`w-full flex items-center gap-2 px-2 py-2 rounded text-sm ${
+                  !selectedCountry
+                    ? "bg-gray-800 text-white"
+                    : "text-gray-200 hover:bg-gray-800"
+                }`}
               >
-                Cerrar
+                <span className="inline-block w-5 h-5 rounded bg-gray-700" />
+                Todos los países
               </button>
-            </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[60vh] overflow-auto">
-              {countries.length === 0 ? (
-                <div className="col-span-full text-xs text-gray-400">
-                  No hay países disponibles.
-                </div>
-              ) : (
-                countries.map((c) => (
+              {/* Lista completa sin scroll (se superpone sobre el contenido) */}
+              <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-1">
+                {countryItems.map(({ country, flagUrl }) => (
                   <button
-                    key={c.country}
-                    type="button"
-                    onClick={() => handlePickCountry(c)}
-                    className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg px-2 py-2 text-left"
+                    key={country}
+                    onClick={() => handleCountrySelect(country)}
+                    className={`w-full flex items-center gap-2 px-2 py-2 rounded text-sm ${
+                      selectedCountry === country
+                        ? "bg-gray-800 text-white"
+                        : "text-gray-200 hover:bg-gray-800"
+                    }`}
+                    title={country}
                   >
-                    {c.flag ? (
+                    {flagUrl ? (
                       <img
-                        src={c.flag}
-                        alt={c.country}
-                        className="h-5 w-5 object-contain rounded-sm border border-white/10"
+                        src={flagUrl}
+                        alt={country}
+                        className="w-5 h-5 object-contain rounded"
                         loading="lazy"
                       />
                     ) : (
-                      <div className="h-5 w-5 rounded-sm bg-white/10" />
+                      <span className="inline-block w-5 h-5 rounded bg-gray-700" />
                     )}
-                    <span className="text-sm text-gray-100 truncate">{c.country}</span>
+                    <span className="truncate">{country}</span>
                   </button>
-                ))
-              )}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
+
+  
