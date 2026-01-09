@@ -691,7 +691,8 @@ function AdminChannelForm() {
    NUEVO: Panel de estado (Activos/Inactivos) + modales
    ========================= */
 function ChannelStatusPanel() {
-  const [channels, setChannels] = useState([]);
+  const [active, setActive] = useState([]);
+  const [inactive, setInactive] = useState([]);
   const [loading, setLoading] = useState(true);
   const [openModal, setOpenModal] = useState(null); // 'active' | 'inactive' | null
 
@@ -699,15 +700,33 @@ function ChannelStatusPanel() {
     let mounted = true;
     (async () => {
       try {
-        const { data, error } = await supabase
+        // Activos: is_suspended = false OR NULL
+        const { data: act, error: errA } = await supabase
           .from('channels')
-          .select('id,name,is_suspended,next_billing_at')
+          .select('id,name,next_billing_at,is_suspended')
+          .or('is_suspended.is.false,is_suspended.is.null')
           .order('name', { ascending: true });
-        if (error) throw error;
-        if (mounted) setChannels(data || []);
+
+        if (errA) throw errA;
+
+        // Inactivos: is_suspended = true
+        const { data: ina, error: errI } = await supabase
+          .from('channels')
+          .select('id,name,next_billing_at,is_suspended')
+          .eq('is_suspended', true)
+          .order('name', { ascending: true });
+
+        if (errI) throw errI;
+
+        if (!mounted) return;
+        setActive(act || []);
+        setInactive(ina || []);
       } catch (e) {
         // eslint-disable-next-line no-console
-        console.error('[ChannelStatusPanel] load', e);
+        console.error('[ChannelStatusPanel] load error', e);
+        if (!mounted) return;
+        setActive([]);
+        setInactive([]);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -715,15 +734,14 @@ function ChannelStatusPanel() {
     return () => { mounted = false; };
   }, []);
 
-  const active = channels.filter(c => !c?.is_suspended);
-  const inactive = channels.filter(c => !!c?.is_suspended);
-
   const fmt = (d) => {
     if (!d) return '—';
     const dt = new Date(d);
     if (Number.isNaN(dt.getTime())) return '—';
     return dt.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
   };
+
+  const list = openModal === 'active' ? active : inactive;
 
   return (
     <div className="mt-8 bg-gray-800/60 border border-gray-700 rounded-2xl p-4">
@@ -749,7 +767,6 @@ function ChannelStatusPanel() {
         </button>
       </div>
 
-      {/* Modal simple */}
       {openModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-2xl p-4">
@@ -774,13 +791,13 @@ function ChannelStatusPanel() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(openModal === 'active' ? active : inactive).map((c) => (
+                  {list.map((c) => (
                     <tr key={c.id} className="odd:bg-gray-800/30">
                       <td className="px-3 py-2 border-b border-gray-800">{c.name || '—'}</td>
                       <td className="px-3 py-2 border-b border-gray-800">{fmt(c.next_billing_at)}</td>
                     </tr>
                   ))}
-                  {(openModal === 'active' ? active : inactive).length === 0 && (
+                  {list.length === 0 && (
                     <tr>
                       <td className="px-3 py-6 text-center text-gray-400" colSpan={2}>
                         Sin registros.
@@ -997,7 +1014,7 @@ export default function AdminLoginPage() {
           <motion.button
             type="submit"
             disabled={loading}
-            className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-all duration-300"
+            className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-all duración-300"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
