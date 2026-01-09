@@ -14,21 +14,21 @@ export default function CategoryFilter({
     return filtered;
   }, [categories]);
 
-  const [showCountryMenu, setShowCountryMenu] = useState(false);
-  const [countries, setCountries] = useState([]);
+  const [showCountries, setShowCountries] = useState(false);
 
-  useEffect(() => {
-    let isMounted = true;
-    (async () => {
-      const { data, error } = await supabase
-        .from("channels")
-        .select("country, url_bandera")
-        .not("country", "is", null);
+  const handleCategoryClick = (cat) => {
+    if (onCategoryChange) onCategoryChange(cat);
+    // Cerrar dropdown país si estaba abierto
+    if (showCountries) setShowCountries(false);
+  };
 
-      if (!isMounted) return;
-      if (error) {
-        console.warn("[CategoryFilter] Error cargando países:", error.message);
-        setCountries([]);
+  const handleCountryToggle = () => setShowCountries((s) => !s);
+
+  const handleCountrySelect = (country) => {
+    if (onCountryChange) onCountryChange(country || "");
+    setShowCountries(false);
+  };
+
         return;
       }
 
