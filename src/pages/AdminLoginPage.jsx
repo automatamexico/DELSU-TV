@@ -139,10 +139,10 @@ function AdminChannelForm() {
 
       // Roku
       if (form.rokuEnabled) {
-        payload.roku_icon_url = ICON_URLS.roku; // ícono común
+        payload.roku = ICON_URLS.roku; // ícono común
         payload.roku_link_url = form.roku_link_url?.trim() || null;
       } else {
-        payload.roku_icon_url = null;
+        payload.roku = null;
         payload.roku_link_url = null;
       }
 
@@ -692,3 +692,4 @@ export default function AdminLoginPage() {
     </div>
   );
 }
+
