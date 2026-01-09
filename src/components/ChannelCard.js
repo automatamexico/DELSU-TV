@@ -169,7 +169,7 @@ export default function ChannelCard({ channel, onClick }) {
                     onClick={(e) => openPopupControlled(e, rokuLink)}
                     className="inline-flex items-center"
                     aria-label="Abrir Roku"
-                    title="Abrir Roku"
+                    title="Roku"
                   >
                     <img
                       src={rokuIcon}
