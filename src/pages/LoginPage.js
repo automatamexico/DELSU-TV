@@ -1,114 +1,115 @@
 // src/pages/LoginPage.jsx
-import React, { useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { Mail, Lock, LogIn } from "lucide-react";
-import { supabase } from "../supabaseClient";
+import React, { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Mail, Lock, LogIn } from 'lucide-react';
+import { supabase } from '../supabaseClient';
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
-  const onSubmit = async (e) => {
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+
+  const submit = async (e) => {
     e.preventDefault();
-    setBusy(true);
-    setErrorMsg("");
+    setErr('');
+    setLoading(true);
 
     try {
-      // 1) Login (sin variable sin uso)
-      const { error: signErr } = await supabase.auth.signInWithPassword({
+      // 1) login
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
         password,
       });
-      if (signErr) throw new Error(signErr.message || "No se pudo iniciar sesión.");
+      if (error) throw new Error(error.message || 'No se pudo iniciar sesión');
 
-      // 2) Obtener user actual
-      const { data: userRes, error: userErr } = await supabase.auth.getUser();
-      if (userErr) throw new Error(userErr.message || "No se pudo obtener el usuario.");
-      const uid = userRes?.user?.id;
-      if (!uid) throw new Error("No se obtuvo UID de la sesión.");
+      const uid = data?.user?.id;
+      if (!uid) throw new Error('No se obtuvo el usuario');
 
-      // 3) Leer role desde user_profiles
+      // 2) leer rol desde user_profiles
       const { data: prof, error: profErr } = await supabase
-        .from("user_profiles")
-        .select("role")
-        .eq("id", uid)
+        .from('user_profiles')
+        .select('role')
+        .eq('id', uid)
         .maybeSingle();
 
-      if (profErr && profErr.code && profErr.code !== "PGRST116") {
-        throw new Error("Error leyendo perfil: " + (profErr.message || profErr.code));
-      }
+      if (profErr) throw new Error(profErr.message || 'Error leyendo perfil');
 
-      const role = prof?.role || "user";
+      const role = prof?.role || 'user';
 
-      // 4) Redirección por rol
-      if (role === "admin") {
-        navigate("/admin", { replace: true, state: { from: location } });
+      // 3) redirección por rol
+      if (role === 'admin') {
+        navigate('/admin', { replace: true });
       } else {
-        navigate("/dashboard", { replace: true, state: { from: location } });
+        navigate('/dashboard', { replace: true });
       }
-    } catch (err) {
-      setErrorMsg(err?.message || String(err));
+    } catch (e2) {
+      setErr(e2?.message || String(e2));
     } finally {
-      setBusy(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-black/40 backdrop-blur p-6 text-white">
-        <h1 className="text-2xl font-semibold text-center mb-6">Iniciar sesión</h1>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center p-4 text-white">
+      <div className="bg-gray-800/70 backdrop-blur-lg border border-gray-700 rounded-2xl p-8 shadow-2xl w-full max-w-md">
+        <h2 className="text-3xl font-bold text-center mb-2">Iniciar sesión</h2>
+        <p className="text-center text-gray-400 mb-6 text-sm">
+          Ingresa con tu correo y contraseña.
+        </p>
 
-        {errorMsg ? (
-          <div className="mb-4 rounded-lg border border-red-700 bg-red-900/30 px-3 py-2 text-sm text-red-200">
-            {errorMsg}
+        {err && (
+          <div className="mb-4 p-3 rounded-lg bg-red-900/40 border border-red-700 text-red-200 text-sm">
+            {err}
           </div>
-        ) : null}
+        )}
 
-        <form onSubmit={onSubmit} className="space-y-5">
+        <form onSubmit={submit} className="space-y-5">
           <div>
-            <label className="mb-1 block text-sm text-gray-300">Correo</label>
+            <label htmlFor="email" className="block text-gray-300 text-sm font-medium mb-2">Correo</label>
             <div className="relative">
-              <Mail className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
+                id="email"
                 type="email"
-                required
                 autoComplete="email"
+                className="w-full bg-gray-700/50 border border-gray-600 rounded-lg pl-10 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                placeholder="tucorreo@ejemplo.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-white/5 pl-10 pr-3 py-2 text-sm placeholder-gray-400 outline-none focus:ring-2 focus:ring-rose-500/40"
-                placeholder="admin@ejemplo.com"
+                required
               />
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block text-sm text-gray-300">Contraseña</label>
+            <label htmlFor="password" className="block text-gray-300 text-sm font-medium mb-2">Contraseña</label>
             <div className="relative">
-              <Lock className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
+                id="password"
                 type="password"
-                required
                 autoComplete="current-password"
+                className="w-full bg-gray-700/50 border border-gray-600 rounded-lg pl-10 pr-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-white/5 pl-10 pr-3 py-2 text-sm placeholder-gray-400 outline-none focus:ring-2 focus:ring-rose-500/40"
-                placeholder="••••••••"
+                required
               />
             </div>
           </div>
 
           <button
             type="submit"
-            disabled={busy}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-rose-600 px-3 py-2 font-medium hover:bg-rose-700 disabled:opacity-60"
+            disabled={loading}
+            className="w-full bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-all duration-300"
           >
-            <LogIn className="h-5 w-5" />
-            {busy ? "Entrando..." : "Entrar"}
+            <LogIn className="w-5 h-5" />
+            {loading ? 'Procesando…' : 'Entrar'}
           </button>
         </form>
       </div>
