@@ -46,13 +46,19 @@ export default function HomePage() {
 
   const [selectedChannel, setSelectedChannel] = useState(null);
 
+  // NUEVO: ocultar canales suspendidos
+  const visibleChannels = useMemo(
+    () => (channels || []).filter((c) => !c?.is_suspended),
+    [channels]
+  );
+
   // NUEVO: estado de País seleccionado
   const [selectedCountry, setSelectedCountry] = useState("");
 
-  // NUEVO: lista de países únicos + bandera desde los canales
+  // NUEVO: lista de países únicos + bandera desde los canales (solo visibles)
   const countryItems = useMemo(() => {
     const map = new Map();
-    (channels || []).forEach((c) => {
+    (visibleChannels || []).forEach((c) => {
       const country = c?.country || c?.pais || "";
       if (!country) return;
       const key = country.trim();
@@ -66,15 +72,15 @@ export default function HomePage() {
     return Array.from(map.values()).sort((a, b) =>
       a.country.localeCompare(b.country, "es", { sensitivity: "base" })
     );
-  }, [channels]);
+  }, [visibleChannels]);
 
-  // NUEVO: filtrado adicional por país (sin tocar tu lógica existente)
+  // NUEVO: filtrado adicional por país (sobre los visibles)
   const countryFilteredChannels = useMemo(() => {
-    if (!selectedCountry) return channels;
-    return (channels || []).filter(
+    if (!selectedCountry) return visibleChannels;
+    return (visibleChannels || []).filter(
       (c) => norm(c?.country || c?.pais) === norm(selectedCountry)
     );
-  }, [channels, selectedCountry]);
+  }, [visibleChannels, selectedCountry]);
 
   const handleChannelClick = (channel) => setSelectedChannel(channel);
   const handleClosePlayer = () => setSelectedChannel(null);
@@ -117,7 +123,7 @@ export default function HomePage() {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.35 }}
           >
-            {/* Pasamos los canales ya filtrados por país */}
+            {/* Pasamos los canales ya filtrados por suspensión + país */}
             <ChannelGrid
               channels={countryFilteredChannels}
               onChannelClick={handleChannelClick}
