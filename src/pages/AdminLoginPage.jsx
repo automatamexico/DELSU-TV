@@ -589,12 +589,15 @@ export default function AdminLoginPage() {
   // Si ya es admin, mostramos directamente el formulario de alta
   if (user && profile?.role === 'admin') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white p-6">
-        <header className="flex items-center justify-between border-b border-gray-800 pb-4">
-          <div className="flex items-center gap-3">
-            <Tv className="w-7 h-7 text-rose-500" />
-            <h2 className="text-2xl font-bold">Admin: Alta de canales</h2>
-          </div>
+      <div className="flex items-center gap-3">
+  <img
+    src="https://uqzcnlmhmglzflkuzczk.supabase.co/storage/v1/object/public/avatars/logo_hispana_blanco.png"
+    alt="Delsu TV"
+    className="w-[240px] h-[100px] object-contain"
+    loading="eager"
+    decoding="async"
+  />
+</div>
           <button
             onClick={handleLogout}
             className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg"
@@ -691,6 +694,7 @@ export default function AdminLoginPage() {
     </div>
   );
 }
+
 
 
 
