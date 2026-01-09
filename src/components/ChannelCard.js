@@ -9,10 +9,11 @@ function withBust(url, version) {
   return `${url}${sep}v=${encodeURIComponent(version)}`;
 }
 
-/** Abre un popup pequeño en lugar de una nueva pestaña */
+/** Abre un popup pequeño y evita que se dispare el onClick del card */
 function openPopup(e, url) {
   if (!url) return;
   e.preventDefault();
+  e.stopPropagation(); // ⬅️ clave para que no abra el reproductor
   const w = 720;
   const h = 600;
   const y = Math.max(0, Math.round((window.screen.height - h) / 2));
@@ -93,8 +94,9 @@ export default function ChannelCard({ channel, onClick }) {
     <button
       onClick={() => onClick?.(channel)}
       className="group w-full text-left rounded-xl overflow-hidden bg-gray-900/40 border border-gray-800 hover:border-gray-700 focus:outline-none focus:ring-2 focus:ring-rose-500/40 transition"
+      type="button"
     >
-      {/* Póster: sin recortes, centrado y con letterbox si hace falta */}
+      {/* Póster ajustado sin recortes */}
       <div className="relative">
         <div className="aspect-[3/4] md:aspect-[2/3] w-full overflow-hidden bg-gray-800">
           <img
@@ -129,6 +131,8 @@ export default function ChannelCard({ channel, onClick }) {
                   alt={country}
                   loading="lazy"
                   className="h-5 w-5 object-contain rounded-sm border border-white/10"
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
                 />
               ) : null}
               <span className="truncate">{country}</span>
@@ -143,15 +147,17 @@ export default function ChannelCard({ channel, onClick }) {
 
           {/* Columna derecha: Disponible en (Roku) */}
           {(rokuIcon || rokuLink) && (
-            <div className="ml-auto shrink-0">
-              <div className="text-[12px] font-medium text-gray-300 mb-1 text-right">
+            <div className="ml-auto shrink-0 text-right">
+              <div className="text-[12px] font-medium text-gray-300 mb-1">
                 Disponible en
               </div>
+
               {rokuIcon ? (
                 rokuLink ? (
                   <a
                     href={rokuLink}
                     onClick={(e) => openPopup(e, rokuLink)}
+                    onMouseDown={(e) => e.stopPropagation()}
                     className="inline-flex items-center"
                     aria-label="Abrir canal en Roku"
                   >
@@ -160,6 +166,8 @@ export default function ChannelCard({ channel, onClick }) {
                       alt="Roku"
                       loading="lazy"
                       className="h-5 w-auto object-contain"
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
                     />
                   </a>
                 ) : (
@@ -168,6 +176,8 @@ export default function ChannelCard({ channel, onClick }) {
                     alt="Roku"
                     loading="lazy"
                     className="h-5 w-auto object-contain"
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
                   />
                 )
               ) : null}
@@ -186,6 +196,7 @@ export default function ChannelCard({ channel, onClick }) {
                 <a
                   href={fbUrl}
                   onClick={(e) => openPopup(e, fbUrl)}
+                  onMouseDown={(e) => e.stopPropagation()}
                   className="inline-flex"
                   aria-label="Facebook"
                 >
@@ -194,6 +205,8 @@ export default function ChannelCard({ channel, onClick }) {
                     alt="Facebook"
                     loading="lazy"
                     className="h-5 w-5 object-contain"
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
                   />
                 </a>
               )}
@@ -201,6 +214,7 @@ export default function ChannelCard({ channel, onClick }) {
                 <a
                   href={ytUrl}
                   onClick={(e) => openPopup(e, ytUrl)}
+                  onMouseDown={(e) => e.stopPropagation()}
                   className="inline-flex"
                   aria-label="YouTube"
                 >
@@ -209,6 +223,8 @@ export default function ChannelCard({ channel, onClick }) {
                     alt="YouTube"
                     loading="lazy"
                     className="h-5 w-5 object-contain"
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
                   />
                 </a>
               )}
@@ -216,6 +232,7 @@ export default function ChannelCard({ channel, onClick }) {
                 <a
                   href={tkUrl}
                   onClick={(e) => openPopup(e, tkUrl)}
+                  onMouseDown={(e) => e.stopPropagation()}
                   className="inline-flex"
                   aria-label="TikTok"
                 >
@@ -224,6 +241,8 @@ export default function ChannelCard({ channel, onClick }) {
                     alt="TikTok"
                     loading="lazy"
                     className="h-5 w-5 object-contain"
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
                   />
                 </a>
               )}
@@ -231,6 +250,7 @@ export default function ChannelCard({ channel, onClick }) {
                 <a
                   href={webUrl}
                   onClick={(e) => openPopup(e, webUrl)}
+                  onMouseDown={(e) => e.stopPropagation()}
                   className="inline-flex"
                   aria-label="Website"
                 >
@@ -239,6 +259,8 @@ export default function ChannelCard({ channel, onClick }) {
                     alt="Website"
                     loading="lazy"
                     className="h-5 w-5 object-contain"
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
                   />
                 </a>
               )}
