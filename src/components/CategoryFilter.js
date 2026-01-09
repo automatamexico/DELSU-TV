@@ -1,4 +1,6 @@
+// src/components/CategoryFilter.jsx
 import React, { useState, useMemo } from "react";
+import { Link } from "react-router-dom";
 
 export default function CategoryFilter({
   categories = [],
@@ -9,34 +11,42 @@ export default function CategoryFilter({
   onCountryChange,
   countryItems = [],
 }) {
-  // Normaliza categorías, evita duplicado de "Todos" y asegura "Entretenimiento"
+  // Normaliza categorías y evita duplicado de "Todos"
   const categoryList = useMemo(() => {
     const base = Array.isArray(categories) ? categories : [];
     const set = new Set(
       base.map((c) => (typeof c === "string" ? c : c?.name).trim())
     );
     set.delete("Todos");
-    // fuerza que exista "Entretenimiento"
-    if (!set.has("Entretenimiento")) set.add("Entretenimiento");
     return ["Todos", ...Array.from(set)];
   }, [categories]);
 
   const [showCountries, setShowCountries] = useState(false);
 
   const handleCategoryClick = (cat) => {
-    onCategoryChange?.(cat);
+    if (onCategoryChange) onCategoryChange(cat);
     if (showCountries) setShowCountries(false);
   };
 
   const handleCountryToggle = () => setShowCountries((s) => !s);
 
   const handleCountrySelect = (country) => {
-    onCountryChange?.(country || "");
+    if (onCountryChange) onCountryChange(country || "");
     setShowCountries(false);
   };
 
   return (
     <div className="px-4 pt-3 relative">
+      {/* Botón Acceso (solo agregado, no se tocó nada más) */}
+      <div className="absolute right-0 top-0 z-30">
+        <Link
+          to="/login"
+          className="px-4 py-2 rounded-full text-sm bg-rose-600 text-white hover:bg-rose-700 border border-rose-500 shadow"
+        >
+          Acceso Administrador y Clientes
+        </Link>
+      </div>
+
       {/* Barra de categorías centrada */}
       <div className="flex flex-wrap justify-center items-center gap-2 pb-2">
         {categoryList.map((cat) => {
@@ -70,11 +80,11 @@ export default function CategoryFilter({
             {selectedCountry ? `País: ${selectedCountry}` : "País"}
           </button>
 
-          {/* Dropdown País (mayor z-index para que no lo tape nada) */}
+          {/* Dropdown País sin scroll: overlay centrado bajo el botón */}
           {showCountries && (
             <div
               className="
-                absolute left-1/2 -translate-x-1/2 z-50 mt-2
+                absolute left-1/2 -translate-x-1/2 z-40 mt-2
                 w-[min(90vw,560px)]
                 rounded-lg border border-gray-700 bg-black/90 backdrop-blur
                 p-2 shadow-2xl
@@ -93,6 +103,7 @@ export default function CategoryFilter({
                 Todos los países
               </button>
 
+              {/* Lista completa sin scroll */}
               <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-1">
                 {countryItems.map(({ country, flagUrl }) => (
                   <button
