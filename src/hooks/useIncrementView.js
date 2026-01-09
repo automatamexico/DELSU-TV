@@ -1,31 +1,29 @@
 // src/hooks/useIncrementView.js
 import { useEffect, useRef } from "react";
-import { supabase } from "../supabaseClient"; // ← deja esta ruta como la que ya usas en el proyecto
+import { supabase } from "../supabaseClient"; // ajusta si tu ruta difiere
 
 /**
- * Incrementa el contador de vistas una sola vez cuando hay channelId válido.
- * No toca UI; sólo hace el RPC de forma segura con async/await.
+ * Llama al RPC SOLO una vez por apertura del modal.
+ * Pasa null/undefined si no quieres contar todavía.
  */
-export default function useIncrementView(channelId, enabled = true) {
-  const firedRef = useRef(false);
+export default function useIncrementView(channelId) {
+  const doneRef = useRef(false);
 
   useEffect(() => {
-    if (!enabled || !channelId || firedRef.current) return;
+    if (!channelId || doneRef.current) return;
 
-    firedRef.current = true;
-
+    doneRef.current = true; // evita dobles llamadas por renders
     (async () => {
-      try {
-        const { error } = await supabase.rpc("increment_channel_view", {
-          p_channel_id: channelId,
-        });
-        if (error) {
-          // No rompemos la UI; sólo log.
-          console.error("[views] RPC error:", error);
-        }
-      } catch (err) {
-        console.error("[views] RPC failed:", err);
+      const { data, error } = await supabase
+        .rpc("increment_channel_views", { p_channel_id: channelId });
+
+      if (error) {
+        // eslint-disable-next-line no-console
+        console.warn("[views] RPC error:", error.message);
+      } else {
+        // eslint-disable-next-line no-console
+        console.info("[views] nuevo views_count:", data);
       }
     })();
-  }, [enabled, channelId]);
+  }, [channelId]);
 }
