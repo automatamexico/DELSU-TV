@@ -22,7 +22,7 @@ export default function ChannelCard({ channel, onClick }) {
   const description =
     channel?.description || channel?.descripcion || channel?.about || "";
 
-  // Roku (icono + link) — mismas llaves de siempre
+  // Roku (icono + link)
   const rokuIcon =
     channel?.roku_icon_url ||
     channel?.roku_icon ||
@@ -79,7 +79,7 @@ export default function ChannelCard({ channel, onClick }) {
         {(rokuIcon || rokuLink) && (
           <div className="mt-2">
             <div className="text-[12px] font-medium text-gray-300 mb-1">
-              También disponible en:
+              Tambien disponible en
             </div>
             <div className="flex items-center gap-2">
               {rokuLink ? (
@@ -94,7 +94,7 @@ export default function ChannelCard({ channel, onClick }) {
                     src={rokuIcon}
                     alt="Roku"
                     loading="lazy"
-                    className="h-7 w-auto object-contain" {/* ⬅️ Aumentado ~40% */}
+                    className="h-7 w-auto object-contain"
                   />
                 </a>
               ) : (
@@ -103,7 +103,7 @@ export default function ChannelCard({ channel, onClick }) {
                     src={rokuIcon}
                     alt="Roku"
                     loading="lazy"
-                    className="h-7 w-auto object-contain" {/* ⬅️ Aumentado ~40% */}
+                    className="h-7 w-auto object-contain"
                   />
                 )
               )}
