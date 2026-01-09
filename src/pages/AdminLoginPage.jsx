@@ -62,6 +62,9 @@ async function preflightAuthRelaxed() {
    ========================= */
 function AdminChannelForm() {
   const [form, setForm] = useState({
+    // NUEVO: correo del propietario
+    ownerEmail: '',
+
     name: '',
     country: '',
     description: '',
@@ -123,7 +126,20 @@ function AdminChannelForm() {
         posterUrl = await uploadPoster(form.posterFile);
       }
 
-      // 2) Preparar payload para la tabla channels
+      // 2) Resolver owner_user_id por correo (si se proporcionó)
+      let ownerId = null;
+      const emailOwner = form.ownerEmail?.trim().toLowerCase();
+      if (emailOwner) {
+        const { data: owner, error: ownerErr } = await supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('email', emailOwner)
+          .maybeSingle();
+        if (ownerErr) throw ownerErr;
+        ownerId = owner?.id || null;
+      }
+
+      // 3) Preparar payload para la tabla channels
       const payload = {
         // mapea los campos que pediste
         name: form.name.trim(),
@@ -134,6 +150,9 @@ function AdminChannelForm() {
 
         // ← agregado
         stream_url: form.stream_url.trim(),
+
+        // NUEVO: dueño (puede ser null si no se escribió correo válido)
+        owner_user_id: ownerId,
       };
 
       // Roku
@@ -181,7 +200,7 @@ function AdminChannelForm() {
         payload.website_url = null;
       }
 
-      // 3) Insertar
+      // 4) Insertar
       const { error } = await supabase.from('channels').insert([payload]);
       if (error) throw error;
 
@@ -189,6 +208,8 @@ function AdminChannelForm() {
       // limpia el formulario mínimamente
       setForm((s) => ({
         ...s,
+        ownerEmail: '',
+
         name: '',
         country: '',
         description: '',
@@ -233,6 +254,21 @@ function AdminChannelForm() {
       )}
 
       <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {/* NUEVO: Propietario (correo) */}
+        <div className="md:col-span-2">
+          <label className="block text-sm text-gray-300 mb-1">Propietario (correo)</label>
+          <input
+            name="ownerEmail"
+            value={form.ownerEmail}
+            onChange={onChange}
+            placeholder="correo@ejemplo.com"
+            className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500/40"
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            Se asignará el canal a este usuario (debe existir en <code>user_profiles</code>).
+          </p>
+        </div>
+
         {/* Nombre */}
         <div>
           <label className="block text-sm text-gray-300 mb-1">Nombre del canal</label>
@@ -378,7 +414,7 @@ function AdminChannelForm() {
                   placeholder="https://youtube.com/@tu-canal"
                   className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500/40"
                 />
-                <div className="text-xs text-gray-400 flex items-end">
+                <div className="text-xs text-gray-400 flex items	end">
                   Ícono: <span className="ml-2 underline break-all">{ICON_URLS.youtube}</span>
                 </div>
               </div>
@@ -472,7 +508,7 @@ function AdminChannelForm() {
                   className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500/40"
                 />
                 <div className="text-xs text-gray-400 flex items-end">
-                  Ícono: <span className="ml-2 underline break-all">{ICON_URLS.website}</span>
+                  Ícono: <span className="ml-2	underline break-all">{ICON_URLS.website}</span>
                 </div>
               </div>
             )}
@@ -699,10 +735,3 @@ export default function AdminLoginPage() {
     </div>
   );
 }
-
-
-
-
-
-
-
