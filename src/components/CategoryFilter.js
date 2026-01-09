@@ -66,6 +66,18 @@ export default function CategoryFilter({
           );
         })}
 
+        {/* Botón Entretenimiento (agregado) */}
+        <button
+          onClick={() => handleCategoryClick("Entretenimiento")}
+          className={`px-3 py-1.5 rounded-full text-sm border transition ${
+            selectedCategory === "Entretenimiento"
+              ? "bg-rose-600 text-white border-rose-500"
+              : "bg-gray-900/40 text-gray-200 border-gray-700 hover:border-gray-500"
+          }`}
+        >
+          Entretenimiento
+        </button>
+
         {/* Botón País */}
         <div className="relative">
           <button
