@@ -9,44 +9,34 @@ export default function CategoryFilter({
   onCountryChange,
   countryItems = [],
 }) {
-  // Normaliza categorías y evita duplicado de "Todos"
+  // Normaliza categorías, evita duplicado de "Todos" y asegura "Entretenimiento"
   const categoryList = useMemo(() => {
     const base = Array.isArray(categories) ? categories : [];
     const set = new Set(
       base.map((c) => (typeof c === "string" ? c : c?.name).trim())
     );
     set.delete("Todos");
+    // fuerza que exista "Entretenimiento"
+    if (!set.has("Entretenimiento")) set.add("Entretenimiento");
     return ["Todos", ...Array.from(set)];
   }, [categories]);
 
   const [showCountries, setShowCountries] = useState(false);
 
   const handleCategoryClick = (cat) => {
-    if (onCategoryChange) onCategoryChange(cat);
-    // Cerrar dropdown país si estaba abierto
+    onCategoryChange?.(cat);
     if (showCountries) setShowCountries(false);
   };
 
   const handleCountryToggle = () => setShowCountries((s) => !s);
 
   const handleCountrySelect = (country) => {
-    if (onCountryChange) onCountryChange(country || "");
+    onCountryChange?.(country || "");
     setShowCountries(false);
   };
 
   return (
     <div className="px-4 pt-3 relative">
-      {/* Botón Acceso (arriba-derecha) */}
-      <a
-        href="/login"
-        className="absolute top-0 right-4 px-3 py-1.5 rounded-full text-sm border
-                   bg-gray-900/40 text-gray-200 border-gray-700 hover:border-gray-500
-                   transition z-50"
-        title="Ir al acceso de administradores y clientes"
-      >
-        Acceso Administrador y Clientes
-      </a>
-
       {/* Barra de categorías centrada */}
       <div className="flex flex-wrap justify-center items-center gap-2 pb-2">
         {categoryList.map((cat) => {
@@ -80,11 +70,11 @@ export default function CategoryFilter({
             {selectedCountry ? `País: ${selectedCountry}` : "País"}
           </button>
 
-          {/* Dropdown País sin scroll: overlay centrado bajo el botón */}
+          {/* Dropdown País (mayor z-index para que no lo tape nada) */}
           {showCountries && (
             <div
               className="
-                absolute left-1/2 -translate-x-1/2 z-40 mt-2
+                absolute left-1/2 -translate-x-1/2 z-50 mt-2
                 w-[min(90vw,560px)]
                 rounded-lg border border-gray-700 bg-black/90 backdrop-blur
                 p-2 shadow-2xl
@@ -103,7 +93,6 @@ export default function CategoryFilter({
                 Todos los países
               </button>
 
-              {/* Lista completa sin scroll (se superpone sobre el contenido) */}
               <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-1">
                 {countryItems.map(({ country, flagUrl }) => (
                   <button
