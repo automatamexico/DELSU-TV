@@ -46,7 +46,6 @@ function calcStarsFromViews(views) {
 }
 
 function Stars({ count = 0 }) {
-  // Estrellas blancas; las vacías con opacidad
   const full = Math.max(0, Math.min(5, count));
   return (
     <span className="inline-flex items-center gap-0.5 align-middle">
@@ -143,7 +142,8 @@ export default function ChannelCard({ channel, onClick }) {
         className="relative block w-full text-left"
         aria-label={`Abrir reproductor: ${title}`}
       >
-        <div className="aspect-[3/4] md:aspect-[2/3] w-full overflow-hidden bg-gray-800">
+        {/* ↓↓↓ ÚNICO CAMBIO: 5% menos alto */}
+        <div className="aspect-[3/4.2] md:aspect-[2/3.15] w-full overflow-hidden bg-gray-800">
           <img
             src={poster}
             alt={title}
