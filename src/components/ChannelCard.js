@@ -9,6 +9,21 @@ function withBust(url, version) {
   return `${url}${sep}v=${encodeURIComponent(version)}`;
 }
 
+/** Abre un popup pequeño en lugar de una nueva pestaña */
+function openPopup(e, url) {
+  if (!url) return;
+  e.preventDefault();
+  const w = 720;
+  const h = 600;
+  const y = Math.max(0, Math.round((window.screen.height - h) / 2));
+  const x = Math.max(0, Math.round((window.screen.width - w) / 2));
+  window.open(
+    url,
+    "social_popup",
+    `width=${w},height=${h},left=${x},top=${y},resizable=yes,scrollbars=yes,noopener`
+  );
+}
+
 export default function ChannelCard({ channel, onClick }) {
   // Títulos / datos base
   const title =
@@ -44,7 +59,7 @@ export default function ChannelCard({ channel, onClick }) {
   const rokuLink =
     channel?.roku_link_url || channel?.roku_url || channel?.roku_link || null;
 
-  // Footer redes (si existen)
+  // Footer redes
   const fbIcon = channel?.facebook_icon_url || channel?.facebook_icon || null;
   const fbUrl = channel?.facebook_url || null;
 
@@ -58,7 +73,7 @@ export default function ChannelCard({ channel, onClick }) {
   const webIcon = channel?.website_icon_url || channel?.web_icon || null;
   const webUrl = channel?.website_url || channel?.web_url || null;
 
-  // Versión para “bust” opcional (si tienes updated_at en la fila úsalo)
+  // Versión para “bust” opcional
   const version =
     channel?.icon_version ||
     channel?.updated_at ||
@@ -72,7 +87,6 @@ export default function ChannelCard({ channel, onClick }) {
   const webIconUrl = withBust(webIcon, version);
   const flagIconUrl = withBust(banderaUrl, version);
 
-  // ¿Hay al menos una red?
   const hasAnySocial = Boolean(fbUrl || ytUrl || tkUrl || webUrl);
 
   return (
@@ -80,15 +94,14 @@ export default function ChannelCard({ channel, onClick }) {
       onClick={() => onClick?.(channel)}
       className="group w-full text-left rounded-xl overflow-hidden bg-gray-900/40 border border-gray-800 hover:border-gray-700 focus:outline-none focus:ring-2 focus:ring-rose-500/40 transition"
     >
-      {/* Póster bien ajustado */}
+      {/* Póster: sin recortes, centrado y con letterbox si hace falta */}
       <div className="relative">
-        {/* Mantén proporción vertical estable; la imagen rellena sin deformarse */}
         <div className="aspect-[3/4] md:aspect-[2/3] w-full overflow-hidden bg-gray-800">
           <img
             src={poster}
             alt={title}
             loading="lazy"
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+            className="w-full h-full object-contain object-center"
           />
         </div>
 
@@ -100,10 +113,10 @@ export default function ChannelCard({ channel, onClick }) {
         </div>
       </div>
 
-      {/* Zona inferior: texto a la izquierda, disponibilidad a la derecha */}
+      {/* Zona inferior */}
       <div className="p-3">
         <div className="flex items-end justify-between gap-3">
-          {/* Columna izquierda: título, país(+bandera), descripción */}
+          {/* Columna izquierda */}
           <div className="min-w-0">
             <h3 className="text-[15px] font-semibold text-white line-clamp-1">
               {title}
@@ -128,42 +141,41 @@ export default function ChannelCard({ channel, onClick }) {
             ) : null}
           </div>
 
-        {/* Columna derecha: Disponible en (Roku) */}
+          {/* Columna derecha: Disponible en (Roku) */}
           {(rokuIcon || rokuLink) && (
             <div className="ml-auto shrink-0">
               <div className="text-[12px] font-medium text-gray-300 mb-1 text-right">
-                También disponible en
+                Disponible en
               </div>
-              {rokuLink ? (
-                <a
-                  href={rokuLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center"
-                  aria-label="Abrir en Roku"
-                >
+              {rokuIcon ? (
+                rokuLink ? (
+                  <a
+                    href={rokuLink}
+                    onClick={(e) => openPopup(e, rokuLink)}
+                    className="inline-flex items-center"
+                    aria-label="Abrir canal en Roku"
+                  >
+                    <img
+                      src={rokuIcon}
+                      alt="Roku"
+                      loading="lazy"
+                      className="h-5 w-auto object-contain"
+                    />
+                  </a>
+                ) : (
                   <img
                     src={rokuIcon}
                     alt="Roku"
                     loading="lazy"
-                    className="h-7 w-auto object-contain" /* 40% más grande aprox */
-                  />
-                </a>
-              ) : (
-                rokuIcon && (
-                  <img
-                    src={rokuIcon}
-                    alt="Roku"
-                    loading="lazy"
-                    className="h-7 w-auto object-contain"
+                    className="h-5 w-auto object-contain"
                   />
                 )
-              )}
+              ) : null}
             </div>
           )}
         </div>
 
-        {/* Footer redes */}
+        {/* Footer redes en popup */}
         {hasAnySocial && (
           <div className="mt-3">
             <div className="text-[12px] font-semibold text-gray-300">
@@ -173,8 +185,7 @@ export default function ChannelCard({ channel, onClick }) {
               {fbUrl && fbIconUrl && (
                 <a
                   href={fbUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  onClick={(e) => openPopup(e, fbUrl)}
                   className="inline-flex"
                   aria-label="Facebook"
                 >
@@ -189,8 +200,7 @@ export default function ChannelCard({ channel, onClick }) {
               {ytUrl && ytIconUrl && (
                 <a
                   href={ytUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  onClick={(e) => openPopup(e, ytUrl)}
                   className="inline-flex"
                   aria-label="YouTube"
                 >
@@ -205,8 +215,7 @@ export default function ChannelCard({ channel, onClick }) {
               {tkUrl && tkIconUrl && (
                 <a
                   href={tkUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  onClick={(e) => openPopup(e, tkUrl)}
                   className="inline-flex"
                   aria-label="TikTok"
                 >
@@ -221,8 +230,7 @@ export default function ChannelCard({ channel, onClick }) {
               {webUrl && webIconUrl && (
                 <a
                   href={webUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  onClick={(e) => openPopup(e, webUrl)}
                   className="inline-flex"
                   aria-label="Website"
                 >
