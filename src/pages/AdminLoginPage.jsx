@@ -9,11 +9,11 @@ import { useAuth } from '../context/AuthContext';
 // ========= ICONOS (AJUSTA ESTAS URLS A TU STORAGE) =========
 const BASE = 'https://uqzcnlmhmglzflkuzczk.supabase.co/storage/v1/object/public';
 const ICON_URLS = {
-  roku:    `${BASE}/icons/roku.png`,
-  youtube: `${BASE}/icons/youtube.png`,
-  facebook:`${BASE}/icons/facebook.png`,
-  tiktok:  `${BASE}/icons/tiktok.png`,
-  website: `${BASE}/icons/web.png`,
+  roku:    'https://uqzcnlmhmglzflkuzczk.supabase.co/storage/v1/object/public/avatars/roku.png',
+  youtube: 'https://uqzcnlmhmglzflkuzczk.supabase.co/storage/v1/object/public/avatars/logo_youtube.png',
+  facebook:'https://uqzcnlmhmglzflkuzczk.supabase.co/storage/v1/object/public/avatars/logo_fb.png',
+  tiktok:  'https://uqzcnlmhmglzflkuzczk.supabase.co/storage/v1/object/public/avatars/logo_tiktok.png',
+  website: 'https://uqzcnlmhmglzflkuzczk.supabase.co/storage/v1/object/public/avatars/logo_web.png',
 };
 // ===========================================================
 
@@ -692,4 +692,5 @@ export default function AdminLoginPage() {
     </div>
   );
 }
+
 
