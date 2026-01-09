@@ -581,11 +581,14 @@ export default function AdminLoginPage() {
     }
   };
 
-  const handleLogout = async () => {
+ const handleLogout = async () => {
+  try {
     await signOut();
-    navigate('/admin', { replace: true });
-  };
-
+  } finally {
+    // Ir al Home en lugar del login de admin
+    navigate('/', { replace: true });
+  }
+};
   // Si ya es admin, mostramos directamente el formulario de alta
   if (user && profile?.role === 'admin') {
     return (
@@ -696,6 +699,7 @@ export default function AdminLoginPage() {
     </div>
   );
 }
+
 
 
 
