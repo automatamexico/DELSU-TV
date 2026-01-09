@@ -11,12 +11,16 @@ export default function Header({
     <header className="sticky top-0 z-30 backdrop-blur bg-black/40 border-b border-white/10">
       <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
         {/* Logo / Marca */}
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded bg-rose-600/80" />
-          <h1 className="text-white font-semibold tracking-wide">
-            Delsu TV
-          </h1>
-        </div>
+        <a href="/" className="flex items-center gap-2 shrink-0">
+          <img
+            src="https://uqzcnlmhmglzflkuzczk.supabase.co/storage/v1/object/public/avatars/logo_hispana_blanco.png"
+            alt="Delsu TV"
+            width={240}
+            height={100}
+            className="w-[240px] h-[100px] object-contain select-none"
+            draggable="false"
+          />
+        </a>
 
         {/* Buscador */}
         <div className="flex-1 max-w-xl">
