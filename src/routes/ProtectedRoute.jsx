@@ -4,11 +4,23 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function ProtectedRoute() {
-  const location = useLocation();
   const { user, loading } = useAuth();
+  const location = useLocation();
 
-  if (loading) return <div className="min-h-screen grid place-items-center text-white">Cargando…</div>;
-  if (!user) return <Navigate to="/login" replace state={{ from: location }} />;
+  // Mientras AuthContext está resolviendo la sesión
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-white">
+        Cargando…
+      </div>
+    );
+  }
 
+  // Si no hay sesión, manda a /login y conserva la ruta de origen
+  if (!user) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+
+  // Autenticado → renderiza la ruta hija
   return <Outlet />;
 }
