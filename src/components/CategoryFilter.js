@@ -10,11 +10,7 @@ export default function CategoryFilter({
   // Asegurar que "Entretenimiento" esté y quede ANTES de "País"
   const uiCategories = useMemo(() => {
     const base = [...categories];
-    // Inserta "Entretenimiento" si no viene en el array
-    if (!base.includes("Entretenimiento")) {
-      base.push("Entretenimiento");
-    }
-    // Remueve "País" si estuviera en la lista para que nuestro botón quede al final
+    if (!base.includes("Entretenimiento")) base.push("Entretenimiento");
     const filtered = base.filter((c) => c !== "País");
     return filtered;
   }, [categories]);
@@ -22,7 +18,6 @@ export default function CategoryFilter({
   const [showCountryMenu, setShowCountryMenu] = useState(false);
   const [countries, setCountries] = useState([]);
 
-  // Carga países (distintos) desde 'channels'
   useEffect(() => {
     let isMounted = true;
     (async () => {
@@ -33,13 +28,11 @@ export default function CategoryFilter({
 
       if (!isMounted) return;
       if (error) {
-        // eslint-disable-next-line no-console
         console.warn("[CategoryFilter] Error cargando países:", error.message);
         setCountries([]);
         return;
       }
 
-      // Normaliza y ordena
       const uniq = new Map();
       (data || []).forEach((row) => {
         const name = String(row.country || "").trim();
@@ -58,20 +51,17 @@ export default function CategoryFilter({
     };
   }, []);
 
-  const handlePickCategory = (cat) => {
-    onCategoryChange?.(cat);
-  };
+  const handlePickCategory = (cat) => onCategoryChange?.(cat);
 
+  // ⬇️ Ajuste ÚNICO: formateo 'Pais: <nombre>' (sin acento y con espacio)
   const handlePickCountry = (c) => {
-    // Envía una cadena simple para no romper la firma existente
-    onCategoryChange?.(`País:${c.country}`);
+    onCategoryChange?.(`Pais: ${c.country}`);
     setShowCountryMenu(false);
   };
 
   return (
     <div className="w-full">
       <div className="w-full flex items-center justify-center gap-2 flex-wrap px-4 py-3">
-        {/* Botones de categorías existentes + “Entretenimiento” insertado */}
         {uiCategories.map((cat) => (
           <button
             key={cat}
@@ -87,13 +77,12 @@ export default function CategoryFilter({
           </button>
         ))}
 
-        {/* Botón País (siempre al final, a la derecha de Entretenimiento) */}
         <button
           type="button"
           onClick={() => setShowCountryMenu(true)}
           className={`px-3 py-1.5 rounded-full text-sm border transition ${
             typeof selectedCategory === "string" &&
-            selectedCategory.startsWith("País:")
+            selectedCategory.startsWith("Pais:")
               ? "bg-rose-600 text-white border-rose-500"
               : "bg-white/5 text-gray-200 border-white/10 hover:bg-white/10"
           }`}
@@ -102,7 +91,6 @@ export default function CategoryFilter({
         </button>
       </div>
 
-      {/* Overlay del menú de países (no queda oculto por nada) */}
       {showCountryMenu && (
         <div
           className="fixed inset-0 z-50"
@@ -110,10 +98,7 @@ export default function CategoryFilter({
           role="dialog"
           onClick={() => setShowCountryMenu(false)}
         >
-          {/* Backdrop */}
           <div className="absolute inset-0 bg-black/40" />
-
-          {/* Panel centrado */}
           <div
             className="absolute left-1/2 top-20 -translate-x-1/2 w-[92vw] max-w-2xl rounded-xl border border-white/10 bg-[#0b1016] p-4 shadow-xl"
             onClick={(e) => e.stopPropagation()}
