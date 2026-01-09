@@ -19,8 +19,8 @@ export default function LoginPage() {
     setErrorMsg("");
 
     try {
-      // 1) Login
-      const { data: signRes, error: signErr } = await supabase.auth.signInWithPassword({
+      // 1) Login (sin variable sin uso)
+      const { error: signErr } = await supabase.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
         password,
       });
@@ -43,7 +43,6 @@ export default function LoginPage() {
         throw new Error("Error leyendo perfil: " + (profErr.message || profErr.code));
       }
 
-      // Si no hay fila, trátalo como "user" (o crea una por detrás si quieres)
       const role = prof?.role || "user";
 
       // 4) Redirección por rol
