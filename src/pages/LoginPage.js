@@ -56,6 +56,16 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center p-4 text-white">
       <div className="bg-gray-800/70 backdrop-blur-lg border border-gray-700 rounded-2xl p-8 shadow-2xl w-full max-w-md">
+        {/* Logo arriba del título */}
+        <div className="flex justify-center mb-4">
+          <img
+            src="https://uqzcnlmhmglzflkuzczk.supabase.co/storage/v1/object/public/avatars/logo_hispana_blanco.png"
+            alt="Hispana TV"
+            className="w-[240px] h-[100px] object-contain"
+            loading="lazy"
+          />
+        </div>
+
         <h2 className="text-3xl font-bold text-center mb-2">Iniciar sesión</h2>
         <p className="text-center text-gray-400 mb-6 text-sm">
           Ingresa con tu correo y contraseña.
