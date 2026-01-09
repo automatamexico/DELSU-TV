@@ -1,19 +1,25 @@
-// src/components/CategoryFilter.jsx
-import React, { useEffect, useMemo, useState } from "react";
-import { supabase } from "../supabaseClient";
+import React, { useState, useMemo } from "react";
 
 export default function CategoryFilter({
   categories = [],
-  selectedCategory,
+  selectedCategory = "Todos",
   onCategoryChange,
+  // País
+  selectedCountry = "",
+  onCountryChange,
+  countryItems = [],
 }) {
-  const uiCategories = useMemo(() => {
-    const base = [...categories];
-    if (!base.includes("Entretenimiento")) base.push("Entretenimiento");
-    const filtered = base.filter((c) => c !== "País");
-    return filtered;
+  // Normaliza categorías y evita duplicado de "Todos"
+  const categoryList = useMemo(() => {
+    const base = Array.isArray(categories) ? categories : [];
+    const set = new Set(
+      base.map((c) => (typeof c === "string" ? c : c?.name).trim())
+    );
+    set.delete("Todos");
+    return ["Todos", ...Array.from(set)];
   }, [categories]);
-const [showCountries, setShowCountries] = useState(false);
+
+  const [showCountries, setShowCountries] = useState(false);
 
   const handleCategoryClick = (cat) => {
     if (onCategoryChange) onCategoryChange(cat);
@@ -30,6 +36,17 @@ const [showCountries, setShowCountries] = useState(false);
 
   return (
     <div className="px-4 pt-3 relative">
+      {/* Botón Acceso (arriba-derecha) */}
+      <a
+        href="/login"
+        className="absolute top-0 right-4 px-3 py-1.5 rounded-full text-sm border
+                   bg-gray-900/40 text-gray-200 border-gray-700 hover:border-gray-500
+                   transition z-50"
+        title="Ir al acceso de administradores y clientes"
+      >
+        Acceso Administrador y Clientes
+      </a>
+
       {/* Barra de categorías centrada */}
       <div className="flex flex-wrap justify-center items-center gap-2 pb-2">
         {categoryList.map((cat) => {
@@ -120,5 +137,3 @@ const [showCountries, setShowCountries] = useState(false);
     </div>
   );
 }
-
-  
