@@ -2,10 +2,16 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../supabaseClient';
 
 export default function DashboardPage() {
-  const { signOut } = useAuth();
+  // ⬇️ además de signOut, usamos user para filtrar
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
+
+  const [channels, setChannels] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [err, setErr] = React.useState('');
 
   const handleLogout = async () => {
     try {
@@ -15,6 +21,33 @@ export default function DashboardPage() {
       navigate('/', { replace: true });
     }
   };
+
+  // ⬇️ carga de canales del dueño autenticado
+  React.useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        setErr('');
+        setLoading(true);
+        if (!user?.id) return;
+
+        const { data, error } = await supabase
+          .from('channels')
+          .select('id,name,poster,stream_url,country,category')
+          .eq('owner_user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        if (alive) setChannels(data || []);
+      } catch (e) {
+        if (alive) setErr(e.message || String(e));
+      } finally {
+        if (alive) setLoading(false);
+      }
+    };
+    load();
+    return () => { alive = false; };
+  }, [user?.id]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white">
@@ -45,6 +78,44 @@ export default function DashboardPage() {
           </div>
         </div>
       </header>
+
+      {/* Contenido */}
+      <main className="p-6 space-y-4">
+        {loading && <div className="opacity-80">Cargando…</div>}
+        {err && (
+          <div className="p-3 rounded-lg bg-red-900/40 border border-red-700 text-red-200 text-sm">
+            {err}
+          </div>
+        )}
+
+        {!loading && !err && channels.length === 0 && (
+          <div className="opacity-80">No tienes canales asignados todavía.</div>
+        )}
+
+        {!loading && !err && channels.length > 0 && (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {channels.map((c) => (
+              <div key={c.id} className="bg-gray-800/60 border border-gray-700 rounded-xl p-4">
+                <div className="font-semibold">{c.name}</div>
+                <div className="text-sm text-gray-400">{c.country} • {c.category}</div>
+                {c.poster && (
+                  <img
+                    src={c.poster}
+                    alt={c.name}
+                    className="w-full h-36 object-cover rounded-lg mt-2"
+                    loading="lazy"
+                  />
+                )}
+                {c.stream_url && (
+                  <div className="mt-2 text-xs break-all text-gray-300">
+                    {c.stream_url}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
     </div>
   );
 }
