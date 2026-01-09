@@ -1,26 +1,21 @@
 // src/routes/ProtectedRoute.jsx
 import React from "react";
-import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { Outlet, Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function ProtectedRoute() {
-  const { user, loading } = useAuth();
-  const location = useLocation();
+  const { user, loading } = useAuth?.() || {};
 
-  // Mientras AuthContext está resolviendo la sesión
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-white">
-        Cargando…
-      </div>
-    );
+  // Mientras el contexto inicializa, no navegues ni pintes "nada".
+  if (loading === true || typeof user === "undefined") {
+    return <div />; // opcional: spinner mínimo
   }
 
-  // Si no hay sesión, manda a /login y conserva la ruta de origen
+  // Si no hay sesión → al login
   if (!user) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
+    return <Navigate to="/login" replace />;
   }
 
-  // Autenticado → renderiza la ruta hija
+  // Hay sesión → deja pasar
   return <Outlet />;
 }
