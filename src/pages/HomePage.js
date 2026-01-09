@@ -1,7 +1,6 @@
-// src/pages/HomePage.jsx 
-import React, { useState, Suspense, lazy } from "react";
+// src/pages/HomePage.jsx
+import React, { useState, Suspense, lazy, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
 import Header from "../components/Header";
 import CategoryFilter from "../components/CategoryFilter";
 import ChannelGrid from "../components/ChannelGrid";
@@ -9,10 +8,8 @@ import { useChannels } from "../hooks/useChannels";
 import { useAuth } from "../context/AuthContext";
 import { categories } from "../data/channels";
 
-// Lazy-load del modal (mejora rendimiento sin tocar el reproductor)
 const PlayerModal = lazy(() => import("../components/PlayerModal"));
 
-// Skeleton simple para primera carga sin cache
 function ChannelsSkeleton() {
   const items = Array.from({ length: 12 });
   return (
@@ -25,6 +22,10 @@ function ChannelsSkeleton() {
       ))}
     </div>
   );
+}
+
+function norm(v) {
+  return String(v || "").trim().toLowerCase();
 }
 
 export default function HomePage() {
@@ -45,6 +46,36 @@ export default function HomePage() {
 
   const [selectedChannel, setSelectedChannel] = useState(null);
 
+  // NUEVO: estado de País seleccionado
+  const [selectedCountry, setSelectedCountry] = useState("");
+
+  // NUEVO: lista de países únicos + bandera desde los canales
+  const countryItems = useMemo(() => {
+    const map = new Map();
+    (channels || []).forEach((c) => {
+      const country = c?.country || c?.pais || "";
+      if (!country) return;
+      const key = country.trim();
+      if (!map.has(key)) {
+        map.set(key, {
+          country: key,
+          flagUrl: c?.url_bandera || c?.bandera_url || null,
+        });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) =>
+      a.country.localeCompare(b.country, "es", { sensitivity: "base" })
+    );
+  }, [channels]);
+
+  // NUEVO: filtrado adicional por país (sin tocar tu lógica existente)
+  const countryFilteredChannels = useMemo(() => {
+    if (!selectedCountry) return channels;
+    return (channels || []).filter(
+      (c) => norm(c?.country || c?.pais) === norm(selectedCountry)
+    );
+  }, [channels, selectedCountry]);
+
   const handleChannelClick = (channel) => setSelectedChannel(channel);
   const handleClosePlayer = () => setSelectedChannel(null);
 
@@ -56,14 +87,6 @@ export default function HomePage() {
         onFilterChange={handleFilterChange}
         filters={filters}
       />
-
-      {/* Botón fijo superior derecho → /login */}
-      <Link
-        to="/login"
-        className="fixed top-3 right-4 z-40 bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold px-4 py-2 rounded-lg shadow"
-      >
-        Acceso Administrador y Clientes
-      </Link>
 
       {channelsLoading && channels.length === 0 ? (
         <ChannelsSkeleton />
@@ -83,6 +106,10 @@ export default function HomePage() {
             categories={categories}
             selectedCategory={selectedCategory}
             onCategoryChange={setSelectedCategory}
+            /* País */
+            selectedCountry={selectedCountry}
+            onCountryChange={setSelectedCountry}
+            countryItems={countryItems}
           />
 
           <motion.main
@@ -90,12 +117,15 @@ export default function HomePage() {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.35 }}
           >
-            <ChannelGrid channels={channels} onChannelClick={handleChannelClick} />
+            {/* Pasamos los canales ya filtrados por país */}
+            <ChannelGrid
+              channels={countryFilteredChannels}
+              onChannelClick={handleChannelClick}
+            />
           </motion.main>
         </>
       )}
 
-      {/* Modal del reproductor (lazy) */}
       <Suspense fallback={null}>
         {selectedChannel && (
           <PlayerModal
