@@ -612,6 +612,7 @@ export default function AdminLoginPage() {
     <AdminChannelForm />
   </div>
 );
+    }
   // Si NO es admin, renderiza el login (igual que antes)
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center p-4 text-white">
@@ -695,6 +696,7 @@ export default function AdminLoginPage() {
     </div>
   );
 }
+
 
 
 
