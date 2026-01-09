@@ -1,5 +1,5 @@
 // src/pages/AdminLoginPage.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Mail, Lock, LogIn, Tv, Upload, Plus } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -55,6 +55,144 @@ async function preflightAuthRelaxed() {
   await tryFetch('/auth/v1/health', 'preflight:health');
   if (!details.ok) await tryFetch('/auth/v1/settings', 'preflight:settings');
   return details; // informativo
+}
+
+/* =========================
+   PANEL: Asignar dueño a canal
+   ========================= */
+function AssignChannelOwnerPanel() {
+  const [channels, setChannels] = useState([]);
+  const [filter, setFilter] = useState('');
+  const [selectedId, setSelectedId] = useState('');
+  const [ownerEmail, setOwnerEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const { data, error } = await supabase
+        .from('channels')
+        .select('id,name,country,owner_user_id')
+        .order('name', { ascending: true })
+        .limit(200);
+      if (!active) return;
+      if (error) {
+        setMsg(`❌ Error cargando canales: ${error.message}`);
+      } else {
+        setChannels(data || []);
+      }
+    })();
+    return () => { active = false; };
+  }, []);
+
+  const filtered = channels.filter(c =>
+    (c.name || '').toLowerCase().includes(filter.toLowerCase()) ||
+    (c.country || '').toLowerCase().includes(filter.toLowerCase())
+  );
+
+  const assignOwner = async (e) => {
+    e.preventDefault();
+    setMsg('');
+    if (!selectedId) {
+      setMsg('❌ Selecciona un canal.');
+      return;
+    }
+    const email = ownerEmail.trim().toLowerCase();
+    if (!email) {
+      setMsg('❌ Ingresa un correo válido.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.rpc('assign_channel_owner', {
+        p_channel_id: selectedId,
+        p_owner_email: email,
+      });
+      if (error) throw error;
+      setMsg('✅ Dueño asignado correctamente.');
+      setOwnerEmail('');
+      // refrescar owner_user_id en memoria
+      setChannels(prev => prev.map(c => c.id === selectedId ? { ...c, owner_user_id: 'updated' } : c));
+    } catch (err) {
+      setMsg(`❌ ${err.message || String(err)}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="mt-6 bg-gray-800/70 backdrop-blur-lg border border-gray-700 rounded-2xl p-6">
+      <div className="flex items-center gap-2 mb-4">
+        <Plus className="w-5 h-5 text-rose-400" />
+        <h3 className="text-xl font-semibold">Asignar dueño a canal</h3>
+      </div>
+
+      {msg && (
+        <div className={`mb-4 p-3 rounded-lg text-sm ${
+          msg.startsWith('✅') ? 'bg-emerald-900/40 border border-emerald-700 text-emerald-200'
+                               : 'bg-red-900/40 border border-red-700 text-red-200'
+        }`}>
+          {msg}
+        </div>
+      )}
+
+      <form onSubmit={assignOwner} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Buscar canal */}
+        <div className="md:col-span-1">
+          <label className="block text-sm text-gray-300 mb-1">Buscar canal</label>
+          <input
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Nombre o país…"
+            className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500/40"
+          />
+        </div>
+
+        {/* Seleccionar canal */}
+        <div className="md:col-span-1">
+          <label className="block text-sm text-gray-300 mb-1">Canal</label>
+          <select
+            value={selectedId}
+            onChange={(e) => setSelectedId(e.target.value)}
+            className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-rose-500/40"
+          >
+            <option value="">— Selecciona —</option>
+            {filtered.map(c => (
+              <option key={c.id} value={c.id}>
+                {c.name} {c.country ? `(${c.country})` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Correo del dueño */}
+        <div className="md:col-span-1">
+          <label className="block text-sm text-gray-300 mb-1">Correo del dueño</label>
+          <input
+            type="email"
+            value={ownerEmail}
+            onChange={(e) => setOwnerEmail(e.target.value)}
+            placeholder="correo@ejemplo.com"
+            className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500/40"
+          />
+        </div>
+
+        <div className="md:col-span-3">
+          <button
+            type="submit"
+            disabled={loading}
+            className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 px-5 py-2.5 rounded-lg font-semibold"
+          >
+            {loading ? 'Asignando…' : 'Asignar dueño'}
+          </button>
+          <p className="text-xs text-gray-400 mt-2">
+            Nota: el correo debe existir en <code>auth.users</code>/<code>user_profiles</code>. Esta acción usa el RPC <code>assign_channel_owner</code>.
+          </p>
+        </div>
+      </form>
+    </div>
+  );
 }
 
 /* =========================
@@ -647,6 +785,9 @@ export default function AdminLoginPage() {
         Salir
       </button>
     </header>
+
+    {/* NUEVO PANEL: asignar dueño */}
+    <AssignChannelOwnerPanel />
 
     <AdminChannelForm />
   </div>
