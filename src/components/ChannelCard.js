@@ -22,112 +22,34 @@ export default function ChannelCard({ channel, onClick }) {
   const description =
     channel?.description || channel?.descripcion || channel?.about || "";
 
-  // ROKU (ícono y link)
+  // Roku (icono + link) — mismas llaves de siempre
   const rokuIcon =
     channel?.roku_icon_url ||
-    channel?.rokuIconUrl ||
-    channel?.roku ||
-    "";
+    channel?.roku_icon ||
+    channel?.roku_logo_url ||
+    channel?.roku_image_url ||
+    null;
+
   const rokuLink =
     channel?.roku_link_url ||
-    channel?.rokuLinkUrl ||
-    "";
-
-  // NUEVO: bandera (misma talla que iconos del footer)
-  const flagUrl =
-    channel?.url_bandera ||
-    channel?.bandera_url ||
-    ""; // soporta ambos nombres por si acaso
-
-  // Cache-busting base
-  const baseVersion =
-    channel?.poster_version ||
-    channel?.icon_version ||
-    channel?.socials_version ||
-    channel?.updated_at ||
-    channel?.last_modified ||
-    Date.now();
-
-  const withBust = (url, ver) => {
-    if (!url) return url;
-    const sep = url.includes("?") ? "&" : "?";
-    return `${url}${sep}v=${encodeURIComponent(String(ver))}`;
-  };
-
-  const posterSrc = withBust(poster, baseVersion);
-  const rokuIconSrc = withBust(rokuIcon, baseVersion);
-  const flagSrc = withBust(flagUrl, baseVersion);
-
-  const hasRoku = Boolean(rokuIcon);
-  const hasFlag = Boolean(flagUrl);
-
-  // Redes sociales (con bust + key)
-  const socialsVersion =
-    channel?.socials_version ||
-    channel?.updated_at ||
-    Date.now();
-
-  const socialsRaw = [
-    {
-      key: "facebook",
-      url: channel?.facebook_url || channel?.facebookUrl,
-      icon: channel?.facebook_icon_url || channel?.facebookIconUrl,
-      label: "Facebook",
-    },
-    {
-      key: "youtube",
-      url: channel?.youtube_url || channel?.youtubeUrl,
-      icon: channel?.youtube_icon_url || channel?.youtubeIconUrl,
-      label: "YouTube",
-    },
-    {
-      key: "tiktok",
-      url: channel?.tiktok_url || channel?.tiktokUrl,
-      icon: channel?.tiktok_icon_url || channel?.tiktokIconUrl,
-      label: "TikTok",
-    },
-    {
-      key: "website",
-      url: channel?.website_url || channel?.websiteUrl,
-      icon: channel?.website_icon_url || channel?.websiteIconUrl,
-      label: "Sitio",
-    },
-  ];
-
-  const socials = socialsRaw
-    .filter((s) => s.url && s.icon)
-    .map((s) => {
-      const iconBusted = withBust(s.icon, socialsVersion);
-      return { ...s, iconBusted, keyRender: `${s.key}-${iconBusted}` };
-    });
-
-  const openPopup = (href) => {
-    if (!href) return;
-    const w = 520, h = 720;
-    const left = window.screenX + Math.max(0, (window.outerWidth - w) / 2);
-    const top = window.screenY + Math.max(0, (window.outerHeight - h) / 2);
-    window.open(
-      href,
-      "channel-social",
-      `width=${w},height=${h},left=${left},top=${top},noopener,noreferrer`
-    );
-  };
+    channel?.roku_url ||
+    channel?.roku_link ||
+    null;
 
   return (
     <button
       onClick={() => onClick?.(channel)}
       className="group w-full text-left rounded-xl overflow-hidden bg-gray-900/40 border border-gray-800 hover:border-gray-700 focus:outline-none focus:ring-2 focus:ring-rose-500/40 transition"
     >
-      {/* Poster vertical, sin deformar */}
+      {/* Poster alto (vertical) */}
       <div className="relative">
-        <div className="relative w-full aspect-[3/4] overflow-hidden bg-gray-800">
+        {/* 3/4 en móviles, 2/3 desde md */}
+        <div className="aspect-[3/4] md:aspect-[2/3] w-full overflow-hidden bg-gray-800">
           <img
-            key={posterSrc}
-            src={posterSrc}
+            src={poster}
             alt={title}
             loading="lazy"
-            draggable={false}
-            className="absolute inset-0 w-full h-full object-contain object-center p-1 block"
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
           />
         </div>
 
@@ -139,82 +61,52 @@ export default function ChannelCard({ channel, onClick }) {
         </div>
       </div>
 
-      {/* Texto + Roku + Redes */}
-      <div className="p-3 space-y-2">
-        {/* Título / País + Roku */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h3 className="text-[15px] font-semibold text-white line-clamp-1">
-              {title}
-            </h3>
+      {/* Texto */}
+      <div className="p-3 space-y-1.5">
+        <h3 className="text-[15px] font-semibold text-white line-clamp-1">
+          {title}
+        </h3>
 
-            {/* País con bandera (misma talla que iconos del footer: h-6 w-6) */}
-            <div className="mt-0.5 flex items-center gap-2">
-              {hasFlag && (
-                <img
-                  key={flagSrc}
-                  src={flagSrc}
-                  alt={`Bandera ${country}`}
-                  title={country}
-                  className="h-6 w-6 object-contain rounded-sm bg-gray-800/60 p-[2px]"
-                  draggable={false}
-                />
-              )}
-              <span className="text-[12px] text-gray-400">{country}</span>
-            </div>
-          </div>
+        <div className="text-[12px] text-gray-400">{country}</div>
 
-          {hasRoku && (
-            <div className="shrink-0 text-right">
-              <div className="text-[10px] text-gray-400 mb-1">
-                Disponible también en:
-              </div>
-              <div className="flex justify-end">
-                <img
-                  key={rokuIconSrc}
-                  src={rokuIconSrc}
-                  alt="Roku"
-                  title="Roku"
-                  className="h-7 w-auto object-contain rounded-md bg-gray-800/60 p-[2px] cursor-pointer hover:bg-gray-700/60 transition"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (rokuLink) openPopup(rokuLink);
-                  }}
-                  draggable={false}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Descripción */}
         {description ? (
-          <p className="text-[12px] leading-4 text-gray-400 line-clamp-2">
+          <p className="text-[12px] leading-4 text-gray-400 line-clamp-2 mt-1.5">
             {description}
           </p>
         ) : null}
 
-        {/* Footer redes */}
-        {socials.length > 0 && (
-          <div className="pt-1">
-            <div className="text-[12px] font-semibold text-gray-200 mb-1">
-              Síguenos en
+        {/* Disponible en (Roku) */}
+        {(rokuIcon || rokuLink) && (
+          <div className="mt-2">
+            <div className="text-[12px] font-medium text-gray-300 mb-1">
+              También disponible en:
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {socials.map((s) => (
-                <img
-                  key={s.keyRender}
-                  src={s.iconBusted}
-                  alt={s.label}
-                  title={s.label}
-                  className="h-6 w-6 object-contain rounded-md bg-gray-800/60 p-[2px] hover:bg-gray-700/70 transition cursor-pointer"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openPopup(s.url);
-                  }}
-                  draggable={false}
-                />
-              ))}
+            <div className="flex items-center gap-2">
+              {rokuLink ? (
+                <a
+                  href={rokuLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center"
+                  aria-label="Abrir en Roku"
+                >
+                  <img
+                    src={rokuIcon}
+                    alt="Roku"
+                    loading="lazy"
+                    className="h-7 w-auto object-contain" {/* ⬅️ Aumentado ~40% */}
+                  />
+                </a>
+              ) : (
+                rokuIcon && (
+                  <img
+                    src={rokuIcon}
+                    alt="Roku"
+                    loading="lazy"
+                    className="h-7 w-auto object-contain" {/* ⬅️ Aumentado ~40% */}
+                  />
+                )
+              )}
             </div>
           </div>
         )}
