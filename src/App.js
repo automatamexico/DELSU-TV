@@ -12,13 +12,12 @@ import ProfilePage from "./pages/ProfilePage";
 
 // Rutas protegidas
 import ProtectedRoute from "./routes/ProtectedRoute";
-import ProtectedRouteAdmin from "./routes/ProtectedRouteAdmin";
+// import ProtectedRouteAdmin from "./routes/ProtectedRouteAdmin"; // <- eliminado porque no se usa
 
 // Error boundary
 import ErrorBoundary from "./components/ErrorBoundary";
 
 export default function App() {
-  // Pequeño diagnóstico al montar la app
   React.useEffect(() => {
     // eslint-disable-next-line no-console
     console.log("[App] Montada. Si ves pantalla en blanco, revisa la consola por errores.");
@@ -38,10 +37,10 @@ export default function App() {
               <Route path="/profile" element={<ProfilePage />} />
             </Route>
 
-            {/* Admin */}
+            {/* Admin login (la página en sí valida rol admin internamente) */}
             <Route path="/admin" element={<AdminLoginPage />} />
 
-            {/* Dashboard: cualquier usuario autenticado (user o admin) */}
+            {/* Dashboard: cualquier usuario autenticado */}
             <Route element={<ProtectedRoute />}>
               <Route path="/dashboard" element={<DashboardPage />} />
             </Route>
