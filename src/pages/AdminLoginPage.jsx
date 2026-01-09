@@ -597,8 +597,6 @@ function AdminChannelForm() {
           </p>
         </div>
 
-        {/* ... (resto del formulario tal cual lo tenías) ... */}
-
         {/* País */}
         <div>
           <label className="block text-sm text-gray-300 mb-1">País</label>
@@ -685,6 +683,117 @@ function AdminChannelForm() {
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+/* =========================
+   NUEVO: Panel de estado (Activos/Inactivos) + modales
+   ========================= */
+function ChannelStatusPanel() {
+  const [channels, setChannels] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [openModal, setOpenModal] = useState(null); // 'active' | 'inactive' | null
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('channels')
+          .select('id,name,is_suspended,next_billing_at')
+          .order('name', { ascending: true });
+        if (error) throw error;
+        if (mounted) setChannels(data || []);
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error('[ChannelStatusPanel] load', e);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  const active = channels.filter(c => !c?.is_suspended);
+  const inactive = channels.filter(c => !!c?.is_suspended);
+
+  const fmt = (d) => {
+    if (!d) return '—';
+    const dt = new Date(d);
+    if (Number.isNaN(dt.getTime())) return '—';
+    return dt.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
+
+  return (
+    <div className="mt-8 bg-gray-800/60 border border-gray-700 rounded-2xl p-4">
+      <h4 className="text-lg font-semibold mb-3">Estado de canales</h4>
+
+      <div className="flex flex-wrap gap-3">
+        <button
+          onClick={() => setOpenModal('active')}
+          className="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 transition border border-emerald-600"
+          disabled={loading}
+          title="Ver lista de canales activos"
+        >
+          Canales activos = <span className="font-bold">{active.length}</span>
+        </button>
+
+        <button
+          onClick={() => setOpenModal('inactive')}
+          className="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-800 transition border border-gray-600"
+          disabled={loading}
+          title="Ver lista de canales inactivos"
+        >
+          Canales inactivos = <span className="font-bold">{inactive.length}</span>
+        </button>
+      </div>
+
+      {/* Modal simple */}
+      {openModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-2xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h5 className="text-xl font-semibold">
+                {openModal === 'active' ? 'Canales activos' : 'Canales inactivos'}
+              </h5>
+              <button
+                onClick={() => setOpenModal(null)}
+                className="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600"
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <div className="max-h-[60vh] overflow-auto rounded-lg border border-gray-700">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-800/70">
+                  <tr>
+                    <th className="text-left px-3 py-2 border-b border-gray-700">Canal</th>
+                    <th className="text-left px-3 py-2 border-b border-gray-700">Vigencia (next_billing_at)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(openModal === 'active' ? active : inactive).map((c) => (
+                    <tr key={c.id} className="odd:bg-gray-800/30">
+                      <td className="px-3 py-2 border-b border-gray-800">{c.name || '—'}</td>
+                      <td className="px-3 py-2 border-b border-gray-800">{fmt(c.next_billing_at)}</td>
+                    </tr>
+                  ))}
+                  {(openModal === 'active' ? active : inactive).length === 0 && (
+                    <tr>
+                      <td className="px-3 py-6 text-center text-gray-400" colSpan={2}>
+                        Sin registros.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -805,15 +914,14 @@ export default function AdminLoginPage() {
           </button>
         </header>
 
-        {/* NUEVOS PANELES */}
+        {/* PANELES EXISTENTES */}
         <SuspendChannelPanel />
         <SuspendedChannelsPanel />
-
-        {/* Panel ya existente */}
         <AssignChannelOwnerPanel />
-
-        {/* Alta de canal */}
         <AdminChannelForm />
+
+        {/* NUEVO: Estado (activos/inactivos) al final, como pediste */}
+        <ChannelStatusPanel />
       </div>
     );
   }
@@ -901,4 +1009,3 @@ export default function AdminLoginPage() {
     </div>
   );
 }
-
