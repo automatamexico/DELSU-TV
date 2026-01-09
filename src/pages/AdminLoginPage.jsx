@@ -69,6 +69,9 @@ function AdminChannelForm() {
     category: '',
     posterFile: null,
 
+    // ← agregado
+    stream_url: '',
+
     rokuEnabled: false,
     roku_link_url: '',
 
@@ -129,6 +132,9 @@ function AdminChannelForm() {
         description: form.description.trim(),
         category: form.category.trim(),
         poster: posterUrl, // ← guarda el URL del póster en 'poster'
+
+        // ← agregado
+        stream_url: form.stream_url.trim(),
       };
 
       // Roku
@@ -189,6 +195,10 @@ function AdminChannelForm() {
         description: '',
         category: '',
         posterFile: null,
+
+        // ← agregado
+        stream_url: '',
+
         rokuEnabled: false,
         roku_link_url: '',
         youtubeEnabled: false,
@@ -260,6 +270,18 @@ function AdminChannelForm() {
             placeholder="Noticias / Entretenimiento / Música..."
             className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500/40"
             required
+          />
+        </div>
+
+        {/* ← agregado: Lista M3u8 (stream_url) */}
+        <div>
+          <label className="block text-sm text-gray-300 mb-1">Lista M3u8</label>
+          <input
+            name="stream_url"
+            value={form.stream_url}
+            onChange={onChange}
+            placeholder="https://tu-cdn.com/stream/playlist.m3u8"
+            className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500/40"
           />
         </div>
 
@@ -670,4 +692,3 @@ export default function AdminLoginPage() {
     </div>
   );
 }
-
