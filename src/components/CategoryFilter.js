@@ -7,7 +7,6 @@ export default function CategoryFilter({
   selectedCategory,
   onCategoryChange,
 }) {
-  // Asegurar que "Entretenimiento" esté y quede ANTES de "País"
   const uiCategories = useMemo(() => {
     const base = [...categories];
     if (!base.includes("Entretenimiento")) base.push("Entretenimiento");
@@ -53,9 +52,9 @@ export default function CategoryFilter({
 
   const handlePickCategory = (cat) => onCategoryChange?.(cat);
 
-  // ⬇️ Ajuste ÚNICO: formateo 'Pais: <nombre>' (sin acento y con espacio)
+  // 🔧 ÚNICO CAMBIO: usar "País: " con acento
   const handlePickCountry = (c) => {
-    onCategoryChange?.(`Pais: ${c.country}`);
+    onCategoryChange?.(`País: ${c.country}`);
     setShowCountryMenu(false);
   };
 
@@ -82,7 +81,7 @@ export default function CategoryFilter({
           onClick={() => setShowCountryMenu(true)}
           className={`px-3 py-1.5 rounded-full text-sm border transition ${
             typeof selectedCategory === "string" &&
-            selectedCategory.startsWith("Pais:")
+            selectedCategory.startsWith("País:")
               ? "bg-rose-600 text-white border-rose-500"
               : "bg-white/5 text-gray-200 border-white/10 hover:bg-white/10"
           }`}
