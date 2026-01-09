@@ -130,7 +130,7 @@ export default function ChannelCard({ channel, onClick }) {
   const hasAnySocial = Boolean(fbUrl || ytUrl || tkUrl || webUrl);
 
   /* Calificación desde vistas */
-  const views = channel?.view_count ?? channel?.views ?? 0;
+ const views = channel?.views_count ?? channel?.view_count ?? channel?.views ?? 0;
   const starCount = calcStarsFromViews(views);
 
   return (
