@@ -17,7 +17,7 @@ function withBust(url, version) {
   return `${url}${sep}v=${encodeURIComponent(version)}`;
 }
 
-/** Abre popup centrado (con fallback si el navegador lo bloquea) */
+/** Abre popup centrado (SIN abrir pestaña nueva si es bloqueado) */
 function openPopupControlled(e, rawUrl) {
   e?.preventDefault?.();
   e?.stopPropagation?.();
@@ -31,11 +31,8 @@ function openPopupControlled(e, rawUrl) {
   const x = Math.max(0, Math.round((window.screen.width - w) / 2));
   const feat = `width=${w},height=${h},left=${x},top=${y},resizable=yes,scrollbars=yes,noopener`;
 
-  const win = window.open(url, "social_popup", feat);
-  if (!win) {
-    // Popup bloqueado → pestaña nueva
-    window.open(url, "_blank", "noopener");
-  }
+  // Solo intento de popup; si es bloqueado, NO hay fallback a nueva pestaña
+  window.open(url, "social_popup", feat);
 }
 
 export default function ChannelCard({ channel, onClick }) {
@@ -68,7 +65,7 @@ export default function ChannelCard({ channel, onClick }) {
     channel?.roku_icon ||
     channel?.roku_logo_url ||
     channel?.roku_image_url ||
-    channel?.roku || // algunos registros guardan el ícono aquí
+    channel?.roku ||
     null;
 
   const rokuLink =
@@ -105,9 +102,7 @@ export default function ChannelCard({ channel, onClick }) {
   const hasAnySocial = Boolean(fbUrl || ytUrl || tkUrl || webUrl);
 
   return (
-    <div
-      className="group w-full text-left rounded-xl overflow-hidden bg-gray-900/40 border border-gray-800 hover:border-gray-700 focus:outline-none focus:ring-2 focus:ring-rose-500/40 transition"
-    >
+    <div className="group w-full text-left rounded-xl overflow-hidden bg-gray-900/40 border border-gray-800 hover:border-gray-700 focus:outline-none focus:ring-2 focus:ring-rose-500/40 transition">
       {/* === PÓSTER (ÚNICO QUE ABRE EL REPRODUCTOR) === */}
       <button
         type="button"
@@ -164,7 +159,7 @@ export default function ChannelCard({ channel, onClick }) {
           {(rokuIcon || rokuLink) && (
             <div className="ml-auto shrink-0 text-right">
               <div className="text-[12px] font-medium text-gray-300 mb-1">
-                Disponible en
+                También disponible en
               </div>
 
               {rokuIcon ? (
