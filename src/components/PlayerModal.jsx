@@ -5,31 +5,23 @@ import VideoPlayer from "./VideoPlayer";
 import useIncrementView from "../hooks/useIncrementView";
 
 export default function PlayerModal({ open, onClose, channel }) {
-  // Llamamos SIEMPRE al hook (regla de hooks), pero lo habilitamos sólo cuando procede
-  const channelId = channel?.id ?? null;
-  const enabled = Boolean(open && channelId);
-  useIncrementView(channelId, enabled);
+  // Cuenta la vista UNA sola vez cuando hay modal abierto con canal válido
+  const channelId = open && channel?.id ? channel.id : null;
+  useIncrementView(channelId);
 
-  // Render control
   if (!open || !channel) return null;
 
   const title =
-    channel?.title ||
-    channel?.name ||
-    channel?.channel_name ||
-    "Canal";
+    channel?.title || channel?.name || channel?.channel_name || "Canal";
 
   return (
     <div className="fixed inset-0 z-50">
       {/* Fondo */}
-      <div
-        className="absolute inset-0 bg-black/70"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
 
       {/* Contenedor del modal */}
       <div className="relative mx-auto my-8 w-[95%] max-w-6xl rounded-2xl overflow-hidden bg-[#0b1016] ring-1 ring-white/10">
-        {/* Header: título ÚNICO + botón cerrar */}
+        {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 bg-[#121821] border-b border-white/10">
           <h2 className="text-sm sm:text-base font-semibold text-white truncate">
             {title}
@@ -43,7 +35,7 @@ export default function PlayerModal({ open, onClose, channel }) {
           </button>
         </div>
 
-        {/* Cuerpo: reproductor */}
+        {/* Reproductor */}
         <div className="bg-black">
           <VideoPlayer channel={channel} onClose={onClose} />
         </div>
