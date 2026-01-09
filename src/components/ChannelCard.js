@@ -1,7 +1,15 @@
 // src/components/ChannelCard.jsx
 import React from "react";
 
-/** Agrega un parámetro v=<vers> para bust cache (opcional) */
+/** Añade https:// si la URL no tiene protocolo */
+function normalizeUrl(url) {
+  if (!url) return "";
+  const u = String(url).trim();
+  if (/^https?:\/\//i.test(u)) return u;
+  return `https://${u}`;
+}
+
+/** Opcional: bust de caché para íconos */
 function withBust(url, version) {
   if (!url) return url;
   if (!version) return url;
@@ -9,24 +17,29 @@ function withBust(url, version) {
   return `${url}${sep}v=${encodeURIComponent(version)}`;
 }
 
-/** Abre popup centrado y NO deja que el card abra el reproductor */
-function openPopupControlled(e, url) {
+/** Abre popup centrado (con fallback si el popup es bloqueado) */
+function openPopupControlled(e, rawUrl) {
+  e?.preventDefault?.();
+  e?.stopPropagation?.();
+
+  const url = normalizeUrl(rawUrl);
   if (!url) return;
-  e.preventDefault?.();
-  e.stopPropagation?.(); // <- evita que se dispare onClick del card
+
   const w = 720;
   const h = 600;
   const y = Math.max(0, Math.round((window.screen.height - h) / 2));
   const x = Math.max(0, Math.round((window.screen.width - w) / 2));
-  window.open(
-    url,
-    "social_popup",
-    `width=${w},height=${h},left=${x},top=${y},resizable=yes,scrollbars=yes,noopener`
-  );
+  const feat = `width=${w},height=${h},left=${x},top=${y},resizable=yes,scrollbars=yes,noopener`;
+
+  const win = window.open(url, "social_popup", feat);
+  if (!win) {
+    // Popup bloqueado -> abre en pestaña nueva como fallback
+    window.open(url, "_blank", "noopener");
+  }
 }
 
 export default function ChannelCard({ channel, onClick }) {
-  // Datos básicos
+  // Básicos
   const title =
     channel?.title ||
     channel?.name ||
@@ -49,13 +62,13 @@ export default function ChannelCard({ channel, onClick }) {
   // Bandera
   const banderaUrl = channel?.url_bandera || channel?.bandera_url || null;
 
-  // Roku: soporta múltiples alias + `roku` (tu caso original)
+  // Roku (soporta varios alias + `roku` como URL del ícono)
   const rokuIconRaw =
     channel?.roku_icon_url ||
     channel?.roku_icon ||
     channel?.roku_logo_url ||
     channel?.roku_image_url ||
-    channel?.roku || // ⬅️ si guardaste el URL directamente en `roku`
+    channel?.roku ||
     null;
 
   const rokuLink =
@@ -75,7 +88,7 @@ export default function ChannelCard({ channel, onClick }) {
   const webIcon = channel?.website_icon_url || channel?.web_icon || null;
   const webUrl = channel?.website_url || channel?.web_url || null;
 
-  // Versión para bust (si la tienes en tu tabla)
+  // Versión para bust cache (opcional)
   const version =
     channel?.icon_version ||
     channel?.updated_at ||
@@ -92,12 +105,16 @@ export default function ChannelCard({ channel, onClick }) {
   const hasAnySocial = Boolean(fbUrl || ytUrl || tkUrl || webUrl);
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => onClick?.(channel)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") onClick?.(channel);
+      }}
       className="group w-full text-left rounded-xl overflow-hidden bg-gray-900/40 border border-gray-800 hover:border-gray-700 focus:outline-none focus:ring-2 focus:ring-rose-500/40 transition"
     >
-      {/* Póster ajustado SIN recortar */}
+      {/* Póster (se mantiene ajustado sin recortar) */}
       <div className="relative">
         <div className="aspect-[3/4] md:aspect-[2/3] w-full overflow-hidden bg-gray-800">
           <img
@@ -108,7 +125,7 @@ export default function ChannelCard({ channel, onClick }) {
           />
         </div>
 
-        {/* Etiqueta de categoría */}
+        {/* Etiqueta categoría */}
         <div className="absolute left-2 top-2">
           <span className="text-[11px] px-2 py-1 rounded-full bg-rose-500/90 text-white shadow">
             {category}
@@ -116,10 +133,10 @@ export default function ChannelCard({ channel, onClick }) {
         </div>
       </div>
 
-      {/* Zona inferior */}
+      {/* Cuerpo */}
       <div className="p-3">
         <div className="flex items-end justify-between gap-3">
-          {/* Columna izquierda */}
+          {/* Izquierda */}
           <div className="min-w-0">
             <h3 className="text-[15px] font-semibold text-white line-clamp-1">
               {title}
@@ -146,7 +163,7 @@ export default function ChannelCard({ channel, onClick }) {
             ) : null}
           </div>
 
-          {/* Columna derecha: Disponible en (Roku) */}
+          {/* Derecha: Roku */}
           {(rokuIcon || rokuLink) && (
             <div className="ml-auto shrink-0 text-right">
               <div className="text-[12px] font-medium text-gray-300 mb-1">
@@ -154,29 +171,40 @@ export default function ChannelCard({ channel, onClick }) {
               </div>
 
               {rokuIcon ? (
-                <button
-                  type="button"
-                  onClick={(e) => openPopupControlled(e, rokuLink || "#")}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  className="inline-flex items-center"
-                  aria-label="Abrir canal en Roku"
-                  title="Abrir Roku"
-                >
+                rokuLink ? (
+                  <button
+                    type="button"
+                    onClick={(e) => openPopupControlled(e, rokuLink)}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className="inline-flex items-center"
+                    aria-label="Abrir Roku"
+                    title="Abrir Roku"
+                  >
+                    <img
+                      src={rokuIcon}
+                      alt="Roku"
+                      loading="lazy"
+                      className="h-5 w-auto object-contain"
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    />
+                  </button>
+                ) : (
                   <img
                     src={rokuIcon}
                     alt="Roku"
                     loading="lazy"
-                    className="h-5 w-auto object-contain" /* tamaño anterior (visible) */
+                    className="h-5 w-auto object-contain"
                     onClick={(e) => e.stopPropagation()}
                     onMouseDown={(e) => e.stopPropagation()}
                   />
-                </button>
+                )
               ) : null}
             </div>
           )}
         </div>
 
-        {/* Footer redes (popup) */}
+        {/* Footer redes */}
         {hasAnySocial && (
           <div className="mt-3">
             <div className="text-[12px] font-semibold text-gray-300">
@@ -263,6 +291,6 @@ export default function ChannelCard({ channel, onClick }) {
           </div>
         )}
       </div>
-    </button>
+    </div>
   );
 }
