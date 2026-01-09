@@ -1,7 +1,7 @@
 // src/components/ChannelCard.jsx
 import React from "react";
 
-/** Añade https:// si la URL no tiene protocolo */
+/** Normaliza la URL con https:// si falta */
 function normalizeUrl(url) {
   if (!url) return "";
   const u = String(url).trim();
@@ -9,7 +9,7 @@ function normalizeUrl(url) {
   return `https://${u}`;
 }
 
-/** Opcional: bust de caché para íconos */
+/** Bust de caché opcional para íconos si usas versión/updated_at en DB */
 function withBust(url, version) {
   if (!url) return url;
   if (!version) return url;
@@ -17,7 +17,7 @@ function withBust(url, version) {
   return `${url}${sep}v=${encodeURIComponent(version)}`;
 }
 
-/** Abre popup centrado (con fallback si el popup es bloqueado) */
+/** Abre popup centrado (con fallback si el navegador lo bloquea) */
 function openPopupControlled(e, rawUrl) {
   e?.preventDefault?.();
   e?.stopPropagation?.();
@@ -33,7 +33,7 @@ function openPopupControlled(e, rawUrl) {
 
   const win = window.open(url, "social_popup", feat);
   if (!win) {
-    // Popup bloqueado -> abre en pestaña nueva como fallback
+    // Popup bloqueado → pestaña nueva
     window.open(url, "_blank", "noopener");
   }
 }
@@ -62,19 +62,19 @@ export default function ChannelCard({ channel, onClick }) {
   // Bandera
   const banderaUrl = channel?.url_bandera || channel?.bandera_url || null;
 
-  // Roku (soporta varios alias + `roku` como URL del ícono)
+  // Roku (ícono y link)
   const rokuIconRaw =
     channel?.roku_icon_url ||
     channel?.roku_icon ||
     channel?.roku_logo_url ||
     channel?.roku_image_url ||
-    channel?.roku ||
+    channel?.roku || // algunos registros guardan el ícono aquí
     null;
 
   const rokuLink =
     channel?.roku_link_url || channel?.roku_url || channel?.roku_link || null;
 
-  // Redes
+  // Redes (ícono + url)
   const fbIcon = channel?.facebook_icon_url || channel?.facebook_icon || null;
   const fbUrl = channel?.facebook_url || null;
 
@@ -88,7 +88,7 @@ export default function ChannelCard({ channel, onClick }) {
   const webIcon = channel?.website_icon_url || channel?.web_icon || null;
   const webUrl = channel?.website_url || channel?.web_url || null;
 
-  // Versión para bust cache (opcional)
+  // Versión para bust cache (si tienes ese campo en DB)
   const version =
     channel?.icon_version ||
     channel?.updated_at ||
@@ -106,37 +106,36 @@ export default function ChannelCard({ channel, onClick }) {
 
   return (
     <div
-      role="button"
-      tabIndex={0}
-      onClick={() => onClick?.(channel)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") onClick?.(channel);
-      }}
       className="group w-full text-left rounded-xl overflow-hidden bg-gray-900/40 border border-gray-800 hover:border-gray-700 focus:outline-none focus:ring-2 focus:ring-rose-500/40 transition"
     >
-      {/* Póster (se mantiene ajustado sin recortar) */}
-      <div className="relative">
+      {/* === PÓSTER (ÚNICO QUE ABRE EL REPRODUCTOR) === */}
+      <button
+        type="button"
+        onClick={() => onClick?.(channel)}
+        className="relative block w-full text-left"
+        aria-label={`Abrir reproductor: ${title}`}
+      >
         <div className="aspect-[3/4] md:aspect-[2/3] w-full overflow-hidden bg-gray-800">
           <img
             src={poster}
             alt={title}
             loading="lazy"
-            className="w-full h-full object-contain object-center"
+            className="w-full h-full object-contain object-center transition-transform duration-300 group-hover:scale-[1.02]"
           />
         </div>
 
-        {/* Etiqueta categoría */}
+        {/* Etiqueta categoría en el póster */}
         <div className="absolute left-2 top-2">
           <span className="text-[11px] px-2 py-1 rounded-full bg-rose-500/90 text-white shadow">
             {category}
           </span>
         </div>
-      </div>
+      </button>
 
-      {/* Cuerpo */}
+      {/* === CUERPO (NO ABRE REPRODUCTOR) === */}
       <div className="p-3">
         <div className="flex items-end justify-between gap-3">
-          {/* Izquierda */}
+          {/* Izquierda: título, país, descripción */}
           <div className="min-w-0">
             <h3 className="text-[15px] font-semibold text-white line-clamp-1">
               {title}
@@ -149,8 +148,6 @@ export default function ChannelCard({ channel, onClick }) {
                   alt={country}
                   loading="lazy"
                   className="h-5 w-5 object-contain rounded-sm border border-white/10"
-                  onClick={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
                 />
               ) : null}
               <span className="truncate">{country}</span>
@@ -163,7 +160,7 @@ export default function ChannelCard({ channel, onClick }) {
             ) : null}
           </div>
 
-          {/* Derecha: Roku */}
+          {/* Derecha: Roku (click → popup) */}
           {(rokuIcon || rokuLink) && (
             <div className="ml-auto shrink-0 text-right">
               <div className="text-[12px] font-medium text-gray-300 mb-1">
@@ -175,7 +172,6 @@ export default function ChannelCard({ channel, onClick }) {
                   <button
                     type="button"
                     onClick={(e) => openPopupControlled(e, rokuLink)}
-                    onMouseDown={(e) => e.stopPropagation()}
                     className="inline-flex items-center"
                     aria-label="Abrir Roku"
                     title="Abrir Roku"
@@ -185,8 +181,6 @@ export default function ChannelCard({ channel, onClick }) {
                       alt="Roku"
                       loading="lazy"
                       className="h-5 w-auto object-contain"
-                      onClick={(e) => e.stopPropagation()}
-                      onMouseDown={(e) => e.stopPropagation()}
                     />
                   </button>
                 ) : (
@@ -195,8 +189,6 @@ export default function ChannelCard({ channel, onClick }) {
                     alt="Roku"
                     loading="lazy"
                     className="h-5 w-auto object-contain"
-                    onClick={(e) => e.stopPropagation()}
-                    onMouseDown={(e) => e.stopPropagation()}
                   />
                 )
               ) : null}
@@ -204,7 +196,7 @@ export default function ChannelCard({ channel, onClick }) {
           )}
         </div>
 
-        {/* Footer redes */}
+        {/* Footer redes (click → popup) */}
         {hasAnySocial && (
           <div className="mt-3">
             <div className="text-[12px] font-semibold text-gray-300">
@@ -215,7 +207,6 @@ export default function ChannelCard({ channel, onClick }) {
                 <button
                   type="button"
                   onClick={(e) => openPopupControlled(e, fbUrl)}
-                  onMouseDown={(e) => e.stopPropagation()}
                   className="inline-flex"
                   aria-label="Facebook"
                   title="Facebook"
@@ -225,8 +216,6 @@ export default function ChannelCard({ channel, onClick }) {
                     alt="Facebook"
                     loading="lazy"
                     className="h-5 w-5 object-contain"
-                    onClick={(e) => e.stopPropagation()}
-                    onMouseDown={(e) => e.stopPropagation()}
                   />
                 </button>
               )}
@@ -234,7 +223,6 @@ export default function ChannelCard({ channel, onClick }) {
                 <button
                   type="button"
                   onClick={(e) => openPopupControlled(e, ytUrl)}
-                  onMouseDown={(e) => e.stopPropagation()}
                   className="inline-flex"
                   aria-label="YouTube"
                   title="YouTube"
@@ -244,8 +232,6 @@ export default function ChannelCard({ channel, onClick }) {
                     alt="YouTube"
                     loading="lazy"
                     className="h-5 w-5 object-contain"
-                    onClick={(e) => e.stopPropagation()}
-                    onMouseDown={(e) => e.stopPropagation()}
                   />
                 </button>
               )}
@@ -253,7 +239,6 @@ export default function ChannelCard({ channel, onClick }) {
                 <button
                   type="button"
                   onClick={(e) => openPopupControlled(e, tkUrl)}
-                  onMouseDown={(e) => e.stopPropagation()}
                   className="inline-flex"
                   aria-label="TikTok"
                   title="TikTok"
@@ -263,8 +248,6 @@ export default function ChannelCard({ channel, onClick }) {
                     alt="TikTok"
                     loading="lazy"
                     className="h-5 w-5 object-contain"
-                    onClick={(e) => e.stopPropagation()}
-                    onMouseDown={(e) => e.stopPropagation()}
                   />
                 </button>
               )}
@@ -272,7 +255,6 @@ export default function ChannelCard({ channel, onClick }) {
                 <button
                   type="button"
                   onClick={(e) => openPopupControlled(e, webUrl)}
-                  onMouseDown={(e) => e.stopPropagation()}
                   className="inline-flex"
                   aria-label="Sitio web"
                   title="Sitio web"
@@ -282,8 +264,6 @@ export default function ChannelCard({ channel, onClick }) {
                     alt="Sitio web"
                     loading="lazy"
                     className="h-5 w-5 object-contain"
-                    onClick={(e) => e.stopPropagation()}
-                    onMouseDown={(e) => e.stopPropagation()}
                   />
                 </button>
               )}
