@@ -1,128 +1,165 @@
-import React, { useState, useMemo } from "react";
+// src/components/CategoryFilter.jsx
+import React, { useEffect, useMemo, useState } from "react";
+import { supabase } from "../supabaseClient";
 
 export default function CategoryFilter({
   categories = [],
-  selectedCategory = "Todos",
+  selectedCategory,
   onCategoryChange,
-  // País
-  selectedCountry = "",
-  onCountryChange,
-  countryItems = [],
 }) {
-  // Normaliza categorías y evita duplicado de "Todos"
-  const categoryList = useMemo(() => {
-    const base = Array.isArray(categories) ? categories : [];
-    const set = new Set(
-      base.map((c) => (typeof c === "string" ? c : c?.name).trim())
-    );
-    set.delete("Todos");
-    return ["Todos", ...Array.from(set)];
+  // Asegurar que "Entretenimiento" esté y quede ANTES de "País"
+  const uiCategories = useMemo(() => {
+    const base = [...categories];
+    // Inserta "Entretenimiento" si no viene en el array
+    if (!base.includes("Entretenimiento")) {
+      base.push("Entretenimiento");
+    }
+    // Remueve "País" si estuviera en la lista para que nuestro botón quede al final
+    const filtered = base.filter((c) => c !== "País");
+    return filtered;
   }, [categories]);
 
-  const [showCountries, setShowCountries] = useState(false);
+  const [showCountryMenu, setShowCountryMenu] = useState(false);
+  const [countries, setCountries] = useState([]);
 
-  const handleCategoryClick = (cat) => {
-    if (onCategoryChange) onCategoryChange(cat);
-    // Cerrar dropdown país si estaba abierto
-    if (showCountries) setShowCountries(false);
+  // Carga países (distintos) desde 'channels'
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      const { data, error } = await supabase
+        .from("channels")
+        .select("country, url_bandera")
+        .not("country", "is", null);
+
+      if (!isMounted) return;
+      if (error) {
+        // eslint-disable-next-line no-console
+        console.warn("[CategoryFilter] Error cargando países:", error.message);
+        setCountries([]);
+        return;
+      }
+
+      // Normaliza y ordena
+      const uniq = new Map();
+      (data || []).forEach((row) => {
+        const name = String(row.country || "").trim();
+        if (!name) return;
+        if (!uniq.has(name)) {
+          uniq.set(name, { country: name, flag: row.url_bandera || null });
+        }
+      });
+      const arr = Array.from(uniq.values()).sort((a, b) =>
+        a.country.localeCompare(b.country)
+      );
+      setCountries(arr);
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handlePickCategory = (cat) => {
+    onCategoryChange?.(cat);
   };
 
-  const handleCountryToggle = () => setShowCountries((s) => !s);
-
-  const handleCountrySelect = (country) => {
-    if (onCountryChange) onCountryChange(country || "");
-    setShowCountries(false);
+  const handlePickCountry = (c) => {
+    // Envía una cadena simple para no romper la firma existente
+    onCategoryChange?.(`País:${c.country}`);
+    setShowCountryMenu(false);
   };
 
   return (
-    <div className="px-4 pt-3 relative">
-      {/* Barra de categorías centrada */}
-      <div className="flex flex-wrap justify-center items-center gap-2 pb-2">
-        {categoryList.map((cat) => {
-          const isActive = selectedCategory === cat;
-          return (
-            <button
-              key={cat}
-              onClick={() => handleCategoryClick(cat)}
-              className={`px-3 py-1.5 rounded-full text-sm border transition ${
-                isActive
-                  ? "bg-rose-600 text-white border-rose-500"
-                  : "bg-gray-900/40 text-gray-200 border-gray-700 hover:border-gray-500"
-              }`}
-            >
-              {cat}
-            </button>
-          );
-        })}
-
-        {/* Botón País */}
-        <div className="relative">
+    <div className="w-full">
+      <div className="w-full flex items-center justify-center gap-2 flex-wrap px-4 py-3">
+        {/* Botones de categorías existentes + “Entretenimiento” insertado */}
+        {uiCategories.map((cat) => (
           <button
-            onClick={handleCountryToggle}
+            key={cat}
+            type="button"
+            onClick={() => handlePickCategory(cat)}
             className={`px-3 py-1.5 rounded-full text-sm border transition ${
-              selectedCountry
-                ? "bg-indigo-600 text-white border-indigo-500"
-                : "bg-gray-900/40 text-gray-200 border-gray-700 hover:border-gray-500"
+              selectedCategory === cat
+                ? "bg-rose-600 text-white border-rose-500"
+                : "bg-white/5 text-gray-200 border-white/10 hover:bg-white/10"
             }`}
-            title="Filtrar por país"
           >
-            {selectedCountry ? `País: ${selectedCountry}` : "País"}
+            {cat}
           </button>
+        ))}
 
-          {/* Dropdown País sin scroll: overlay centrado bajo el botón */}
-          {showCountries && (
-            <div
-              className="
-                absolute left-1/2 -translate-x-1/2 z-40 mt-2
-                w-[min(90vw,560px)]
-                rounded-lg border border-gray-700 bg-black/90 backdrop-blur
-                p-2 shadow-2xl
-                max-h-none overflow-visible
-              "
-            >
+        {/* Botón País (siempre al final, a la derecha de Entretenimiento) */}
+        <button
+          type="button"
+          onClick={() => setShowCountryMenu(true)}
+          className={`px-3 py-1.5 rounded-full text-sm border transition ${
+            typeof selectedCategory === "string" &&
+            selectedCategory.startsWith("País:")
+              ? "bg-rose-600 text-white border-rose-500"
+              : "bg-white/5 text-gray-200 border-white/10 hover:bg-white/10"
+          }`}
+        >
+          País
+        </button>
+      </div>
+
+      {/* Overlay del menú de países (no queda oculto por nada) */}
+      {showCountryMenu && (
+        <div
+          className="fixed inset-0 z-50"
+          aria-modal="true"
+          role="dialog"
+          onClick={() => setShowCountryMenu(false)}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/40" />
+
+          {/* Panel centrado */}
+          <div
+            className="absolute left-1/2 top-20 -translate-x-1/2 w-[92vw] max-w-2xl rounded-xl border border-white/10 bg-[#0b1016] p-4 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-white">Selecciona un país</h3>
               <button
-                onClick={() => handleCountrySelect("")}
-                className={`w-full flex items-center gap-2 px-2 py-2 rounded text-sm ${
-                  !selectedCountry
-                    ? "bg-gray-800 text-white"
-                    : "text-gray-200 hover:bg-gray-800"
-                }`}
+                type="button"
+                onClick={() => setShowCountryMenu(false)}
+                className="text-xs text-gray-300 hover:text-white px-2 py-1 rounded bg-white/10"
               >
-                <span className="inline-block w-5 h-5 rounded bg-gray-700" />
-                Todos los países
+                Cerrar
               </button>
+            </div>
 
-              {/* Lista completa sin scroll (se superpone sobre el contenido) */}
-              <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-1">
-                {countryItems.map(({ country, flagUrl }) => (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[60vh] overflow-auto">
+              {countries.length === 0 ? (
+                <div className="col-span-full text-xs text-gray-400">
+                  No hay países disponibles.
+                </div>
+              ) : (
+                countries.map((c) => (
                   <button
-                    key={country}
-                    onClick={() => handleCountrySelect(country)}
-                    className={`w-full flex items-center gap-2 px-2 py-2 rounded text-sm ${
-                      selectedCountry === country
-                        ? "bg-gray-800 text-white"
-                        : "text-gray-200 hover:bg-gray-800"
-                    }`}
-                    title={country}
+                    key={c.country}
+                    type="button"
+                    onClick={() => handlePickCountry(c)}
+                    className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg px-2 py-2 text-left"
                   >
-                    {flagUrl ? (
+                    {c.flag ? (
                       <img
-                        src={flagUrl}
-                        alt={country}
-                        className="w-5 h-5 object-contain rounded"
+                        src={c.flag}
+                        alt={c.country}
+                        className="h-5 w-5 object-contain rounded-sm border border-white/10"
                         loading="lazy"
                       />
                     ) : (
-                      <span className="inline-block w-5 h-5 rounded bg-gray-700" />
+                      <div className="h-5 w-5 rounded-sm bg-white/10" />
                     )}
-                    <span className="truncate">{country}</span>
+                    <span className="text-sm text-gray-100 truncate">{c.country}</span>
                   </button>
-                ))}
-              </div>
+                ))
+              )}
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
