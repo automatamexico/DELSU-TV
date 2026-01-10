@@ -592,7 +592,7 @@ function AdminChannelForm() {
           </p>
         </div>
 
-        {/* Nombre (AGREGADO) */}
+        {/* Nombre */}
         <div className="md:col-span-2">
           <label className="block text-sm text-gray-300 mb-1">Nombre del canal</label>
           <input
@@ -698,7 +698,9 @@ function AdminChannelForm() {
                   className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500/40"
                 />
               </div>
-              {iconNote(ICON_URLS.roku)}
+              <div className="text-xs text-gray-400 flex items-end">
+                Ícono: <span className="ml-2 underline break-all">{ICON_URLS.roku}</span>
+              </div>
             </div>
           )}
         </div>
@@ -729,7 +731,9 @@ function AdminChannelForm() {
                   placeholder="https://youtube.com/@tu-canal"
                   className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500/40"
                 />
-                {iconNote(ICON_URLS.youtube)}
+                <div className="text-xs text-gray-400 flex items-end">
+                  Ícono: <span className="ml-2 underline break-all">{ICON_URLS.youtube}</span>
+                </div>
               </div>
             )}
           </div>
@@ -758,7 +762,9 @@ function AdminChannelForm() {
                   placeholder="https://facebook.com/tu-pagina"
                   className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500/40"
                 />
-                {iconNote(ICON_URLS.facebook)}
+                <div className="text-xs text-gray-400 flex items-end">
+                  Ícono: <span className="ml-2 underline break-all">{ICON_URLS.facebook}</span>
+                </div>
               </div>
             )}
           </div>
@@ -787,7 +793,9 @@ function AdminChannelForm() {
                   placeholder="https://www.tiktok.com/@tu-cuenta"
                   className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500/40"
                 />
-                {iconNote(ICON_URLS.tiktok)}
+                <div className="text-xs text-gray-400 flex items-end">
+                  Ícono: <span className="ml-2 underline break-all">{ICON_URLS.tiktok}</span>
+                </div>
               </div>
             )}
           </div>
@@ -816,7 +824,9 @@ function AdminChannelForm() {
                   placeholder="https://tusitio.com"
                   className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500/40"
                 />
-                {iconNote(ICON_URLS.website)}
+                <div className="text-xs text-gray-400 flex items-end">
+                  Ícono: <span className="ml-2 underline break-all">{ICON_URLS.website}</span>
+                </div>
               </div>
             )}
           </div>
@@ -932,14 +942,14 @@ function ChannelStatusPanel() {
                 <thead className="bg-gray-800/70">
                   <tr>
                     <th className="text-left px-3 py-2 border-b border-gray-700">Canal</th>
-                    <th className="text-left px-3 py-2 border-b border-gray-700">Vigencia (next_billing_at)</th>
+                    <th className="text-left px-3 py-2 border-b border-gray-700">Vigencia (billing_next_due_date)</th>
                   </tr>
                 </thead>
                 <tbody>
                   {list.map((c) => (
                     <tr key={c.id} className="odd:bg-gray-800/30">
                       <td className="px-3 py-2 border-b border-gray-800">{c.name || '—'}</td>
-                      <td className="px-3 py-2 border-b border-gray-800">{fmt(c.next_billing_at)}</td>
+                      <td className="px-3 py-2 border-b border-gray-800">{fmt(c.billing_next_due_date)}</td>
                     </tr>
                   ))}
                   {list.length === 0 && (
@@ -1066,7 +1076,7 @@ export default function AdminLoginPage() {
               decoding="async"
             />
           </div>
-          <button
+        <button
             onClick={handleLogout}
             className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg"
           >
