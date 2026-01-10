@@ -571,7 +571,7 @@ function AdminChannelForm() {
       )}
 
       <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {/* NUEVO: Propietario (correo) */}
+        {/* Propietario (correo) */}
         <div className="md:col-span-2">
           <label className="block text-sm text-gray-300 mb-1">Propietario (correo)</label>
           <input
@@ -584,6 +584,19 @@ function AdminChannelForm() {
           <p className="text-xs text-gray-400 mt-1">
             Se asignará el canal a este usuario (debe existir en <code>user_profiles</code>).
           </p>
+        </div>
+
+        {/* >>> AGREGADO: Nombre del canal <<< */}
+        <div className="md:col-span-2">
+          <label className="block text-sm text-gray-300 mb-1">Nombre del canal</label>
+          <input
+            name="name"
+            value={form.name}
+            onChange={onChange}
+            placeholder="Ej. Vision M"
+            className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500/40"
+            required
+          />
         </div>
 
         {/* País */}
@@ -652,7 +665,7 @@ function AdminChannelForm() {
           />
         </div>
 
-        {/* ======= Roku / Redes ======= */}
+        {/* ======= Roku / Redes (sin cambios) ======= */}
 
         <div className="md:col-span-2 pt-2">
           <button
@@ -682,7 +695,6 @@ function ChannelStatusPanel() {
     let mounted = true;
     (async () => {
       try {
-        // Activos (is_suspended = false)
         const { data: act, error: errA } = await supabase
           .from('channels')
           .select('*')
@@ -690,7 +702,6 @@ function ChannelStatusPanel() {
           .order('name', { ascending: true });
         if (errA) throw errA;
 
-        // Inactivos (is_suspended = true)
         const { data: ina, error: errI } = await supabase
           .from('channels')
           .select('*')
@@ -900,12 +911,12 @@ export default function AdminLoginPage() {
               decoding="async"
             />
           </div>
-        <button
-          onClick={handleLogout}
-          className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg"
-        >
-          Salir
-        </button>
+          <button
+            onClick={handleLogout}
+            className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg"
+          >
+            Salir
+          </button>
         </header>
 
         {/* PANELES EXISTENTES */}
@@ -914,7 +925,7 @@ export default function AdminLoginPage() {
         <AssignChannelOwnerPanel />
         <AdminChannelForm />
 
-        {/* NUEVO: Estado (activos/inactivos) al final */}
+        {/* Estado (activos/inactivos) al final */}
         <ChannelStatusPanel />
       </div>
     );
