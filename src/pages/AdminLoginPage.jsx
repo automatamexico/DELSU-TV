@@ -554,12 +554,6 @@ function AdminChannelForm() {
     }
   };
 
-  const iconNote = (url) => (
-    <div className="text-xs text-gray-400 flex items-end">
-      Ícono: <span className="ml-2 underline break-all">{url}</span>
-    </div>
-  );
-
   return (
     <div className="mt-8 bg-gray-800/70 backdrop-blur-lg border border-gray-700 rounded-2xl p-6">
       <div className="flex items-center gap-2 mb-4">
@@ -1076,7 +1070,7 @@ export default function AdminLoginPage() {
               decoding="async"
             />
           </div>
-        <button
+          <button
             onClick={handleLogout}
             className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg"
           >
