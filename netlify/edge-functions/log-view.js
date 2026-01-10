@@ -1,38 +1,30 @@
 // netlify/edge-functions/log-view.js
-import { env } from 'netlify:edge';
-
 export default async (request, context) => {
   try {
     const url = new URL(request.url);
     const channelId = url.searchParams.get('channel_id');
-    if (!channelId) {
-      return new Response('missing channel_id', { status: 400 });
-    }
+    if (!channelId) return new Response('missing channel_id', { status: 400 });
 
-    // IP del cliente (mejor esfuerzo)
+    // IP del cliente (best-effort)
     const ip =
       request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
       request.headers.get('x-nf-client-connection-ip') ||
       context.ip ||
       '0.0.0.0';
 
-    // Geo por Netlify Edge (sin servicios externos)
+    // País detectado por Netlify (edge geo)
     const country = context.geo?.country?.code || 'XX';
 
-    // Variables de entorno desde Edge
-    const SB_URL = env.get('REACT_APP_SUPABASE_URL');
-    const SB_KEY = env.get('REACT_APP_SUPABASE_ANON_KEY');
+    // Variables de entorno en runtime Edge
+    const SB_URL = Deno.env.get('REACT_APP_SUPABASE_URL');
+    const SB_KEY = Deno.env.get('REACT_APP_SUPABASE_ANON_KEY');
+    if (!SB_URL || !SB_KEY) return new Response('missing Supabase env', { status: 500 });
 
-    if (!SB_URL || !SB_KEY) {
-      return new Response('missing Supabase env', { status: 500 });
-    }
-
-    // Inserta registro (ajusta la tabla/columnas a tu esquema)
+    // Inserción en tu tabla (ajusta nombres si difieren)
     const payload = {
       channel_id: channelId,
       ip,
       country_code: country,
-      // opcional: timestamp en el edge
       viewed_at: new Date().toISOString(),
     };
 
@@ -58,5 +50,5 @@ export default async (request, context) => {
   }
 };
 
-// Mapea la ruta /log-view a esta función
+// Ruta pública para esta Edge Function
 export const config = { path: '/log-view' };
