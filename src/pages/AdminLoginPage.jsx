@@ -16,7 +16,6 @@ const ICON_URLS = {
 };
 // ===========================================================
 
-// Determina la URL de Supabase sin depender de exports adicionales
 const ENV_URL = process.env.REACT_APP_SUPABASE_URL?.trim();
 const FALLBACK_URL = 'https://uqzcnlmhmglzflkuzczk.supabase.co';
 const SB_URL = ENV_URL || FALLBACK_URL;
@@ -54,7 +53,7 @@ async function preflightAuthRelaxed() {
   };
   await tryFetch('/auth/v1/health', 'preflight:health');
   if (!details.ok) await tryFetch('/auth/v1/settings', 'preflight:settings');
-  return details; // informativo
+  return details;
 }
 
 /* =========================
@@ -158,7 +157,6 @@ function SuspendChannelPanel() {
         </div>
       </div>
 
-      {/* Modal de confirmación simple */}
       {confirmOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
           <div className="bg-gray-800 border border-gray-700 rounded-xl p-6 w-[min(480px,92vw)]">
@@ -441,22 +439,15 @@ function AdminChannelForm() {
 
   const onChange = (e) => {
     const { name, value, type, checked, files } = e.target;
-    if (type === 'file') {
-      setForm((s) => ({ ...s, posterFile: files?.[0] || null }));
-    } else if (type === 'checkbox') {
-      setForm((s) => ({ ...s, [name]: checked }));
-    } else {
-      setForm((s) => ({ ...s, [name]: value }));
-    }
+    if (type === 'file') setForm((s) => ({ ...s, posterFile: files?.[0] || null }));
+    else if (type === 'checkbox') setForm((s) => ({ ...s, [name]: checked }));
+    else setForm((s) => ({ ...s, [name]: value }));
   };
 
   const uploadPoster = async (file) => {
     if (!file) return null;
     const path = `posters/${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-    const up = await supabase.storage.from('avatars').upload(path, file, {
-      cacheControl: '0',
-      upsert: true,
-    });
+    const up = await supabase.storage.from('avatars').upload(path, file, { cacheControl: '0', upsert: true });
     if (up.error) throw up.error;
     const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
     return pub?.publicUrl || null;
@@ -468,9 +459,7 @@ function AdminChannelForm() {
     setSubmitting(true);
     try {
       let posterUrl = null;
-      if (form.posterFile) {
-        posterUrl = await uploadPoster(form.posterFile);
-      }
+      if (form.posterFile) posterUrl = await uploadPoster(form.posterFile);
 
       let ownerId = null;
       const emailOwner = form.ownerEmail?.trim().toLowerCase();
@@ -642,13 +631,7 @@ function AdminChannelForm() {
             <label className="inline-flex items-center gap-2 bg-gray-700/50 border border-gray-600 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-700">
               <Upload className="w-4 h-4" />
               <span>Subir imagen</span>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={onChange}
-                name="posterFile"
-                className="hidden"
-              />
+              <input type="file" accept="image/*" onChange={onChange} name="posterFile" className="hidden" />
             </label>
             <span className="text-xs text-gray-400 truncate max-w-[240px]">
               {form.posterFile ? form.posterFile.name : 'Sin archivo seleccionado'}
@@ -670,7 +653,6 @@ function AdminChannelForm() {
         </div>
 
         {/* ======= Roku / Redes ======= */}
-        {/* (se mantiene tal como lo tenías) */}
 
         <div className="md:col-span-2 pt-2">
           <button
@@ -700,29 +682,26 @@ function ChannelStatusPanel() {
     let mounted = true;
     (async () => {
       try {
-        // Activos: is_suspended = false OR NULL
+        // Activos (is_suspended = false)
         const { data: act, error: errA } = await supabase
           .from('channels')
-          .select('id,name,next_billing_at,is_suspended')
-          .or('is_suspended.is.false,is_suspended.is.null')
+          .select('*')
+          .eq('is_suspended', false)
           .order('name', { ascending: true });
-
         if (errA) throw errA;
 
-        // Inactivos: is_suspended = true
+        // Inactivos (is_suspended = true)
         const { data: ina, error: errI } = await supabase
           .from('channels')
-          .select('id,name,next_billing_at,is_suspended')
+          .select('*')
           .eq('is_suspended', true)
           .order('name', { ascending: true });
-
         if (errI) throw errI;
 
         if (!mounted) return;
         setActive(act || []);
         setInactive(ina || []);
       } catch (e) {
-        // eslint-disable-next-line no-console
         console.error('[ChannelStatusPanel] load error', e);
         if (!mounted) return;
         setActive([]);
@@ -836,7 +815,6 @@ export default function AdminLoginPage() {
   const log = (label, data) => {
     const line = `[${ts()}] ${label}${data !== undefined ? ` | ${safe(data)}` : ''}`;
     setSteps((s) => [...s, line]);
-    // eslint-disable-next-line no-console
     console.log('[Admin]', line, data);
   };
 
@@ -892,7 +870,6 @@ export default function AdminLoginPage() {
         return;
       }
 
-      // Si es admin, simplemente permanece en /admin y verá el formulario.
       log('5) OK admin: mostrar formulario en esta misma página.');
     } catch (e2) {
       setErr(e2?.message || String(e2));
@@ -923,12 +900,12 @@ export default function AdminLoginPage() {
               decoding="async"
             />
           </div>
-          <button
-            onClick={handleLogout}
-            className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg"
-          >
-            Salir
-          </button>
+        <button
+          onClick={handleLogout}
+          className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg"
+        >
+          Salir
+        </button>
         </header>
 
         {/* PANELES EXISTENTES */}
@@ -937,13 +914,12 @@ export default function AdminLoginPage() {
         <AssignChannelOwnerPanel />
         <AdminChannelForm />
 
-        {/* NUEVO: Estado (activos/inactivos) al final, como pediste */}
+        {/* NUEVO: Estado (activos/inactivos) al final */}
         <ChannelStatusPanel />
       </div>
     );
   }
 
-  // Si NO es admin, renderiza el login (igual que antes)
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center p-4 text-white">
       <motion.div
@@ -1014,7 +990,7 @@ export default function AdminLoginPage() {
           <motion.button
             type="submit"
             disabled={loading}
-            className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-all duración-300"
+            className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-all duration-300"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
