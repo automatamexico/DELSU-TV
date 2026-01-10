@@ -4,6 +4,44 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 
+// 🔹 MiniPlayer: autoplay, loop, proporción 16:9 y botón SOLO para mute
+function MiniPlayer({ src }) {
+  const videoRef = React.useRef(null);
+  const [muted, setMuted] = React.useState(true);
+
+  React.useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.muted = muted;
+    // intentar reproducir en silencio (autoplay en móviles)
+    v.play().catch(() => {});
+  }, [muted]);
+
+  return (
+    <div className="mt-2 rounded-lg overflow-hidden bg-black relative aspect-video">
+      <video
+        ref={videoRef}
+        className="w-full h-full"
+        src={src}
+        autoPlay
+        muted={muted}
+        loop
+        playsInline
+        controls={false}
+        preload="metadata"
+      />
+      <button
+        onClick={() => setMuted((m) => !m)}
+        className="absolute bottom-2 right-2 px-2 py-1 text-xs rounded bg-black/60 hover:bg-black/80 border border-white/20"
+        aria-label={muted ? 'Quitar mute' : 'Silenciar'}
+        title={muted ? 'Quitar mute' : 'Silenciar'}
+      >
+        {muted ? 'Quitar mute' : 'Silenciar'}
+      </button>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   // ⬇️ además de signOut, usamos user para filtrar
   const { user, signOut } = useAuth();
@@ -99,34 +137,21 @@ export default function DashboardPage() {
                 <div className="font-semibold">{c.name}</div>
                 <div className="text-sm text-gray-400">{c.country} • {c.category}</div>
 
-                {/* 🔁 Reemplazo: player autoplay muted (usa póster solo si no hay stream_url) */}
+                {/* ▶️ Player proporcional 16:9 con botón para (des)mutear */}
                 {c.stream_url ? (
-                  <video
-                    className="w-full h-36 rounded-lg mt-2 bg-black"
-                    src={c.stream_url}
-                    autoPlay
-                    muted
-                    loop
-                    playsInline
-                    controls={false}
-                    preload="none"
-                  />
+                  <MiniPlayer src={c.stream_url} />
                 ) : (
                   c.poster && (
                     <img
                       src={c.poster}
                       alt={c.name}
-                      className="w-full h-36 object-cover rounded-lg mt-2"
+                      className="w-full rounded-lg mt-2"
                       loading="lazy"
                     />
                   )
                 )}
 
-                {c.stream_url && (
-                  <div className="mt-2 text-xs break-all text-gray-300">
-                    {c.stream_url}
-                  </div>
-                )}
+                {/* ❌ Ya no mostramos la URL del m3u8 */}
               </div>
             ))}
           </div>
