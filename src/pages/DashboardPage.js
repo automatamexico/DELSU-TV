@@ -13,7 +13,6 @@ function MiniPlayer({ src }) {
     const v = videoRef.current;
     if (!v) return;
     v.muted = muted;
-    // intentar reproducir en silencio (autoplay en móviles)
     v.play().catch(() => {});
   }, [muted]);
 
@@ -39,6 +38,30 @@ function MiniPlayer({ src }) {
         {muted ? 'Quitar mute' : 'Silenciar'}
       </button>
     </div>
+  );
+}
+
+// 🔹 util: formatear fecha “10 Enero 2026”
+function formatLongDate(d) {
+  if (!d) return '—';
+  const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return '—';
+  return dt.toLocaleDateString('es-MX', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+// 🔹 util: estrellas (usa rating_stars o rating si existe)
+function Stars({ value = 0, max = 5 }) {
+  const v = Math.max(0, Math.min(max, Number(value) || 0));
+  return (
+    <span aria-label={`Calificación: ${v} de ${max}`}>
+      {Array.from({ length: max }).map((_, i) => (
+        <span key={i}>{i < v ? '★' : '☆'}</span>
+      ))}
+    </span>
   );
 }
 
@@ -71,7 +94,9 @@ export default function DashboardPage() {
 
         const { data, error } = await supabase
           .from('channels')
-          .select('id,name,poster,stream_url,country,category')
+          .select(
+            'id,name,poster,stream_url,country,category,is_suspended,billing_next_due_date,views_count,rating_stars,rating'
+          )
           .eq('owner_user_id', user.id)
           .order('created_at', { ascending: false });
 
@@ -84,7 +109,9 @@ export default function DashboardPage() {
       }
     };
     load();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [user?.id]);
 
   return (
@@ -134,24 +161,73 @@ export default function DashboardPage() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {channels.map((c) => (
               <div key={c.id} className="bg-gray-800/60 border border-gray-700 rounded-xl p-4">
+                {/* Cabecera del canal */}
                 <div className="font-semibold">{c.name}</div>
-                <div className="text-sm text-gray-400">{c.country} • {c.category}</div>
+                <div className="text-sm text-gray-400">
+                  {c.country} • {c.category}
+                </div>
 
-                {/* ▶️ Player proporcional 16:9 con botón para (des)mutear */}
-                {c.stream_url ? (
-                  <MiniPlayer src={c.stream_url} />
-                ) : (
-                  c.poster && (
-                    <img
-                      src={c.poster}
-                      alt={c.name}
-                      className="w-full rounded-lg mt-2"
-                      loading="lazy"
-                    />
-                  )
-                )}
+                {/* Layout: player a la izquierda, info a la derecha (en pantallas medianas+) */}
+                <div className="mt-2 grid md:grid-cols-2 gap-4 items-start">
+                  {/* ▶️ Player proporcional 16:9 con botón para (des)mutear */}
+                  <div>
+                    {c.stream_url ? (
+                      <MiniPlayer src={c.stream_url} />
+                    ) : (
+                      c.poster && (
+                        <img
+                          src={c.poster}
+                          alt={c.name}
+                          className="w-full rounded-lg"
+                          loading="lazy"
+                        />
+                      )
+                    )}
+                  </div>
 
-                {/* ❌ Ya no mostramos la URL del m3u8 */}
+                  {/* ℹ️ Panel de información */}
+                  <div className="text-sm space-y-3">
+                    {/* 1) Estatus del canal */}
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">Estatus del Canal :</span>
+                      <span
+                        className={
+                          (c.is_suspended ? 'bg-red-600/80' : 'bg-green-600/80') +
+                          ' text-black font-semibold px-2 py-0.5 rounded'
+                        }
+                      >
+                        {c.is_suspended ? 'Inactivo' : 'Activo'}
+                      </span>
+                    </div>
+
+                    {/* 2) Próximo pago (billing_next_due_date) */}
+                    <div>
+                      <span className="font-semibold">Próximo pago:</span>{' '}
+                      {formatLongDate(c.billing_next_due_date)}
+                    </div>
+
+                    {/* 3) Número acumulado de Vistas (views_count) */}
+                    <div>
+                      <span className="font-semibold">Número acumulado de Vistas :</span>{' '}
+                      {typeof c.views_count === 'number' ? c.views_count : 0}
+                    </div>
+
+                    {/* 4) Calificación del Canal */}
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">Calificación del Canal:</span>
+                      <Stars value={c.rating_stars ?? c.rating ?? 0} />
+                    </div>
+
+                    {/* 5) Botón Pagar Renovación */}
+                    <div className="pt-1">
+                      <button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg">
+                        Pagar Renovación
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ❌ La URL del m3u8 NO se muestra */}
               </div>
             ))}
           </div>
