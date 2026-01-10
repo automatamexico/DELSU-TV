@@ -65,15 +65,14 @@ function Stars({ value = 0, max = 5 }) {
   );
 }
 
-// 🔹 regla de estrellas basada en views_count
+// 🔹 regla de estrellas basada en views_count (según tu especificación)
 function computeStars(views) {
   const v = Number(views) || 0;
-  if (v >= 1000) return 5;
-  if (v >= 500) return 4;
-  if (v >= 100) return 3;
-  if (v >= 25) return 2;
-  if (v > 0) return 1;
-  return 0;
+  if (v <= 10) return 0;         // 0 a 10 → 0★
+  if (v <= 100) return 1;        // 11 a 100 → 1★
+  if (v <= 200) return 3;        // 101 a 200 → 3★
+  if (v <= 300) return 4;        // 201 a 300 → 4★
+  return 5;                      // 301+ → 5★
 }
 
 export default function DashboardPage() {
@@ -178,9 +177,9 @@ export default function DashboardPage() {
                   {c.country} • {c.category}
                 </div>
 
-                {/* Layout: player a la izquierda, info a la derecha (en pantallas medianas+) */}
+                {/* Layout: player a la izquierda, info a la derecha */}
                 <div className="mt-2 grid md:grid-cols-2 gap-4 items-start">
-                  {/* ▶️ Player proporcional 16:9 con botón para (des)mutear */}
+                  {/* ▶️ Player */}
                   <div>
                     {c.stream_url ? (
                       <MiniPlayer src={c.stream_url} />
@@ -198,7 +197,7 @@ export default function DashboardPage() {
 
                   {/* ℹ️ Panel de información */}
                   <div className="text-sm space-y-3">
-                    {/* 1) Estatus del canal */}
+                    {/* 1) Estatus */}
                     <div className="flex items-center gap-2">
                       <span className="font-semibold">Estatus del Canal :</span>
                       <span
@@ -211,19 +210,19 @@ export default function DashboardPage() {
                       </span>
                     </div>
 
-                    {/* 2) Próximo pago (billing_next_due_date) */}
+                    {/* 2) Próximo pago */}
                     <div>
                       <span className="font-semibold">Próximo pago:</span>{' '}
                       {formatLongDate(c.billing_next_due_date)}
                     </div>
 
-                    {/* 3) Número acumulado de Vistas (views_count) */}
+                    {/* 3) Vistas */}
                     <div>
                       <span className="font-semibold">Número acumulado de Vistas :</span>{' '}
                       {typeof c.views_count === 'number' ? c.views_count : 0}
                     </div>
 
-                    {/* 4) Calificación del Canal (calculada por views_count) */}
+                    {/* 4) Calificación (estrellas calculadas) */}
                     <div className="flex items-center gap-2">
                       <span className="font-semibold">Calificación del Canal:</span>
                       <Stars value={computeStars(c.views_count)} />
@@ -238,7 +237,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {/* ❌ La URL del m3u8 NO se muestra */}
+                {/* La URL del m3u8 NO se muestra */}
               </div>
             ))}
           </div>
