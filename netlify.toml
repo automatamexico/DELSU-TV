@@ -33,3 +33,7 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+  [edge_functions]
+directory = "netlify/edge-functions"
+
