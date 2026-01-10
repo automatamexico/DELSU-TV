@@ -98,14 +98,30 @@ export default function DashboardPage() {
               <div key={c.id} className="bg-gray-800/60 border border-gray-700 rounded-xl p-4">
                 <div className="font-semibold">{c.name}</div>
                 <div className="text-sm text-gray-400">{c.country} • {c.category}</div>
-                {c.poster && (
-                  <img
-                    src={c.poster}
-                    alt={c.name}
-                    className="w-full h-36 object-cover rounded-lg mt-2"
-                    loading="lazy"
+
+                {/* 🔁 Reemplazo: player autoplay muted (usa póster solo si no hay stream_url) */}
+                {c.stream_url ? (
+                  <video
+                    className="w-full h-36 rounded-lg mt-2 bg-black"
+                    src={c.stream_url}
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    controls={false}
+                    preload="none"
                   />
+                ) : (
+                  c.poster && (
+                    <img
+                      src={c.poster}
+                      alt={c.name}
+                      className="w-full h-36 object-cover rounded-lg mt-2"
+                      loading="lazy"
+                    />
+                  )
                 )}
+
                 {c.stream_url && (
                   <div className="mt-2 text-xs break-all text-gray-300">
                     {c.stream_url}
