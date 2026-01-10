@@ -53,7 +53,7 @@ function formatLongDate(d) {
   });
 }
 
-// 🔹 util: estrellas (usa rating_stars o rating si existe)
+// 🔹 util: estrellas (render)
 function Stars({ value = 0, max = 5 }) {
   const v = Math.max(0, Math.min(max, Number(value) || 0));
   return (
@@ -63,6 +63,17 @@ function Stars({ value = 0, max = 5 }) {
       ))}
     </span>
   );
+}
+
+// 🔹 regla de estrellas basada en views_count
+function computeStars(views) {
+  const v = Number(views) || 0;
+  if (v >= 1000) return 5;
+  if (v >= 500) return 4;
+  if (v >= 100) return 3;
+  if (v >= 25) return 2;
+  if (v > 0) return 1;
+  return 0;
 }
 
 export default function DashboardPage() {
@@ -95,7 +106,7 @@ export default function DashboardPage() {
         const { data, error } = await supabase
           .from('channels')
           .select(
-            'id,name,poster,stream_url,country,category,is_suspended,billing_next_due_date,views_count,rating_stars,rating'
+            'id,name,poster,stream_url,country,category,is_suspended,billing_next_due_date,views_count'
           )
           .eq('owner_user_id', user.id)
           .order('created_at', { ascending: false });
@@ -212,10 +223,10 @@ export default function DashboardPage() {
                       {typeof c.views_count === 'number' ? c.views_count : 0}
                     </div>
 
-                    {/* 4) Calificación del Canal */}
+                    {/* 4) Calificación del Canal (calculada por views_count) */}
                     <div className="flex items-center gap-2">
                       <span className="font-semibold">Calificación del Canal:</span>
-                      <Stars value={c.rating_stars ?? c.rating ?? 0} />
+                      <Stars value={computeStars(c.views_count)} />
                     </div>
 
                     {/* 5) Botón Pagar Renovación */}
