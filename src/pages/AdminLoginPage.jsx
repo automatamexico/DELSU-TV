@@ -554,6 +554,12 @@ function AdminChannelForm() {
     }
   };
 
+  const iconNote = (url) => (
+    <div className="text-xs text-gray-400 flex items-end">
+      Ícono: <span className="ml-2 underline break-all">{url}</span>
+    </div>
+  );
+
   return (
     <div className="mt-8 bg-gray-800/70 backdrop-blur-lg border border-gray-700 rounded-2xl p-6">
       <div className="flex items-center gap-2 mb-4">
@@ -586,7 +592,7 @@ function AdminChannelForm() {
           </p>
         </div>
 
-        {/* >>> AGREGADO: Nombre del canal <<< */}
+        {/* Nombre (AGREGADO) */}
         <div className="md:col-span-2">
           <label className="block text-sm text-gray-300 mb-1">Nombre del canal</label>
           <input
@@ -665,7 +671,156 @@ function AdminChannelForm() {
           />
         </div>
 
-        {/* ======= Roku / Redes (sin cambios) ======= */}
+        {/* ======= Roku ======= */}
+        <div className="md:col-span-2 border-t border-gray-700 pt-4">
+          <div className="flex items-center gap-3 mb-3">
+            <input
+              id="rokuEnabled"
+              name="rokuEnabled"
+              type="checkbox"
+              checked={form.rokuEnabled}
+              onChange={onChange}
+              className="h-4 w-4"
+            />
+            <label htmlFor="rokuEnabled" className="text-sm text-gray-200 font-medium">
+              Roku (usar ícono común y capturar URL del canal en Roku)
+            </label>
+          </div>
+          {form.rokuEnabled && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-gray-300 mb-1">URL de Roku</label>
+                <input
+                  name="roku_link_url"
+                  value={form.roku_link_url}
+                  onChange={onChange}
+                  placeholder="https://channelstore.roku.com/..."
+                  className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500/40"
+                />
+              </div>
+              {iconNote(ICON_URLS.roku)}
+            </div>
+          )}
+        </div>
+
+        {/* ======= Redes ======= */}
+        <div className="md:col-span-2 border-t border-gray-700 pt-4 space-y-5">
+          {/* YouTube */}
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <input
+                id="youtubeEnabled"
+                name="youtubeEnabled"
+                type="checkbox"
+                checked={form.youtubeEnabled}
+                onChange={onChange}
+                className="h-4 w-4"
+              />
+              <label htmlFor="youtubeEnabled" className="text-sm text-gray-200 font-medium">
+                YouTube
+              </label>
+            </div>
+            {form.youtubeEnabled && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input
+                  name="youtube_url"
+                  value={form.youtube_url}
+                  onChange={onChange}
+                  placeholder="https://youtube.com/@tu-canal"
+                  className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500/40"
+                />
+                {iconNote(ICON_URLS.youtube)}
+              </div>
+            )}
+          </div>
+
+          {/* Facebook */}
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <input
+                id="facebookEnabled"
+                name="facebookEnabled"
+                type="checkbox"
+                checked={form.facebookEnabled}
+                onChange={onChange}
+                className="h-4 w-4"
+              />
+              <label htmlFor="facebookEnabled" className="text-sm text-gray-200 font-medium">
+                Facebook
+              </label>
+            </div>
+            {form.facebookEnabled && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input
+                  name="facebook_url"
+                  value={form.facebook_url}
+                  onChange={onChange}
+                  placeholder="https://facebook.com/tu-pagina"
+                  className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500/40"
+                />
+                {iconNote(ICON_URLS.facebook)}
+              </div>
+            )}
+          </div>
+
+          {/* TikTok */}
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <input
+                id="tiktokEnabled"
+                name="tiktokEnabled"
+                type="checkbox"
+                checked={form.tiktokEnabled}
+                onChange={onChange}
+                className="h-4 w-4"
+              />
+              <label htmlFor="tiktokEnabled" className="text-sm text-gray-200 font-medium">
+                TikTok
+              </label>
+            </div>
+            {form.tiktokEnabled && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input
+                  name="tiktok_url"
+                  value={form.tiktok_url}
+                  onChange={onChange}
+                  placeholder="https://www.tiktok.com/@tu-cuenta"
+                  className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500/40"
+                />
+                {iconNote(ICON_URLS.tiktok)}
+              </div>
+            )}
+          </div>
+
+          {/* Website */}
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <input
+                id="websiteEnabled"
+                name="websiteEnabled"
+                type="checkbox"
+                checked={form.websiteEnabled}
+                onChange={onChange}
+                className="h-4 w-4"
+              />
+              <label htmlFor="websiteEnabled" className="text-sm text-gray-200 font-medium">
+                Sitio web
+              </label>
+            </div>
+            {form.websiteEnabled && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input
+                  name="website_url"
+                  value={form.website_url}
+                  onChange={onChange}
+                  placeholder="https://tusitio.com"
+                  className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500/40"
+                />
+                {iconNote(ICON_URLS.website)}
+              </div>
+            )}
+          </div>
+        </div>
 
         <div className="md:col-span-2 pt-2">
           <button
