@@ -8,6 +8,9 @@ export default function VideoPlayer({ channel, onClose }) {
   const [needUserGesture, setNeedUserGesture] = useState(false);
   const [nativeError, setNativeError] = useState(null);
 
+  // 🔒 Bloquear menú contextual (clic derecho)
+  const blockContext = (e) => e.preventDefault();
+
   // Resuelve src del canal (ajusta a tus claves reales)
   const src = useMemo(() => {
     return (
@@ -116,7 +119,10 @@ export default function VideoPlayer({ channel, onClose }) {
   };
 
   return (
-    <div className="relative">
+    <div
+      className="relative select-none"
+      onContextMenu={blockContext}
+    >
       {/* Vídeo: pide autoplay en silencio */}
       <video
         ref={videoRef}
@@ -127,6 +133,10 @@ export default function VideoPlayer({ channel, onClose }) {
         autoPlay
         controls
         preload="auto"
+        // 🔒 Bloqueos del navegador
+        onContextMenu={blockContext}
+        controlsList="nodownload noplaybackrate"
+        disablePictureInPicture
         // si quieres iniciar siempre silenciado, deja muted en true.
         // el overlay lo desmutea tras clic.
         onPlay={() => setNeedUserGesture(false)}
