@@ -64,7 +64,7 @@ export default function ChannelGeoMap({ channelId, className = "" }) {
   return (
     <div
       className={
-        "bg-gray-800/60 border border-gray-700 rounded-2xl px-3 pt-1 pb-2 " +
+        "bg-gray-800/60 border border-gray-700 rounded-2xl px-3 pt-1 pb-1 " +
         className
       }
     >
@@ -79,7 +79,7 @@ export default function ChannelGeoMap({ channelId, className = "" }) {
         )}
       </div>
 
-      {/* Subimos el mapa y le damos más altura visible */}
+      {/* Mapa alto y pegado arriba */}
       <div className="-mt-6 md:-mt-8 lg:-mt-12">
         <div className="w-full h-[460px] md:h-[560px] lg:h-[660px]">
           <ComposableMap
@@ -122,8 +122,8 @@ export default function ChannelGeoMap({ channelId, className = "" }) {
         </div>
       </div>
 
-      {/* Texto y leyenda compactos dentro de la tarjeta */}
-      <div className="mt-2 text-sm text-gray-300 h-5">
+      {/* Texto: más arriba */}
+      <div className="mt-1 -mb-1 text-sm text-gray-300 h-5">
         {hover ? (
           <span>
             {hover.name}: <strong>{fmtNumber(hover.views)}</strong> reproducciones
@@ -135,6 +135,7 @@ export default function ChannelGeoMap({ channelId, className = "" }) {
         )}
       </div>
 
+      {/* Leyenda compacta */}
       <div className="mt-2 grid grid-cols-5 gap-2 text-[10px] md:text-[11px] text-gray-300">
         {[
           { l: "0", c: "rgba(59,130,246,0.08)" },
