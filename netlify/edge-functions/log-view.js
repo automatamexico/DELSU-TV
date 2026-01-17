@@ -1,7 +1,6 @@
 // netlify/edge-functions/log-view.js
 export default async (request, context) => {
   try {
-    // ✅ Permitir GET/POST (y devolver OK en OPTIONS para preflight si llega)
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204 });
     }
@@ -15,12 +14,10 @@ export default async (request, context) => {
       );
     }
 
-    // 🌎 Geo de Netlify Edge
     const geo = context?.geo || {};
     const countryCode = (geo.country?.code || "UN").toUpperCase();
     const countryName = geo.country?.name || "Unknown";
 
-    // 🔐 Credenciales seguras (Environment variables en Netlify)
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_KEY");
     if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
@@ -39,7 +36,7 @@ export default async (request, context) => {
       Prefer: "return=representation",
     };
 
-    // 1) UPDATE: sumar 1 si ya existe la fila para (channel_id, country_code)
+    // UPDATE: sumar 1 si ya existe el país
     const updateRes = await fetch(
       `${SUPABASE_URL}/rest/v1/${table}?channel_id=eq.${channelId}&country_code=eq.${countryCode}`,
       {
@@ -59,7 +56,7 @@ export default async (request, context) => {
       geoOk = Array.isArray(upd) && upd.length > 0;
     }
 
-    // 2) INSERT si no existía
+    // INSERT si no existía
     if (!geoOk) {
       const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
         method: "POST",
@@ -84,16 +81,8 @@ export default async (request, context) => {
       }
     }
 
-    // 3) Mantener sincronía con Home: incrementar channels.views_count
-    // (Ignoramos el resultado; si falla no rompemos el flujo)
-    await fetch(`${SUPABASE_URL}/rest/v1/channels?id=eq.${channelId}`, {
-      method: "PATCH",
-      headers,
-      body: JSON.stringify({
-        views_count: { increment: 1 },
-        updated_at: now,
-      }),
-    });
+    // 👇 Ya NO tocamos public.channels aquí.
+    // El trigger mantiene channels.views_count en sincronía.
 
     return new Response(
       JSON.stringify({
