@@ -66,7 +66,7 @@ function Stars({ value = 0, max = 5 }) {
   );
 }
 
-// 🔹 regla de estrellas basada en views_count (según tu especificación)
+// 🔹 regla de estrellas basada en views_count
 function computeStars(views) {
   const v = Number(views) || 0;
   if (v <= 10) return 0;         // 0 a 10 → 0★
@@ -77,7 +77,6 @@ function computeStars(views) {
 }
 
 export default function DashboardPage() {
-  // ⬇️ además de signOut, usamos user para filtrar
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
@@ -89,12 +88,10 @@ export default function DashboardPage() {
     try {
       await signOut();
     } finally {
-      // Ir al Home
       navigate('/', { replace: true });
     }
   };
 
-  // ⬇️ carga de canales del dueño autenticado
   React.useEffect(() => {
     let alive = true;
     const load = async () => {
@@ -120,9 +117,7 @@ export default function DashboardPage() {
       }
     };
     load();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, [user?.id]);
 
   return (
@@ -130,7 +125,6 @@ export default function DashboardPage() {
       {/* Top bar */}
       <header className="px-6 py-4 border-b border-gray-800">
         <div className="grid grid-cols-3 items-center">
-          {/* Izquierda: logo */}
           <div className="flex items-center">
             <img
               src="https://uqzcnlmhmglzflkuzczk.supabase.co/storage/v1/object/public/avatars/logo_hispana_blanco.png"
@@ -139,11 +133,7 @@ export default function DashboardPage() {
               loading="lazy"
             />
           </div>
-
-          {/* Centro: título */}
           <h1 className="text-xl font-semibold text-center">Tablero de Control</h1>
-
-          {/* Derecha: botón salir */}
           <div className="flex justify-end">
             <button
               onClick={handleLogout}
@@ -169,86 +159,79 @@ export default function DashboardPage() {
         )}
 
         {!loading && !err && channels.length > 0 && (
-          <>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {channels.map((c) => (
-                <div key={c.id} className="bg-gray-800/60 border border-gray-700 rounded-xl p-4">
-                  {/* Cabecera del canal */}
-                  <div className="font-semibold">{c.name}</div>
-                  <div className="text-sm text-gray-400">
-                    {c.country} • {c.category}
-                  </div>
-
-                  {/* Layout: player a la izquierda, info a la derecha */}
-                  <div className="mt-2 grid md:grid-cols-2 gap-4 items-start">
-                    {/* ▶️ Player */}
-                    <div>
-                      {c.stream_url ? (
-                        <MiniPlayer src={c.stream_url} />
-                      ) : (
-                        c.poster && (
-                          <img
-                            src={c.poster}
-                            alt={c.name}
-                            className="w-full rounded-lg"
-                            loading="lazy"
-                          />
-                        )
-                      )}
+          <div className="grid lg:grid-cols-3 gap-4 items-start">
+            {/* Columna izquierda: tarjetas (igual que ya tenías) */}
+            <div className="lg:col-span-1">
+              <div className="space-y-4">
+                {channels.map((c) => (
+                  <div key={c.id} className="bg-gray-800/60 border border-gray-700 rounded-xl p-4">
+                    <div className="font-semibold">{c.name}</div>
+                    <div className="text-sm text-gray-400">
+                      {c.country} • {c.category}
                     </div>
 
-                    {/* ℹ️ Panel de información */}
-                    <div className="text-sm space-y-3">
-                      {/* 1) Estatus */}
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold">Estatus del Canal :</span>
-                        <span
-                          className={
-                            (c.is_suspended ? 'bg-red-600/80' : 'bg-green-600/80') +
-                            ' text-black font-semibold px-2 py-0.5 rounded'
-                          }
-                        >
-                          {c.is_suspended ? 'Inactivo' : 'Activo'}
-                        </span>
-                      </div>
-
-                      {/* 2) Próximo pago */}
+                    <div className="mt-2 grid md:grid-cols-2 gap-4 items-start">
                       <div>
-                        <span className="font-semibold">Próximo pago:</span>{' '}
-                        {formatLongDate(c.billing_next_due_date)}
+                        {c.stream_url ? (
+                          <MiniPlayer src={c.stream_url} />
+                        ) : (
+                          c.poster && (
+                            <img
+                              src={c.poster}
+                              alt={c.name}
+                              className="w-full rounded-lg"
+                              loading="lazy"
+                            />
+                          )
+                        )}
                       </div>
 
-                      {/* 3) Vistas */}
-                      <div>
-                        <span className="font-semibold">Número acumulado de Vistas :</span>{' '}
-                        {typeof c.views_count === 'number' ? c.views_count : 0}
-                      </div>
+                      <div className="text-sm space-y-3">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">Estatus del Canal :</span>
+                          <span
+                            className={
+                              (c.is_suspended ? 'bg-red-600/80' : 'bg-green-600/80') +
+                              ' text-black font-semibold px-2 py-0.5 rounded'
+                            }
+                          >
+                            {c.is_suspended ? 'Inactivo' : 'Activo'}
+                          </span>
+                        </div>
 
-                      {/* 4) Calificación (estrellas calculadas) */}
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold">Calificación del Canal:</span>
-                        <Stars value={computeStars(c.views_count)} />
-                      </div>
+                        <div>
+                          <span className="font-semibold">Próximo pago:</span>{' '}
+                          {formatLongDate(c.billing_next_due_date)}
+                        </div>
 
-                      {/* 5) Botón Pagar Renovación */}
-                      <div className="pt-1">
-                        <button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg">
-                          Pagar Renovación
-                        </button>
+                        <div>
+                          <span className="font-semibold">Número acumulado de Vistas :</span>{' '}
+                          {typeof c.views_count === 'number' ? c.views_count : 0}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">Calificación del Canal:</span>
+                          <Stars value={computeStars(c.views_count)} />
+                        </div>
+
+                        <div className="pt-1">
+                          <button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg">
+                            Pagar Renovación
+                          </button>
+                        </div>
                       </div>
                     </div>
+                    {/* La URL del m3u8 NO se muestra */}
                   </div>
-
-                  {/* La URL del m3u8 NO se muestra */}
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
 
-            {/* ⬇️ Mapa de audiencia por país (usa el primer canal del dueño) */}
-            <div className="mt-6 max-w-[900px] ml-auto">
-              <ChannelGeoMap channelId={channels[0].id} />
+            {/* Columna derecha: mapa (arriba y más grande) */}
+            <div className="lg:col-span-2">
+              <ChannelGeoMap channelId={channels[0].id} className="h-[560px]" />
             </div>
-          </>
+          </div>
         )}
       </main>
     </div>
