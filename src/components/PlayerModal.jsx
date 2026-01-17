@@ -1,13 +1,31 @@
 // src/components/PlayerModal.jsx
-import React from "react";
+import React, { useEffect } from "react";
 import { X } from "lucide-react";
 import VideoPlayer from "./VideoPlayer";
 import useIncrementView from "../hooks/useIncrementView";
+
+// 🔔 Enviar ping al Edge para registrar la vista geolocalizada
+function logGeoView(channelId) {
+  if (!channelId) return;
+  const url = `/log-view?channel_id=${encodeURIComponent(channelId)}`;
+  if (navigator.sendBeacon) {
+    navigator.sendBeacon(url);
+  } else {
+    fetch(url, { method: "POST", keepalive: true });
+  }
+}
 
 export default function PlayerModal({ open, onClose, channel }) {
   // Cuenta la vista UNA sola vez cuando hay modal abierto con canal válido
   const channelId = open && channel?.id ? channel.id : null;
   useIncrementView(channelId);
+
+  // ➕ Registrar vista geolocalizada cuando se abre el modal con canal válido
+  useEffect(() => {
+    if (open && channel?.id) {
+      logGeoView(channel.id);
+    }
+  }, [open, channel?.id]);
 
   if (!open || !channel) return null;
 
