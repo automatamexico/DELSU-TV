@@ -1,4 +1,3 @@
-// src/hooks/useIncrementView.js
 import { useEffect } from "react";
 
 export default function useIncrementView(channelId) {
@@ -6,21 +5,41 @@ export default function useIncrementView(channelId) {
     if (!channelId) return;
     let cancelled = false;
 
-    (async () => {
-      try {
-        // Llama SIEMPRE al abrir el modal (sin antiduplicado).
-        const url = `/log-view?channel_id=${encodeURIComponent(channelId)}&t=${Date.now()}`;
-        await fetch(url, {
-          method: "GET",
-          headers: { "cache-control": "no-cache" },
-          // no 'no-cors': queremos ver errores si los hay
-        });
-      } catch (e) {
-        // opcional: console.warn("log-view failed", e);
-      }
-      if (cancelled) return;
-    })();
+    const hit = async () => {
+      // usa URL absoluta para evitar cualquier basePath/SPA redirect raro
+      const url = `${window.location.origin}/log-view?channel_id=${encodeURIComponent(
+        channelId
+      )}&t=${Date.now()}`;
 
+      try {
+        const res = await fetch(url, {
+          method: "GET",
+          headers: {
+            "cache-control": "no-cache",
+            "content-type": "application/json",
+          },
+          // mismo origen, no hace falta credentials
+        });
+
+        // si por alguna razón el Edge respondiera no-2xx, intentamos 1 retry rápido
+        if (!res.ok && !cancelled) {
+          await new Promise((r) => setTimeout(r, 400));
+          await fetch(url, {
+            method: "GET",
+            headers: { "cache-control": "no-cache" },
+          });
+        }
+      } catch {
+        // último intento “a ciegas” para saltar errores intermitentes
+        if (!cancelled) {
+          try {
+            await fetch(url, { method: "GET" });
+          } catch {}
+        }
+      }
+    };
+
+    hit();
     return () => {
       cancelled = true;
     };
