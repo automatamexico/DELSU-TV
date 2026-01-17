@@ -159,8 +159,8 @@ export default function DashboardPage() {
         )}
 
         {!loading && !err && channels.length > 0 && (
-          <div className="grid lg:grid-cols-3 gap-4 items-start">
-            {/* Columna izquierda: tarjetas (igual que ya tenías) */}
+          <div className="grid lg:grid-cols-3 gap-4 items-start content-start">
+            {/* Izquierda: tarjetas */}
             <div className="lg:col-span-1">
               <div className="space-y-4">
                 {channels.map((c) => (
@@ -221,15 +221,21 @@ export default function DashboardPage() {
                         </div>
                       </div>
                     </div>
-                    {/* La URL del m3u8 NO se muestra */}
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Columna derecha: mapa (arriba y más grande) */}
-            <div className="lg:col-span-2">
-              <ChannelGeoMap channelId={channels[0].id} className="h-[560px]" />
+            {/* Derecha: mapa alineado arriba y sin espacio sobrante */}
+            <div className="lg:col-span-2 self-start">
+              {/* Contenedor para recortar cualquier sobrante y evitar scroll extra */}
+              <div className="rounded-2xl border border-gray-700 bg-gray-800/20 p-0 overflow-hidden">
+                {/* Altura ajustada para que la leyenda quede visible sin empujar el layout */}
+                <ChannelGeoMap
+                  channelId={channels[0].id}
+                  className="h-[500px] md:h-[540px] lg:h-[560px]"
+                />
+              </div>
             </div>
           </div>
         )}
