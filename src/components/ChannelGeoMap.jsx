@@ -44,7 +44,7 @@ export default function ChannelGeoMap({ channelId, className = "" }) {
     };
   }, [channelId]);
 
-  // índice por nombre de país (los nombres vienen de Netlify geo, p.ej. "Mexico", "United States")
+  // índice por nombre de país
   const viewsByCountryName = useMemo(() => {
     const map = new Map();
     for (const r of rows) {
@@ -59,18 +59,19 @@ export default function ChannelGeoMap({ channelId, className = "" }) {
   // Escala simple por cuantiles (5 rangos)
   const colorFor = (views) => {
     const v = Number(views || 0);
-    if (v <= 0) return "rgba(59,130,246,0.08)"; // azul muy tenue
+    if (v <= 0) return "rgba(59,130,246,0.08)";
     if (v <= 3) return "rgba(59,130,246,0.25)";
     if (v <= 10) return "rgba(59,130,246,0.45)";
     if (v <= 50) return "rgba(59,130,246,0.65)";
-    return "rgba(59,130,246,0.9)"; // azul fuerte
+    return "rgba(59,130,246,0.9)";
   };
 
   return (
     <div
       className={
-        // p-3 => px-3 pt-1 pb-3 para reducir aire arriba
-        "bg-gray-800/60 border border-gray-700 rounded-2xl px-3 pt-1 pb-3 " + className
+        // reducimos aire superior y dejamos fondo/borde igual
+        "bg-gray-800/60 border border-gray-700 rounded-2xl px-3 pt-1 pb-3 " +
+        className
       }
     >
       <div className="flex items-center justify-between mb-1">
@@ -84,50 +85,52 @@ export default function ChannelGeoMap({ channelId, className = "" }) {
         )}
       </div>
 
-      {/* Mapa responsivo (subido con margen negativo) */}
-      <div className="w-full -mt-3 md:-mt-4 lg:-mt-6">
-        <ComposableMap
-          projectionConfig={{ scale: 145 }}
-          style={{ width: "100%", height: "auto" }}
-        >
-          <Geographies geography={WORLD_TOPO}>
-            {({ geographies }) =>
-              geographies.map((geo) => {
-                const name = (geo.properties?.name || "").trim();
-                const views = viewsByCountryName.get(name.toLowerCase()) || 0;
-                return (
-                  <Geography
-                    key={geo.rsmKey}
-                    geography={geo}
-                    onMouseEnter={() =>
-                      setHover({
-                        name,
-                        views,
-                      })
-                    }
-                    onMouseLeave={() => setHover(null)}
-                    style={{
-                      default: {
-                        fill: colorFor(views),
-                        outline: "none",
-                        stroke: "rgba(148,163,184,0.15)",
-                        strokeWidth: 0.5,
-                      },
-                      hover: {
-                        fill: "rgb(99,102,241)", // indigo al hover
-                        outline: "none",
-                      },
-                      pressed: {
-                        fill: "rgb(79,70,229)",
-                        outline: "none",
-                      },
-                    }}
-                  />
-                );
-              })
-            }
-          </Geographies>
-        </ComposableMap>
+      {/* Contenedor del mapa más arriba y con altura fija (para que quepa leyenda/tooltip) */}
+      <div className="-mt-6 md:-mt-8 lg:-mt-12">
+        <div className="w-full h-[360px] md:h-[420px] lg:h-[520px]">
+          <ComposableMap
+            projectionConfig={{ scale: 145 }}
+            style={{ width: "100%", height: "100%" }}
+          >
+            <Geographies geography={WORLD_TOPO}>
+              {({ geographies }) =>
+                geographies.map((geo) => {
+                  const name = (geo.properties?.name || "").trim();
+                  const views = viewsByCountryName.get(name.toLowerCase()) || 0;
+                  return (
+                    <Geography
+                      key={geo.rsmKey}
+                      geography={geo}
+                      onMouseEnter={() =>
+                        setHover({
+                          name,
+                          views,
+                        })
+                      }
+                      onMouseLeave={() => setHover(null)}
+                      style={{
+                        default: {
+                          fill: colorFor(views),
+                          outline: "none",
+                          stroke: "rgba(148,163,184,0.15)",
+                          strokeWidth: 0.5,
+                        },
+                        hover: {
+                          fill: "rgb(99,102,241)",
+                          outline: "none",
+                        },
+                        pressed: {
+                          fill: "rgb(79,70,229)",
+                          outline: "none",
+                        },
+                      }}
+                    />
+                  );
+                })
+              }
+            </Geographies>
+          </ComposableMap>
+        </div>
       </div>
 
       {/* Tooltip simple */}
