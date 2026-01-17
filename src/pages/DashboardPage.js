@@ -17,8 +17,13 @@ function MiniPlayer({ src }) {
     v.play().catch(() => {});
   }, [muted]);
 
+  const blockContext = (e) => e.preventDefault();
+
   return (
-    <div className="mt-2 rounded-lg overflow-hidden bg-black relative aspect-video">
+    <div
+      className="mt-2 rounded-lg overflow-hidden bg-black relative aspect-video select-none"
+      onContextMenu={blockContext}
+    >
       <video
         ref={videoRef}
         className="w-full h-full"
@@ -29,6 +34,9 @@ function MiniPlayer({ src }) {
         playsInline
         controls={false}
         preload="metadata"
+        controlsList="nodownload noplaybackrate"
+        disablePictureInPicture
+        onContextMenu={blockContext}
       />
       <button
         onClick={() => setMuted((m) => !m)}
@@ -41,6 +49,7 @@ function MiniPlayer({ src }) {
     </div>
   );
 }
+
 
 // 🔹 util: formatear fecha “10 Enero 2026”
 function formatLongDate(d) {
