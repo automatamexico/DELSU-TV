@@ -1,8 +1,16 @@
 // netlify/edge-functions/log-view.js
+const JSON_HEADERS = {
+  "content-type": "application/json",
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET, OPTIONS",
+  "access-control-allow-headers": "content-type",
+};
+
 export default async (request, context) => {
   try {
+    // Preflight CORS
     if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204 });
+      return new Response(null, { status: 204, headers: JSON_HEADERS });
     }
 
     const url = new URL(request.url);
@@ -10,7 +18,7 @@ export default async (request, context) => {
     if (!channelId) {
       return new Response(
         JSON.stringify({ ok: false, error: "missing channel_id" }),
-        { status: 400, headers: { "content-type": "application/json" } }
+        { status: 400, headers: JSON_HEADERS }
       );
     }
 
@@ -23,7 +31,7 @@ export default async (request, context) => {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
       return new Response(
         JSON.stringify({ ok: false, error: "missing supabase env" }),
-        { status: 500, headers: { "content-type": "application/json" } }
+        { status: 500, headers: JSON_HEADERS }
       );
     }
 
@@ -76,9 +84,9 @@ export default async (request, context) => {
         const errTxt = await insertRes.text();
         return new Response(
           JSON.stringify({ ok: false, error: "insert_failed", detail: errTxt }),
-          { status: 500, headers: { "content-type": "application/json" } }
+          { status: 500, headers: JSON_HEADERS }
         );
-      }
+        }
     }
 
     // 👇 Ya NO tocamos public.channels aquí.
@@ -91,12 +99,12 @@ export default async (request, context) => {
         inserted_geo: !geoOk,
         geo: { countryCode, countryName },
       }),
-      { headers: { "content-type": "application/json" } }
+      { headers: JSON_HEADERS }
     );
   } catch (e) {
     return new Response(
       JSON.stringify({ ok: false, error: e?.message || String(e) }),
-      { status: 500, headers: { "content-type": "application/json" } }
+      { status: 500, headers: JSON_HEADERS }
     );
   }
 };
