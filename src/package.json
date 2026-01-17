@@ -7,6 +7,7 @@
         "lucide-react": "latest",
         "react-router-dom": "latest",
         "recharts": "latest",
+        "react-simple-maps": "^3.0.0",
         "react-datepicker": "latest",
         "react-is": "latest",
         "@supabase/supabase-js": "latest"
