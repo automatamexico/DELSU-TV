@@ -69,10 +69,11 @@ export default function ChannelGeoMap({ channelId, className = "" }) {
   return (
     <div
       className={
-        "bg-gray-800/60 border border-gray-700 rounded-2xl p-3 " + className
+        // p-3 => px-3 pt-1 pb-3 para reducir aire arriba
+        "bg-gray-800/60 border border-gray-700 rounded-2xl px-3 pt-1 pb-3 " + className
       }
     >
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-1">
         <h3 className="text-lg font-semibold">Audiencia por país</h3>
         {loading ? (
           <span className="text-xs text-gray-400">Cargando…</span>
@@ -83,8 +84,8 @@ export default function ChannelGeoMap({ channelId, className = "" }) {
         )}
       </div>
 
-      {/* Mapa responsivo (ancho completo, alto contenido) */}
-      <div className="w-full">
+      {/* Mapa responsivo (subido con margen negativo) */}
+      <div className="w-full -mt-3 md:-mt-4 lg:-mt-6">
         <ComposableMap
           projectionConfig={{ scale: 145 }}
           style={{ width: "100%", height: "auto" }}
