@@ -233,7 +233,7 @@ export default function DashboardPage() {
                 {/* Altura ajustada para que la leyenda quede visible sin empujar el layout */}
                 <ChannelGeoMap
                   channelId={channels[0].id}
-                  className="h-[640px] md:h-[680px] lg:h-[750px]"
+                  className="h-[690px] md:h-[690px] lg:h-[690px]"
                 />
               </div>
             </div>
