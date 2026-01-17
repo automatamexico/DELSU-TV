@@ -3,7 +3,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabaseClient";
 import { ComposableMap, Geographies, Geography } from "react-simple-maps";
 
-// TopoJSON público (solo lectura)
 const WORLD_TOPO =
   "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
@@ -14,10 +13,9 @@ const fmtNumber = (n) =>
 
 export default function ChannelGeoMap({ channelId, className = "" }) {
   const [rows, setRows] = useState([]);
-  const [hover, setHover] = useState(null); // { name, views }
+  const [hover, setHover] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Carga agregados por país para este canal
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -32,7 +30,6 @@ export default function ChannelGeoMap({ channelId, className = "" }) {
         if (error) throw error;
         if (alive) setRows(data || []);
       } catch (e) {
-        // eslint-disable-next-line no-console
         console.error("[GeoMap] supabase", e);
         if (alive) setRows([]);
       } finally {
@@ -44,7 +41,6 @@ export default function ChannelGeoMap({ channelId, className = "" }) {
     };
   }, [channelId]);
 
-  // índice por nombre de país
   const viewsByCountryName = useMemo(() => {
     const map = new Map();
     for (const r of rows) {
@@ -56,7 +52,6 @@ export default function ChannelGeoMap({ channelId, className = "" }) {
     return map;
   }, [rows]);
 
-  // Escala simple por cuantiles (5 rangos)
   const colorFor = (views) => {
     const v = Number(views || 0);
     if (v <= 0) return "rgba(59,130,246,0.08)";
@@ -69,8 +64,7 @@ export default function ChannelGeoMap({ channelId, className = "" }) {
   return (
     <div
       className={
-        // reducimos aire superior y dejamos fondo/borde igual
-        "bg-gray-800/60 border border-gray-700 rounded-2xl px-3 pt-1 pb-3 " +
+        "bg-gray-800/60 border border-gray-700 rounded-2xl px-3 pt-1 pb-2 " +
         className
       }
     >
@@ -85,9 +79,9 @@ export default function ChannelGeoMap({ channelId, className = "" }) {
         )}
       </div>
 
-      {/* Contenedor del mapa más arriba y con altura fija (para que quepa leyenda/tooltip) */}
+      {/* Subimos el mapa y le damos más altura visible */}
       <div className="-mt-6 md:-mt-8 lg:-mt-12">
-        <div className="w-full h-[360px] md:h-[420px] lg:h-[520px]">
+        <div className="w-full h-[460px] md:h-[560px] lg:h-[660px]">
           <ComposableMap
             projectionConfig={{ scale: 145 }}
             style={{ width: "100%", height: "100%" }}
@@ -101,12 +95,7 @@ export default function ChannelGeoMap({ channelId, className = "" }) {
                     <Geography
                       key={geo.rsmKey}
                       geography={geo}
-                      onMouseEnter={() =>
-                        setHover({
-                          name,
-                          views,
-                        })
-                      }
+                      onMouseEnter={() => setHover({ name, views })}
                       onMouseLeave={() => setHover(null)}
                       style={{
                         default: {
@@ -133,7 +122,7 @@ export default function ChannelGeoMap({ channelId, className = "" }) {
         </div>
       </div>
 
-      {/* Tooltip simple */}
+      {/* Texto y leyenda compactos dentro de la tarjeta */}
       <div className="mt-2 text-sm text-gray-300 h-5">
         {hover ? (
           <span>
@@ -146,8 +135,7 @@ export default function ChannelGeoMap({ channelId, className = "" }) {
         )}
       </div>
 
-      {/* Leyenda */}
-      <div className="mt-3 grid grid-cols-5 gap-2 text-[11px] text-gray-300">
+      <div className="mt-2 grid grid-cols-5 gap-2 text-[10px] md:text-[11px] text-gray-300">
         {[
           { l: "0", c: "rgba(59,130,246,0.08)" },
           { l: "1–3", c: "rgba(59,130,246,0.25)" },
