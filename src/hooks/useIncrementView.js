@@ -1,29 +1,28 @@
 // src/hooks/useIncrementView.js
-import { useEffect, useRef } from "react";
-import { supabase } from "../supabaseClient"; // ajusta si tu ruta difiere
+import { useEffect } from "react";
 
-/**
- * Llama al RPC SOLO una vez por apertura del modal.
- * Pasa null/undefined si no quieres contar todavía.
- */
 export default function useIncrementView(channelId) {
-  const doneRef = useRef(false);
-
   useEffect(() => {
-    if (!channelId || doneRef.current) return;
+    if (!channelId) return;
+    let cancelled = false;
 
-    doneRef.current = true; // evita dobles llamadas por renders
     (async () => {
-      const { data, error } = await supabase
-        .rpc("increment_channel_views", { p_channel_id: channelId });
-
-      if (error) {
-        // eslint-disable-next-line no-console
-        console.warn("[views] RPC error:", error.message);
-      } else {
-        // eslint-disable-next-line no-console
-        console.info("[views] nuevo views_count:", data);
+      try {
+        // Llama SIEMPRE al abrir el modal (sin antiduplicado).
+        const url = `/log-view?channel_id=${encodeURIComponent(channelId)}&t=${Date.now()}`;
+        await fetch(url, {
+          method: "GET",
+          headers: { "cache-control": "no-cache" },
+          // no 'no-cors': queremos ver errores si los hay
+        });
+      } catch (e) {
+        // opcional: console.warn("log-view failed", e);
       }
+      if (cancelled) return;
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [channelId]);
 }
