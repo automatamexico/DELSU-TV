@@ -52,13 +52,19 @@ export default function ChannelGeoMap({ channelId, className = "" }) {
     return map;
   }, [rows]);
 
+  // 🎨 Colores:
+  // 0 → azul tenue (igual que antes)
+  // 1–3 → rojo
+  // 4–10 → verde
+  // 11–50 → amarillo
+  // 51+ → rosa
   const colorFor = (views) => {
     const v = Number(views || 0);
-    if (v <= 0) return "rgba(59,130,246,0.08)";
-    if (v <= 3) return "rgba(59,130,246,0.25)";
-    if (v <= 10) return "rgba(59,130,246,0.45)";
-    if (v <= 50) return "rgba(59,130,246,0.65)";
-    return "rgba(59,130,246,0.9)";
+    if (v <= 0) return "rgba(59,130,246,0.08)";   // azul muy tenue
+    if (v <= 3) return "rgba(239,68,68,0.75)";    // rojo
+    if (v <= 10) return "rgba(34,197,94,0.75)";   // verde
+    if (v <= 50) return "rgba(234,179,8,0.8)";    // amarillo
+    return "rgba(236,72,153,0.9)";                // rosa
   };
 
   return (
@@ -79,7 +85,6 @@ export default function ChannelGeoMap({ channelId, className = "" }) {
         )}
       </div>
 
-      {/* Mapa alto y pegado arriba */}
       <div className="-mt-6 md:-mt-8 lg:-mt-12">
         <div className="w-full h-[460px] md:h-[560px] lg:h-[660px]">
           <ComposableMap
@@ -122,7 +127,6 @@ export default function ChannelGeoMap({ channelId, className = "" }) {
         </div>
       </div>
 
-      {/* Texto: más arriba */}
       <div className="mt-1 -mb-1 text-sm text-gray-300 h-5">
         {hover ? (
           <span>
@@ -135,14 +139,14 @@ export default function ChannelGeoMap({ channelId, className = "" }) {
         )}
       </div>
 
-      {/* Leyenda compacta */}
+      {/* Leyenda con los mismos colores */}
       <div className="mt-2 grid grid-cols-5 gap-2 text-[10px] md:text-[11px] text-gray-300">
         {[
-          { l: "0", c: "rgba(59,130,246,0.08)" },
-          { l: "1–3", c: "rgba(59,130,246,0.25)" },
-          { l: "4–10", c: "rgba(59,130,246,0.45)" },
-          { l: "11–50", c: "rgba(59,130,246,0.65)" },
-          { l: "51+", c: "rgba(59,130,246,0.9)" },
+          { l: "0", c: "rgba(59,130,246,0.08)" },   // azul tenue
+          { l: "1–3", c: "rgba(239,68,68,0.75)" },  // rojo
+          { l: "4–10", c: "rgba(34,197,94,0.75)" }, // verde
+          { l: "11–50", c: "rgba(234,179,8,0.8)" }, // amarillo
+          { l: "51+", c: "rgba(236,72,153,0.9)" },  // rosa
         ].map((b) => (
           <div key={b.l} className="flex items-center gap-2">
             <span
