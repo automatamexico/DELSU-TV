@@ -5,7 +5,6 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import ChannelGeoMap from "../components/ChannelGeoMap";
 
-
 // 🔹 MiniPlayer: autoplay, loop, proporción 16:9 y botón SOLO para mute
 function MiniPlayer({ src }) {
   const videoRef = React.useRef(null);
@@ -170,79 +169,86 @@ export default function DashboardPage() {
         )}
 
         {!loading && !err && channels.length > 0 && (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {channels.map((c) => (
-              <div key={c.id} className="bg-gray-800/60 border border-gray-700 rounded-xl p-4">
-                {/* Cabecera del canal */}
-                <div className="font-semibold">{c.name}</div>
-                <div className="text-sm text-gray-400">
-                  {c.country} • {c.category}
-                </div>
-
-                {/* Layout: player a la izquierda, info a la derecha */}
-                <div className="mt-2 grid md:grid-cols-2 gap-4 items-start">
-                  {/* ▶️ Player */}
-                  <div>
-                    {c.stream_url ? (
-                      <MiniPlayer src={c.stream_url} />
-                    ) : (
-                      c.poster && (
-                        <img
-                          src={c.poster}
-                          alt={c.name}
-                          className="w-full rounded-lg"
-                          loading="lazy"
-                        />
-                      )
-                    )}
+          <>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {channels.map((c) => (
+                <div key={c.id} className="bg-gray-800/60 border border-gray-700 rounded-xl p-4">
+                  {/* Cabecera del canal */}
+                  <div className="font-semibold">{c.name}</div>
+                  <div className="text-sm text-gray-400">
+                    {c.country} • {c.category}
                   </div>
 
-                  {/* ℹ️ Panel de información */}
-                  <div className="text-sm space-y-3">
-                    {/* 1) Estatus */}
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">Estatus del Canal :</span>
-                      <span
-                        className={
-                          (c.is_suspended ? 'bg-red-600/80' : 'bg-green-600/80') +
-                          ' text-black font-semibold px-2 py-0.5 rounded'
-                        }
-                      >
-                        {c.is_suspended ? 'Inactivo' : 'Activo'}
-                      </span>
-                    </div>
-
-                    {/* 2) Próximo pago */}
+                  {/* Layout: player a la izquierda, info a la derecha */}
+                  <div className="mt-2 grid md:grid-cols-2 gap-4 items-start">
+                    {/* ▶️ Player */}
                     <div>
-                      <span className="font-semibold">Próximo pago:</span>{' '}
-                      {formatLongDate(c.billing_next_due_date)}
+                      {c.stream_url ? (
+                        <MiniPlayer src={c.stream_url} />
+                      ) : (
+                        c.poster && (
+                          <img
+                            src={c.poster}
+                            alt={c.name}
+                            className="w-full rounded-lg"
+                            loading="lazy"
+                          />
+                        )
+                      )}
                     </div>
 
-                    {/* 3) Vistas */}
-                    <div>
-                      <span className="font-semibold">Número acumulado de Vistas :</span>{' '}
-                      {typeof c.views_count === 'number' ? c.views_count : 0}
-                    </div>
+                    {/* ℹ️ Panel de información */}
+                    <div className="text-sm space-y-3">
+                      {/* 1) Estatus */}
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">Estatus del Canal :</span>
+                        <span
+                          className={
+                            (c.is_suspended ? 'bg-red-600/80' : 'bg-green-600/80') +
+                            ' text-black font-semibold px-2 py-0.5 rounded'
+                          }
+                        >
+                          {c.is_suspended ? 'Inactivo' : 'Activo'}
+                        </span>
+                      </div>
 
-                    {/* 4) Calificación (estrellas calculadas) */}
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">Calificación del Canal:</span>
-                      <Stars value={computeStars(c.views_count)} />
-                    </div>
+                      {/* 2) Próximo pago */}
+                      <div>
+                        <span className="font-semibold">Próximo pago:</span>{' '}
+                        {formatLongDate(c.billing_next_due_date)}
+                      </div>
 
-                    {/* 5) Botón Pagar Renovación */}
-                    <div className="pt-1">
-                      <button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg">
-                        Pagar Renovación
-                      </button>
+                      {/* 3) Vistas */}
+                      <div>
+                        <span className="font-semibold">Número acumulado de Vistas :</span>{' '}
+                        {typeof c.views_count === 'number' ? c.views_count : 0}
+                      </div>
+
+                      {/* 4) Calificación (estrellas calculadas) */}
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">Calificación del Canal:</span>
+                        <Stars value={computeStars(c.views_count)} />
+                      </div>
+
+                      {/* 5) Botón Pagar Renovación */}
+                      <div className="pt-1">
+                        <button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg">
+                          Pagar Renovación
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* La URL del m3u8 NO se muestra */}
-              </div>
-            ))}
-          </div>
+                  {/* La URL del m3u8 NO se muestra */}
+                </div>
+              ))}
+            </div>
+
+            {/* ⬇️ Mapa de audiencia por país (usa el primer canal del dueño) */}
+            <div className="mt-6 max-w-[900px] ml-auto">
+              <ChannelGeoMap channelId={channels[0].id} />
+            </div>
+          </>
         )}
       </main>
     </div>
