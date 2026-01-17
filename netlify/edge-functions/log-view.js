@@ -22,6 +22,7 @@ export default async (request, context) => {
       );
     }
 
+    // Geo de Netlify (Edge)
     const geo = context?.geo || {};
     const countryCode = (geo.country?.code || "UN").toUpperCase();
     const countryName = geo.country?.name || "Unknown";
@@ -35,68 +36,34 @@ export default async (request, context) => {
       );
     }
 
-    const now = new Date().toISOString();
-    const table = "channel_views_geo";
-    const headers = {
-      apikey: SUPABASE_SERVICE_KEY,
-      Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-      "Content-Type": "application/json",
-      Prefer: "return=representation",
-    };
+    // 🔒 Llamada única al RPC atómico (INSERT ON CONFLICT DO UPDATE … +1)
+    const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/increment_geo_view`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_SERVICE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({
+        p_channel_id: channelId,
+        p_country_code: countryCode,
+        p_country_name: countryName,
+      }),
+    });
 
-    // UPDATE: sumar 1 si ya existe el país
-    const updateRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/${table}?channel_id=eq.${channelId}&country_code=eq.${countryCode}`,
-      {
-        method: "PATCH",
-        headers,
-        body: JSON.stringify({
-          views_count: { increment: 1 },
-          country_name: countryName,
-          last_viewed_at: now,
-        }),
-      }
-    );
-
-    let geoOk = false;
-    if (updateRes.status === 200) {
-      const upd = await updateRes.json();
-      geoOk = Array.isArray(upd) && upd.length > 0;
+    if (!(rpcRes.status >= 200 && rpcRes.status < 300)) {
+      const errTxt = await rpcRes.text();
+      return new Response(
+        JSON.stringify({ ok: false, error: "rpc_failed", detail: errTxt }),
+        { status: 500, headers: JSON_HEADERS }
+      );
     }
 
-    // INSERT si no existía
-    if (!geoOk) {
-      const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify([
-          {
-            channel_id: channelId,
-            country_code: countryCode,
-            country_name: countryName,
-            views_count: 1,
-            last_viewed_at: now,
-          },
-        ]),
-      });
-
-      if (!(insertRes.status >= 200 && insertRes.status < 300)) {
-        const errTxt = await insertRes.text();
-        return new Response(
-          JSON.stringify({ ok: false, error: "insert_failed", detail: errTxt }),
-          { status: 500, headers: JSON_HEADERS }
-        );
-        }
-    }
-
-    // 👇 Ya NO tocamos public.channels aquí.
-    // El trigger mantiene channels.views_count en sincronía.
-
+    // ✅ Éxito
     return new Response(
       JSON.stringify({
         ok: true,
-        updated_geo: geoOk,
-        inserted_geo: !geoOk,
         geo: { countryCode, countryName },
       }),
       { headers: JSON_HEADERS }
