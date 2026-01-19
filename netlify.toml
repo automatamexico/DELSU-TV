@@ -16,11 +16,11 @@
     Content-Security-Policy = '''
       default-src 'self';
       script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com;
-      connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://delsutv.netlify.app https://*.streamhoster.com https://cdn.jsdelivr.net;
+      connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://delsutv.netlify.app https://*.streamhoster.com https://cdn.jsdelivr.net https://hispanatv.com https://www.hispanatv.com;
       img-src 'self' data: https:;
       style-src 'self' 'unsafe-inline' https:;
       font-src 'self' data: https:;
-      media-src 'self' blob: data: https://delsutv.netlify.app https://*.streamhoster.com;
+      media-src 'self' blob: data: https://delsutv.netlify.app https://*.streamhoster.com https://hispanatv.com https://www.hispanatv.com;
       frame-ancestors *;
     '''
     Referrer-Policy = "strict-origin-when-cross-origin"
