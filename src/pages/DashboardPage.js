@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import ChannelGeoMap from "../components/ChannelGeoMap";
+import PageTitle from "../components/PageTitle"; // ← agregado
 
 // 🔹 MiniPlayer: autoplay, loop, proporción 16:9 y botón SOLO para mute
 function MiniPlayer({ src }) {
@@ -131,6 +132,8 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white">
+      <PageTitle title="Hispana TV • Dashboard" /> {/* ← agregado */}
+
       {/* Top bar */}
       <header className="px-6 py-4 border-b border-gray-800">
         <div className="grid grid-cols-3 items-center">
