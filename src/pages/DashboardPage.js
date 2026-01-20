@@ -89,7 +89,7 @@ function computeStars(views) {
    BARRAS TOP PAÍSES (debajo de tarjetas)
    ========================= */
 
-// --- REEMPLAZA SÓLO ESTE COMPONENTE CountryBars (no toques nada más) ---
+// --- REEMPLAZA SOLO ESTE COMPONENTE CountryBars ---
 function CountryBars({ channelId }) {
   // Escala Y según tu regla
   const bucketMax = (v) => {
@@ -122,109 +122,144 @@ function CountryBars({ channelId }) {
     if (!channelId) return;
     let alive = true;
 
-    const normalize = (rows) =>
-      (rows || [])
-        .map((r) => ({
+    // Normalizador muy permisivo
+    const normalize = (json) => {
+      if (!json) return [];
+      const arr =
+        (Array.isArray(json) && json) ||
+        json.byCountry || json.by_country ||
+        json.countries || json.data || json.result || json.stats;
+      if (Array.isArray(arr)) {
+        return arr.map((r) => ({
           name:
-            r.country_name ||
-            r.country ||
-            r.country_code ||
-            r.code ||
-            r.pais ||
-            r.iso2 ||
-            r.iso ||
-            r.name ||
-            '—',
-          count: Number(
-            r.count ?? r.views ?? r.total ?? r.value ?? r.reproducciones ?? 0
-          ),
-        }))
-        .filter((x) => x.name && Number.isFinite(x.count));
+            r.country_name || r.country || r.name ||
+            r.country_code || r.code || r.pais || '—',
+          count: Number(r.count ?? r.views ?? r.value ?? r.total ?? r.reproducciones ?? 0),
+        }));
+      }
+      // Diccionario { MX: 27, AR: 4 }
+      const dict =
+        (json.countries && typeof json.countries === 'object' && !Array.isArray(json.countries) && json.countries) ||
+        (typeof json.byCountry === 'object' && !Array.isArray(json.byCountry) && json.byCountry) ||
+        (typeof json.data === 'object' && !Array.isArray(json.data) && json.data) ||
+        (typeof json.stats === 'object' && !Array.isArray(json.stats) && json.stats);
+      if (dict) {
+        return Object.entries(dict).map(([k, v]) => {
+          if (typeof v === 'number') return { name: k, count: v };
+          if (v && typeof v === 'object') {
+            return {
+              name: v.country_name || v.country || v.name || v.code || v.country_code || k,
+              count: Number(v.count ?? v.views ?? v.value ?? v.total ?? v.reproducciones ?? 0),
+            };
+          }
+          return { name: k, count: Number(v) || 0 };
+        });
+      }
+      return [];
+    };
 
-    // 1) INTENTO A: leer del mismo "cache" del mapa si existe (no modifica el mapa)
-    const cache = (window.__geoCache ||= {});
-    if (Array.isArray(cache[channelId]) && cache[channelId].length) {
-      const top = normalize(cache[channelId])
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 4);
-      if (alive && top.length) setItems(top);
-    }
-
-    // 2) INTENTO B: varias tablas/vistas comunes (una de éstas es la que usa tu mapa)
-    const tablePlans = [
-      // vistas/materializadas típicas
-      { table: 'views_by_country', countryCols: ['country_name', 'country', 'country_code', 'pais', 'code', 'iso2'] },
-      { table: 'channel_country_views', countryCols: ['country_name', 'country', 'country_code', 'pais', 'code', 'iso2'] },
-      { table: 'stats_by_country', countryCols: ['country_name', 'country', 'country_code', 'pais', 'code', 'iso2'] },
-      { table: 'geo_by_country', countryCols: ['country_name', 'country', 'country_code', 'pais', 'code', 'iso2'] },
-      // tablas de logs crudos (agrupamos al vuelo)
-      { table: 'view_logs', countryCols: ['country_name', 'country', 'country_code', 'pais', 'code', 'iso2'] },
-      { table: 'play_logs', countryCols: ['country_name', 'country', 'country_code', 'pais', 'code', 'iso2'] },
-      { table: 'analytics_events', countryCols: ['country_name', 'country', 'country_code', 'pais', 'code', 'iso2'] },
+    // ====== 1) MISMO ORIGEN QUE EL MAPA (relativas y absolutas) ======
+    const origin = window?.location?.origin || '';
+    const qs = (k) => `${k}=${encodeURIComponent(channelId)}`;
+    const candidates = [
+      // relativas
+      `/api/channel-geo?${qs('channel_id')}`,
+      `/api/geo/countries?${qs('channel_id')}`,
+      `/api/geo?${qs('channel_id')}`,
+      `/.netlify/functions/channel-geo?${qs('channel_id')}`,
+      `/.netlify/functions/geo-countries?${qs('channel_id')}`,
+      `/netlify/functions/channel-geo?${qs('channel_id')}`,
+      // absolutas (por si el mapa llama con dominio)
+      `${origin}/api/channel-geo?${qs('channel_id')}`,
+      `${origin}/api/geo/countries?${qs('channel_id')}`,
+      `${origin}/api/geo?${qs('channel_id')}`,
+      `${origin}/.netlify/functions/channel-geo?${qs('channel_id')}`,
+      `${origin}/.netlify/functions/geo-countries?${qs('channel_id')}`,
+      // dominios que usas
+      `https://hispanatv.com/api/channel-geo?${qs('channel_id')}`,
+      `https://www.hispanatv.com/api/channel-geo?${qs('channel_id')}`,
     ];
 
-    const tryTables = async () => {
-      // a) primero, vistas ya agregadas
-      for (const plan of tablePlans.slice(0, 4)) {
-        for (const col of plan.countryCols) {
+    const tryHTTP = async () => {
+      for (const url of candidates) {
+        try {
+          const res = await fetch(url, { credentials: 'same-origin' });
+          if (!res.ok) continue;
+          const json = await res.json().catch(() => null);
+          const data = normalize(json).filter((x) => x && x.name);
+          if (data.length) return data;
+        } catch {}
+      }
+      return [];
+    };
+
+    // ====== 2) SUPABASE (fallback genérico) ======
+    const trySupabase = async () => {
+      // Vistas agregadas usuales
+      const views = ['views_by_country', 'channel_country_views', 'stats_by_country', 'geo_by_country'];
+      const cols  = ['country_name', 'country', 'country_code', 'pais', 'code', 'iso2'];
+      for (const t of views) {
+        for (const c of cols) {
           try {
             const { data, error } = await supabase
-              .from(plan.table)
-              .select(`${col}, count`)
+              .from(t)
+              .select(`${c}, count`)
               .eq('channel_id', channelId)
               .order('count', { ascending: false })
               .limit(4);
-
             if (!error && Array.isArray(data) && data.length) {
-              return normalize(
-                data.map((r) => ({ ...r, country: r[col] }))
-              );
+              return data.map((r) => ({
+                name: r[c] || '—',
+                count: Number(r.count || 0),
+              }));
             }
           } catch {}
         }
       }
-
-      // b) si no hay vistas, agrupamos nosotros en tablas de logs
-      for (const plan of tablePlans.slice(4)) {
-        for (const col of plan.countryCols) {
+      // Logs crudos (agrupación PostgREST)
+      const logs = ['view_logs', 'play_logs', 'analytics_events'];
+      for (const t of logs) {
+        for (const c of cols) {
           try {
             const { data, error } = await supabase
-              .from(plan.table)
-              .select(`${col}, count:count()`)
+              .from(t)
+              .select(`${c}, count:count()`)
               .eq('channel_id', channelId)
-              .not(col, 'is', null)
+              .not(c, 'is', null)
               .order('count', { ascending: false })
               .limit(4);
-
             if (!error && Array.isArray(data) && data.length) {
-              return normalize(
-                data.map((r) => ({ ...r, country: r[col] }))
-              );
+              return data.map((r) => ({
+                name: r[c] || '—',
+                count: Number(r.count || 0),
+              }));
             }
           } catch {}
         }
       }
-
-      // c) RPC opcional si existe
+      // RPC opcional
       try {
-        const { data, error } = await supabase.rpc(
-          'channel_views_top_countries',
-          { p_channel_id: channelId, p_limit: 4 }
-        );
+        const { data, error } = await supabase.rpc('channel_views_top_countries', {
+          p_channel_id: channelId,
+          p_limit: 4,
+        });
         if (!error && Array.isArray(data) && data.length) {
           return normalize(data);
         }
       } catch {}
-
       return [];
     };
 
     (async () => {
-      const rows = await tryTables();
-      if (!alive) return;
+      let rows = await tryHTTP();
+      if (!rows.length) rows = await trySupabase();
 
-      const top4 = rows.sort((a, b) => b.count - a.count).slice(0, 4);
-      setItems(top4);
+      const top4 = rows
+        .map((r) => ({ name: String(r.name || '—'), count: Number(r.count) || 0 }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 4);
+
+      if (alive) setItems(top4);
     })();
 
     return () => { alive = false; };
@@ -234,15 +269,13 @@ function CountryBars({ channelId }) {
   const maxCount = items.length ? Math.max(...items.map((i) => i.count)) : 0;
   const MAX = bucketMax(maxCount);
 
-  // SVG (ligero y sin dependencias)
+  // SVG
   const W = 520, H = 260, PAD_L = 36, PAD_B = 28;
   const innerW = W - PAD_L - 12;
   const innerH = H - PAD_B - 12;
-
   const n = Math.max(1, items.length || 1);
   const barW = innerW / (n * 1.6);
   const gap = (innerW - barW * n) / (n + 1);
-
   const y = (v) => 12 + innerH - (Math.max(0, Math.min(MAX, v)) / MAX) * innerH;
 
   const step = (() => {
@@ -310,6 +343,7 @@ function CountryBars({ channelId }) {
   );
 }
 // --- FIN CountryBars ---
+
 
 
 export default function DashboardPage() {
