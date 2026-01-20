@@ -89,31 +89,7 @@ function computeStars(views) {
    BARRAS TOP PAÍSES (debajo de tarjetas)
    ========================= */
 
-// Colores como en el mapa
-function colorByCount(n) {
-  if (n >= 51) return '#e879f9';   // 51+
-  if (n >= 11) return '#eab308';   // 11–50
-  if (n >= 4)  return '#22c55e';   // 4–10
-  if (n >= 1)  return '#ef4444';   // 1–3
-  return '#6b7280';
-}
-
-// Regla que pediste (10 → 20 → 50 → 100 → 200 → 300 → 500 → 1000 → 2000 …)
-function bucketMax(maxViews) {
-  const v = Number(maxViews) || 0;
-  if (v <= 10) return 10;
-  if (v <= 20) return 20;
-  if (v <= 50) return 50;
-  if (v <= 100) return 100;
-  if (v <= 200) return 200;
-  if (v <= 300) return 300;
-  if (v <= 500) return 500;
-  if (v <= 1000) return 1000;
-  if (v <= 2000) return 2000;
-  // Si algún día rebasas 2000, sube al siguiente múltiplo de 1000
-  return Math.ceil(v / 1000) * 1000;
-}
-
+// --- CountryBars (fix: parsea más formatos y siempre pinta si hay datos) ---
 function CountryBars({ channelId }) {
   const [items, setItems] = React.useState([]);
 
@@ -121,23 +97,78 @@ function CountryBars({ channelId }) {
     let alive = true;
     if (!channelId) return;
 
+    // Acepta múltiples formas de respuesta (array u objetos tipo diccionario)
     const parseHTTP = (json) => {
       if (!json) return [];
-      const arr = json.byCountry || json.by_country || json.countries || json.data || (Array.isArray(json) ? json : []);
-      return (arr || []).map((r) => ({
-        name: r.country_name || r.country || r.code || '—',
-        count: Number(r.count ?? r.views ?? r.value ?? 0),
-      }));
+
+      // 1) Arrays comunes
+      const arr =
+        json.byCountry ||
+        json.by_country ||
+        json.countries ||
+        json.data ||
+        (Array.isArray(json) ? json : null);
+
+      if (Array.isArray(arr)) {
+        return arr.map((r) => ({
+          name:
+            r.country_name ||
+            r.country ||
+            r.country_code ||
+            r.code ||
+            '—',
+          count: Number(r.count ?? r.views ?? r.value ?? 0),
+        }));
+      }
+
+      // 2) Diccionario { "MX": 27, "AR": 2, ... }
+      const dict =
+        (json.countries && typeof json.countries === 'object' && !Array.isArray(json.countries) && json.countries) ||
+        (typeof json.byCountry === 'object' && !Array.isArray(json.byCountry) && json.byCountry) ||
+        (typeof json.data === 'object' && !Array.isArray(json.data) && json.data);
+
+      if (dict) {
+        const out = [];
+        for (const [key, val] of Object.entries(dict)) {
+          if (val == null) continue;
+          if (typeof val === 'number') {
+            out.push({ name: key, count: Number(val) });
+          } else if (typeof val === 'object') {
+            out.push({
+              name: val.country_name || val.country || val.code || key,
+              count: Number(val.count ?? val.views ?? val.value ?? 0),
+            });
+          }
+        }
+        return out;
+      }
+
+      return [];
     };
 
     const tryHTTP = async () => {
-      const paths = ['/api/channel-geo','/channel-geo','/api/geo','/geo','/api/views/by-country','/views/by-country'];
+      // Incluye rutas típicas usadas por el mapa
+      const paths = [
+        '/api/channel-geo',
+        '/channel-geo',
+        '/api/geo',
+        '/geo',
+        '/api/geo/countries',
+        '/geo/countries',
+        '/api/views/by-country',
+        '/views/by-country',
+      ];
       for (const p of paths) {
         try {
-          const res = await fetch(`${p}?channel_id=${encodeURIComponent(channelId)}`, { credentials: 'same-origin' });
+          const res = await fetch(`${p}?channel_id=${encodeURIComponent(channelId)}`, {
+            credentials: 'same-origin',
+          });
           if (!res.ok) continue;
-          const data = parseHTTP(await res.json().catch(() => null));
-          if (data.length) return data;
+          const json = await res.json().catch(() => null);
+          const data = parseHTTP(json);
+          if (Array.isArray(data) && data.some(d => Number(d.count) > 0)) {
+            return data;
+          }
         } catch {}
       }
       return [];
@@ -146,14 +177,22 @@ function CountryBars({ channelId }) {
     const trySupabase = async () => {
       // RPC opcional si existe
       try {
-        const { data, error } = await supabase.rpc('channel_views_top_countries', { p_channel_id: channelId, p_limit: 4 });
+        const { data, error } = await supabase.rpc('channel_views_top_countries', {
+          p_channel_id: channelId,
+          p_limit: 4,
+        });
         if (!error && Array.isArray(data) && data.length) {
-          return data.map(r => ({ name: r.country_name || r.country || r.country_code || '—', count: Number(r.count || r.views || 0) }));
+          const rows = data.map(r => ({
+            name: r.country_name || r.country || r.country_code || '—',
+            count: Number(r.count || r.views || 0),
+          }));
+          if (rows.some(r => r.count > 0)) return rows;
         }
       } catch {}
+
       // Tablas comunes
-      const tables = ['view_logs','views','play_logs'];
-      const cols = ['country_name','country','country_code'];
+      const tables = ['view_logs', 'views', 'play_logs', 'stats_by_country', 'channel_country_views'];
+      const cols = ['country_name', 'country', 'country_code'];
       for (const t of tables) {
         for (const c of cols) {
           try {
@@ -165,7 +204,8 @@ function CountryBars({ channelId }) {
               .order('count', { ascending: false })
               .limit(4);
             if (!error && Array.isArray(data) && data.length) {
-              return data.map(r => ({ name: r[c] || '—', count: Number(r.count || 0) }));
+              const rows = data.map(r => ({ name: r[c] || '—', count: Number(r.count || 0) }));
+              if (rows.some(r => r.count > 0)) return rows;
             }
           } catch {}
         }
@@ -176,31 +216,38 @@ function CountryBars({ channelId }) {
     (async () => {
       let rows = await tryHTTP();
       if (!rows.length) rows = await trySupabase();
-      // Top 4 países (eje X = número de países, máx 4)
-      const top4 = rows.sort((a,b) => b.count - a.count).slice(0, 4);
+
+      // Top 4 países (si hay 1 o 2, se muestran igual)
+      const top4 = rows
+        .filter(r => Number(r.count) >= 0) // permite también conteos pequeños como 1–2
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 4);
+
       if (alive) setItems(top4);
     })();
 
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [channelId]);
 
-  // ----- Escala del eje Y según TU regla -----
+  // ---------- Escala Y según tu regla ----------
   const maxCount = items.length ? Math.max(...items.map(i => i.count)) : 0;
   const MAX = bucketMax(maxCount);
 
-  // Dimensiones
+  // Dimensiones SVG
   const W = 520, H = 260, PAD_L = 36, PAD_B = 28;
   const innerW = W - PAD_L - 12;
   const innerH = H - PAD_B - 12;
 
-  const n = Math.max(1, items.length || 1);            // eje X = # países (máx 4)
+  // Eje X = número de países (máx 4)
+  const n = Math.max(1, items.length || 1);
   const barW = innerW / (n * 1.6);
   const gap  = (innerW - barW * n) / (n + 1);
 
   const y = (v) => 12 + innerH - (Math.max(0, Math.min(MAX, v)) / MAX) * innerH;
 
-  // Ticks del eje Y “bonitos” según rango
-  const step = (()=>{
+  const step = (() => {
     if (MAX <= 20) return 5;
     if (MAX <= 50) return 10;
     if (MAX <= 100) return 10;
@@ -208,7 +255,7 @@ function CountryBars({ channelId }) {
     if (MAX <= 300) return 30;
     if (MAX <= 500) return 50;
     if (MAX <= 1000) return 100;
-    return 200; // para 2000
+    return 200;
   })();
 
   return (
@@ -220,7 +267,7 @@ function CountryBars({ channelId }) {
 
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[260px]">
         {/* Grid + labels Y */}
-        {Array.from({ length: Math.floor(MAX/step) + 1 }).map((_, i) => {
+        {Array.from({ length: Math.floor(MAX / step) + 1 }).map((_, i) => {
           const val = i * step;
           const yy = y(val);
           return (
@@ -231,22 +278,23 @@ function CountryBars({ channelId }) {
           );
         })}
 
-        {/* Eje X base */}
+        {/* Eje X */}
         <line x1={PAD_L} x2={W - 6} y1={12 + innerH} y2={12 + innerH} stroke="#9ca3af" strokeWidth="1" />
 
-        {/* Barras + ticks X */}
+        {/* Barras */}
         {items.map((it, idx) => {
           const x = PAD_L + gap * (idx + 1) + barW * idx;
           const baseY = 12 + innerH;
           const topY = y(it.count);
-          const h = it.count > 0 ? Math.max(2, baseY - topY) : 0; // siempre visible si count>0
+          const h = it.count > 0 ? Math.max(2, baseY - topY) : 0;
           const fill = colorByCount(it.count);
-
           return (
             <g key={idx}>
               <line x1={x + barW/2} x2={x + barW/2} y1={baseY} y2={baseY + 4} stroke="#9ca3af" strokeWidth="1" />
               <rect x={x} y={baseY - h} width={barW} height={h} rx="6" ry="6" fill={fill} opacity="0.9" />
-              <text x={x + barW/2} y={H - 10} textAnchor="middle" fontSize="11" fill="#e5e7eb">{it.name}</text>
+              <text x={x + barW/2} y={H - 10} textAnchor="middle" fontSize="11" fill="#e5e7eb">
+                {it.name}
+              </text>
               {it.count > 0 && (
                 <text x={x + barW/2} y={baseY - h - 6} textAnchor="middle" fontSize="11" fill="#e5e7eb">
                   {it.count}
@@ -263,6 +311,8 @@ function CountryBars({ channelId }) {
     </div>
   );
 }
+// --- fin CountryBars fix ---
+
 
 export default function DashboardPage() {
   const { user, signOut } = useAuth();
