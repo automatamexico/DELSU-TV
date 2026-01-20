@@ -51,7 +51,6 @@ function MiniPlayer({ src }) {
   );
 }
 
-
 // 🔹 util: formatear fecha “10 Enero 2026”
 function formatLongDate(d) {
   if (!d) return '—';
@@ -84,6 +83,187 @@ function computeStars(views) {
   if (v <= 200) return 3;        // 101 a 200 → 3★
   if (v <= 300) return 4;        // 201 a 300 → 4★
   return 5;                      // 301+ → 5★
+}
+
+/* =========================
+   BARRAS TOP PAÍSES (debajo de tarjetas)
+   ========================= */
+
+// Colores equivalentes a la leyenda del mapa (buckets aproximados)
+function colorByCount(n) {
+  if (n >= 51) return '#e879f9';   // 51+  (fucsia/rose)
+  if (n >= 11) return '#eab308';   // 11–50 (amarillo)
+  if (n >= 4)  return '#22c55e';   // 4–10  (verde)
+  if (n >= 1)  return '#ef4444';   // 1–3   (rojo)
+  return '#6b7280';                // 0     (gris)
+}
+
+function CountryBars({ channelId }) {
+  const [items, setItems] = React.useState([]);
+
+  React.useEffect(() => {
+    let alive = true;
+    if (!channelId) return;
+
+    (async () => {
+      try {
+        // Reutiliza el mismo endpoint que usa el mapa (siempre existente en el proyecto)
+        const res = await fetch(`/log-view?channel_id=${channelId}`);
+        const json = await res.json().catch(() => ({}));
+
+        // Intentamos distintas formas comunes de estructura
+        const arr =
+          json?.byCountry ||
+          json?.by_country ||
+          json?.countries ||
+          [];
+
+        // Normaliza { name, count }
+        const norm = arr.map((r) => ({
+          name: r.country_name || r.country || r.code || '—',
+          count: Number(r.count || r.views || r.value || 0)
+        }));
+
+        // Top 4
+        const top = norm
+          .filter(x => x.count > 0)
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 4);
+
+        if (alive) setItems(top);
+      } catch (_) {
+        if (alive) setItems([]);
+      }
+    })();
+
+    return () => { alive = false; };
+  }, [channelId]);
+
+  // Dimensiones del gráfico
+  const W = 520;       // ancho svg
+  const H = 260;       // alto svg
+  const PAD_L = 36;    // padding izq para eje Y
+  const PAD_B = 28;    // padding inferior para eje X
+  const MAX = 1000;    // máximo eje Y
+  const STEP_MINOR = 10;
+  const STEP_MAJOR = 100;
+
+  const innerW = W - PAD_L - 12;
+  const innerH = H - PAD_B - 12;
+
+  const barW = items.length ? innerW / (items.length * 1.6) : 40;
+  const gap = items.length ? (innerW - barW * items.length) / (items.length + 1) : 20;
+
+  const y = (v) => {
+    const clamped = Math.max(0, Math.min(MAX, v));
+    return 12 + innerH - (clamped / MAX) * innerH;
+  };
+
+  return (
+    <div className="mt-6 bg-gray-800/60 border border-gray-700 rounded-xl p-3">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-semibold">Top países por reproducciones</h3>
+        <span className="text-[11px] text-gray-400">Escala 0–1000 (paso 10)</span>
+      </div>
+
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[260px]">
+        {/* Líneas menores cada 10 */}
+        {Array.from({ length: Math.floor(MAX / STEP_MINOR) + 1 }).map((_, i) => {
+          const val = i * STEP_MINOR;
+          const yy = y(val);
+          return (
+            <line
+              key={`m-${i}`}
+              x1={PAD_L}
+              x2={W - 6}
+              y1={yy}
+              y2={yy}
+              stroke="#374151"
+              strokeWidth={val % 100 === 0 ? 0 : 0.6}
+              opacity={0.25}
+            />
+          );
+        })}
+
+        {/* Líneas mayores y etiquetas cada 100 */}
+        {Array.from({ length: Math.floor(MAX / STEP_MAJOR) + 1 }).map((_, i) => {
+          const val = i * STEP_MAJOR;
+          const yy = y(val);
+          return (
+            <g key={`M-${i}`}>
+              <line
+                x1={PAD_L}
+                x2={W - 6}
+                y1={yy}
+                y2={yy}
+                stroke="#4b5563"
+                strokeWidth={1}
+                opacity={0.5}
+              />
+              <text
+                x={PAD_L - 6}
+                y={yy + 3}
+                textAnchor="end"
+                fontSize="10"
+                fill="#9ca3af"
+              >
+                {val}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Barras */}
+        {items.map((it, idx) => {
+          const x = PAD_L + gap * (idx + 1) + barW * idx;
+          const h = innerH - (y(it.count) - 12);
+          const barY = y(it.count);
+          const fill = colorByCount(it.count);
+          return (
+            <g key={idx}>
+              <rect
+                x={x}
+                y={barY}
+                width={barW}
+                height={h}
+                rx="6"
+                ry="6"
+                fill={fill}
+                opacity="0.9"
+              />
+              {/* Etiqueta del país */}
+              <text
+                x={x + barW / 2}
+                y={H - 10}
+                textAnchor="middle"
+                fontSize="11"
+                fill="#e5e7eb"
+              >
+                {it.name}
+              </text>
+              {/* Valor arriba de la barra */}
+              <text
+                x={x + barW / 2}
+                y={barY - 6}
+                textAnchor="middle"
+                fontSize="11"
+                fill="#e5e7eb"
+              >
+                {it.count}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Eje Y */}
+        <line x1={PAD_L} y1={12} x2={PAD_L} y2={H - PAD_B} stroke="#9ca3af" strokeWidth="1" />
+      </svg>
+
+      {items.length === 0 && (
+        <div className="text-xs text-gray-400 px-2 pb-2">Sin datos suficientes aún.</div>
+      )}
+    </div>
+  );
 }
 
 export default function DashboardPage() {
@@ -235,6 +415,9 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 ))}
+
+                {/* === NUEVO: barras top países (usa el primer canal visible) === */}
+                <CountryBars channelId={channels[0]?.id} />
               </div>
             </div>
 
