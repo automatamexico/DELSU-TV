@@ -107,24 +107,21 @@ function CountryBars({ channelId }) {
 
     (async () => {
       try {
-        // Reutiliza el mismo endpoint que usa el mapa (siempre existente en el proyecto)
+        // Reutiliza el mismo endpoint que usa el mapa
         const res = await fetch(`/log-view?channel_id=${channelId}`);
         const json = await res.json().catch(() => ({}));
 
-        // Intentamos distintas formas comunes de estructura
         const arr =
           json?.byCountry ||
           json?.by_country ||
           json?.countries ||
           [];
 
-        // Normaliza { name, count }
         const norm = arr.map((r) => ({
           name: r.country_name || r.country || r.code || '—',
           count: Number(r.count || r.views || r.value || 0)
         }));
 
-        // Top 4
         const top = norm
           .filter(x => x.count > 0)
           .sort((a, b) => b.count - a.count)
@@ -139,14 +136,30 @@ function CountryBars({ channelId }) {
     return () => { alive = false; };
   }, [channelId]);
 
+  // ====== AUTOESCALA ======
+  const rawMax = items.length ? Math.max(...items.map(i => i.count)) : 0;
+  // si no hay datos o todos 0, forzamos 0–100 para que siempre se pinte
+  let MAX;
+  if (rawMax <= 0) {
+    MAX = 100;
+  } else if (rawMax <= 100) {
+    MAX = 100;
+  } else if (rawMax <= 200) {
+    MAX = 200;
+  } else if (rawMax <= 500) {
+    MAX = 500;
+  } else {
+    MAX = 1000;
+  }
+  // ========================
+
   // Dimensiones del gráfico
-  const W = 520;       // ancho svg
-  const H = 260;       // alto svg
-  const PAD_L = 36;    // padding izq para eje Y
-  const PAD_B = 28;    // padding inferior para eje X
-  const MAX = 1000;    // máximo eje Y
-  const STEP_MINOR = 10;
-  const STEP_MAJOR = 100;
+  const W = 520;
+  const H = 260;
+  const PAD_L = 36;
+  const PAD_B = 28;
+  const STEP_MINOR = 10;          // línea cada 10
+  const STEP_MAJOR = 100;         // etiqueta cada 100
 
   const innerW = W - PAD_L - 12;
   const innerH = H - PAD_B - 12;
@@ -163,7 +176,7 @@ function CountryBars({ channelId }) {
     <div className="mt-6 bg-gray-800/60 border border-gray-700 rounded-xl p-3">
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-sm font-semibold">Top países por reproducciones</h3>
-        <span className="text-[11px] text-gray-400">Escala 0–1000 (paso 10)</span>
+        <span className="text-[11px] text-gray-400">Escala 0–{MAX} (paso 10)</span>
       </div>
 
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[260px]">
@@ -179,7 +192,7 @@ function CountryBars({ channelId }) {
               y1={yy}
               y2={yy}
               stroke="#374151"
-              strokeWidth={val % 100 === 0 ? 0 : 0.6}
+              strokeWidth={val % STEP_MAJOR === 0 ? 0 : 0.6}
               opacity={0.25}
             />
           );
