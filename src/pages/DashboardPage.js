@@ -89,17 +89,18 @@ function computeStars(views) {
    BARRAS TOP PAÍSES (debajo de tarjetas)
    ========================= */
 
-// Colores equivalentes a la leyenda del mapa (buckets aproximados)
+// Colores como en el mapa
 function colorByCount(n) {
   if (n >= 51) return '#e879f9';   // 51+
   if (n >= 11) return '#eab308';   // 11–50
   if (n >= 4)  return '#22c55e';   // 4–10
   if (n >= 1)  return '#ef4444';   // 1–3
-  return '#6b7280';                // 0
+  return '#6b7280';
 }
 
-// Bucket solicitado para el eje Y
-function bucketMax(v) {
+// Regla que pediste (10 → 20 → 50 → 100 → 200 → 300 → 500 → 1000 → 2000 …)
+function bucketMax(maxViews) {
+  const v = Number(maxViews) || 0;
   if (v <= 10) return 10;
   if (v <= 20) return 20;
   if (v <= 50) return 50;
@@ -109,7 +110,7 @@ function bucketMax(v) {
   if (v <= 500) return 500;
   if (v <= 1000) return 1000;
   if (v <= 2000) return 2000;
-  // si supera 2000, siguiente múltiplo de 1000
+  // Si algún día rebasas 2000, sube al siguiente múltiplo de 1000
   return Math.ceil(v / 1000) * 1000;
 }
 
@@ -120,84 +121,95 @@ function CountryBars({ channelId }) {
     let alive = true;
     if (!channelId) return;
 
-    // Intentamos varios endpoints comunes (mismo origen que el mapa)
-    const candidates = [
-      '/api/channel-geo',
-      '/channel-geo',
-      '/api/geo',
-      '/geo',
-      '/api/log-view',
-      '/log-view',
-      '/api/views/by-country',
-      '/views/by-country'
-    ];
-
-    const parse = (json) => {
+    const parseHTTP = (json) => {
       if (!json) return [];
-      const arr =
-        json.byCountry ||
-        json.by_country ||
-        json.countries ||
-        json.data ||
-        (Array.isArray(json) ? json : []);
+      const arr = json.byCountry || json.by_country || json.countries || json.data || (Array.isArray(json) ? json : []);
       return (arr || []).map((r) => ({
         name: r.country_name || r.country || r.code || '—',
         count: Number(r.count ?? r.views ?? r.value ?? 0),
       }));
     };
 
-    (async () => {
-      let got = [];
-      for (const base of candidates) {
+    const tryHTTP = async () => {
+      const paths = ['/api/channel-geo','/channel-geo','/api/geo','/geo','/api/views/by-country','/views/by-country'];
+      for (const p of paths) {
         try {
-          const url = `${base}?channel_id=${encodeURIComponent(channelId)}`;
-          const res = await fetch(url, { method: 'GET', credentials: 'same-origin' });
+          const res = await fetch(`${p}?channel_id=${encodeURIComponent(channelId)}`, { credentials: 'same-origin' });
           if (!res.ok) continue;
-          const json = await res.json().catch(() => null);
-          const parsed = parse(json).filter(x => x && typeof x.count === 'number');
-          if (parsed.length) { got = parsed; break; }
-        } catch { /* sigue */ }
+          const data = parseHTTP(await res.json().catch(() => null));
+          if (data.length) return data;
+        } catch {}
       }
+      return [];
+    };
 
-      // Ordenar y tomar máximo 4 países
-      const top4 = got
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 4);
+    const trySupabase = async () => {
+      // RPC opcional si existe
+      try {
+        const { data, error } = await supabase.rpc('channel_views_top_countries', { p_channel_id: channelId, p_limit: 4 });
+        if (!error && Array.isArray(data) && data.length) {
+          return data.map(r => ({ name: r.country_name || r.country || r.country_code || '—', count: Number(r.count || r.views || 0) }));
+        }
+      } catch {}
+      // Tablas comunes
+      const tables = ['view_logs','views','play_logs'];
+      const cols = ['country_name','country','country_code'];
+      for (const t of tables) {
+        for (const c of cols) {
+          try {
+            const { data, error } = await supabase
+              .from(t)
+              .select(`${c}, count:count()`)
+              .eq('channel_id', channelId)
+              .not(c, 'is', null)
+              .order('count', { ascending: false })
+              .limit(4);
+            if (!error && Array.isArray(data) && data.length) {
+              return data.map(r => ({ name: r[c] || '—', count: Number(r.count || 0) }));
+            }
+          } catch {}
+        }
+      }
+      return [];
+    };
 
+    (async () => {
+      let rows = await tryHTTP();
+      if (!rows.length) rows = await trySupabase();
+      // Top 4 países (eje X = número de países, máx 4)
+      const top4 = rows.sort((a,b) => b.count - a.count).slice(0, 4);
       if (alive) setItems(top4);
     })();
 
     return () => { alive = false; };
   }, [channelId]);
 
-  // Máximo para bucket del eje Y en base al mayor valor mostrado
-  const currentMax = items.length ? Math.max(...items.map(i => i.count)) : 0;
-  const MAX = bucketMax(currentMax);
+  // ----- Escala del eje Y según TU regla -----
+  const maxCount = items.length ? Math.max(...items.map(i => i.count)) : 0;
+  const MAX = bucketMax(maxCount);
 
-  // Dimensiones del gráfico
-  const W = 520;
-  const H = 260;
-  const PAD_L = 36;
-  const PAD_B = 28;
-
+  // Dimensiones
+  const W = 520, H = 260, PAD_L = 36, PAD_B = 28;
   const innerW = W - PAD_L - 12;
   const innerH = H - PAD_B - 12;
 
-  const n = Math.max(1, items.length); // X = número de países (máx 4)
+  const n = Math.max(1, items.length || 1);            // eje X = # países (máx 4)
   const barW = innerW / (n * 1.6);
-  const gap = (innerW - barW * n) / (n + 1);
+  const gap  = (innerW - barW * n) / (n + 1);
 
-  const y = (v) => {
-    const clamped = Math.max(0, Math.min(MAX, v));
-    return 12 + innerH - (clamped / MAX) * innerH;
-  };
+  const y = (v) => 12 + innerH - (Math.max(0, Math.min(MAX, v)) / MAX) * innerH;
 
-  // elegir pasos de grilla legibles según MAX
-  const majorStep =
-    MAX <= 50 ? 10 :
-    MAX <= 200 ? 20 :
-    MAX <= 500 ? 50 :
-    MAX <= 1000 ? 100 : 200;
+  // Ticks del eje Y “bonitos” según rango
+  const step = (()=>{
+    if (MAX <= 20) return 5;
+    if (MAX <= 50) return 10;
+    if (MAX <= 100) return 10;
+    if (MAX <= 200) return 20;
+    if (MAX <= 300) return 30;
+    if (MAX <= 500) return 50;
+    if (MAX <= 1000) return 100;
+    return 200; // para 2000
+  })();
 
   return (
     <div className="mt-6 bg-gray-800/60 border border-gray-700 rounded-xl p-3">
@@ -207,82 +219,42 @@ function CountryBars({ channelId }) {
       </div>
 
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[260px]">
-        {/* Líneas y etiquetas del eje Y */}
-        {Array.from({ length: Math.floor(MAX / majorStep) + 1 }).map((_, i) => {
-          const val = i * majorStep;
+        {/* Grid + labels Y */}
+        {Array.from({ length: Math.floor(MAX/step) + 1 }).map((_, i) => {
+          const val = i * step;
           const yy = y(val);
           return (
-            <g key={`grid-${i}`}>
-              <line
-                x1={PAD_L}
-                x2={W - 6}
-                y1={yy}
-                y2={yy}
-                stroke="#4b5563"
-                strokeWidth={1}
-                opacity={0.4}
-              />
-              <text
-                x={PAD_L - 6}
-                y={yy + 3}
-                textAnchor="end"
-                fontSize="10"
-                fill="#9ca3af"
-              >
-                {val}
-              </text>
+            <g key={i}>
+              <line x1={PAD_L} x2={W - 6} y1={yy} y2={yy} stroke="#4b5563" strokeWidth="1" opacity="0.4" />
+              <text x={PAD_L - 6} y={yy + 3} textAnchor="end" fontSize="10" fill="#9ca3af">{val}</text>
             </g>
           );
         })}
 
-        {/* Barras (si hay 1–4 países, se pintan todos) */}
+        {/* Eje X base */}
+        <line x1={PAD_L} x2={W - 6} y1={12 + innerH} y2={12 + innerH} stroke="#9ca3af" strokeWidth="1" />
+
+        {/* Barras + ticks X */}
         {items.map((it, idx) => {
           const x = PAD_L + gap * (idx + 1) + barW * idx;
-          const idealY = y(it.count);
-          const idealH = innerH - (idealY - 12);
-          const h = it.count > 0 ? Math.max(2, idealH) : 0; // siempre visible si >0
-          const barY = it.count > 0 ? (12 + innerH - h) : (12 + innerH);
+          const baseY = 12 + innerH;
+          const topY = y(it.count);
+          const h = it.count > 0 ? Math.max(2, baseY - topY) : 0; // siempre visible si count>0
           const fill = colorByCount(it.count);
+
           return (
             <g key={idx}>
-              <rect
-                x={x}
-                y={barY}
-                width={barW}
-                height={h}
-                rx="6"
-                ry="6"
-                fill={fill}
-                opacity="0.9"
-              />
-              {/* País en X */}
-              <text
-                x={x + barW / 2}
-                y={H - 10}
-                textAnchor="middle"
-                fontSize="11"
-                fill="#e5e7eb"
-              >
-                {it.name}
-              </text>
-              {/* Valor arriba de la barra */}
+              <line x1={x + barW/2} x2={x + barW/2} y1={baseY} y2={baseY + 4} stroke="#9ca3af" strokeWidth="1" />
+              <rect x={x} y={baseY - h} width={barW} height={h} rx="6" ry="6" fill={fill} opacity="0.9" />
+              <text x={x + barW/2} y={H - 10} textAnchor="middle" fontSize="11" fill="#e5e7eb">{it.name}</text>
               {it.count > 0 && (
-                <text
-                  x={x + barW / 2}
-                  y={barY - 6}
-                  textAnchor="middle"
-                  fontSize="11"
-                  fill="#e5e7eb"
-                >
+                <text x={x + barW/2} y={baseY - h - 6} textAnchor="middle" fontSize="11" fill="#e5e7eb">
                   {it.count}
                 </text>
               )}
             </g>
           );
         })}
-
-        {/* Eje Y */}
-        <line x1={PAD_L} y1={12} x2={PAD_L} y2={H - PAD_B} stroke="#9ca3af" strokeWidth="1" />
       </svg>
 
       {items.length === 0 && (
