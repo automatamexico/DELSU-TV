@@ -89,11 +89,12 @@ function computeStars(views) {
    BARRAS TOP PAÍSES (debajo de tarjetas)
    ========================= */
 
+// --- CountryBars (sin tocar nada más) ---
 function CountryBars({ channelId }) {
-  // Helpers dentro del componente
+  // Bucket Y máx (tu regla)
   const bucketMax = (v) => {
     const n = Number(v) || 0;
-    if (n <= 0) return 100; // fallback para que siempre pinte
+    if (n <= 0) return 100;
     if (n <= 10) return 10;
     if (n <= 20) return 20;
     if (n <= 50) return 50;
@@ -105,13 +106,14 @@ function CountryBars({ channelId }) {
     return 2000;
   };
 
+  // Colores alineados al mapa
   const colorByCount = (count) => {
     const c = Number(count) || 0;
-    if (c <= 0) return '#6b7280'; // gris para 0
-    if (c <= 3) return '#ef4444'; // 1–3 (rojo)
-    if (c <= 10) return '#22c55e'; // 4–10 (verde)
-    if (c <= 50) return '#f59e0b'; // 11–50 (ámbar)
-    return '#ec4899'; // 51+ (rosa) — coincide con la leyenda del mapa
+    if (c <= 0) return '#6b7280';
+    if (c <= 3) return '#ef4444';   // 1–3
+    if (c <= 10) return '#22c55e';  // 4–10
+    if (c <= 50) return '#f59e0b';  // 11–50
+    return '#ec4899';              // 51+
   };
 
   const [items, setItems] = React.useState([]);
@@ -120,96 +122,104 @@ function CountryBars({ channelId }) {
     let alive = true;
     if (!channelId) return;
 
-    // Acepta múltiples formas de respuesta
-    const parseHTTP = (json) => {
+    // Normalizador MUY permisivo
+    const normalize = (json) => {
       if (!json) return [];
-
-      const arr =
-        json.byCountry ||
-        json.by_country ||
-        json.countries ||
-        json.data ||
-        (Array.isArray(json) ? json : null);
-
-      if (Array.isArray(arr)) {
-        return arr.map((r) => ({
-          name:
-            r.country_name ||
-            r.country ||
-            r.country_code ||
-            r.code ||
-            '—',
-          count: Number(r.count ?? r.views ?? r.value ?? 0),
+      // Arrays directos
+      if (Array.isArray(json)) {
+        return json.map((r) => ({
+          name: r.country_name || r.country || r.code || r.country_code || '—',
+          count: Number(r.count ?? r.views ?? r.value ?? r.total ?? 0),
         }));
       }
-
+      // Campos comunes
+      const candidate =
+        json.byCountry || json.by_country || json.countries || json.data || json.result || json.stats;
+      if (Array.isArray(candidate)) {
+        return candidate.map((r) => ({
+          name: r.country_name || r.country || r.code || r.country_code || '—',
+          count: Number(r.count ?? r.views ?? r.value ?? r.total ?? 0),
+        }));
+      }
+      // Diccionario { MX: 27, AR: 4 }
       const dict =
         (json.countries && typeof json.countries === 'object' && !Array.isArray(json.countries) && json.countries) ||
         (typeof json.byCountry === 'object' && !Array.isArray(json.byCountry) && json.byCountry) ||
-        (typeof json.data === 'object' && !Array.isArray(json.data) && json.data);
-
+        (typeof json.data === 'object' && !Array.isArray(json.data) && json.data) ||
+        (typeof json.stats === 'object' && !Array.isArray(json.stats) && json.stats);
       if (dict) {
-        const out = [];
-        for (const [key, val] of Object.entries(dict)) {
-          if (val == null) continue;
-          if (typeof val === 'number') {
-            out.push({ name: key, count: Number(val) });
-          } else if (typeof val === 'object') {
-            out.push({
-              name: val.country_name || val.country || val.code || key,
-              count: Number(val.count ?? val.views ?? val.value ?? 0),
-            });
+        return Object.entries(dict).map(([k, v]) => {
+          if (typeof v === 'number') return { name: k, count: v };
+          if (v && typeof v === 'object') {
+            return {
+              name: v.country_name || v.country || v.code || k,
+              count: Number(v.count ?? v.views ?? v.value ?? v.total ?? 0),
+            };
           }
-        }
-        return out;
+          return { name: k, count: Number(v) || 0 };
+        });
       }
-
       return [];
     };
 
+    // Intentos HTTP: mismas rutas que usan muchos mapas + variantes Netlify
+    const baseQs = [
+      `channel_id=${encodeURIComponent(channelId)}`,
+      `channelId=${encodeURIComponent(channelId)}`,
+      `id=${encodeURIComponent(channelId)}`,
+      `cid=${encodeURIComponent(channelId)}`
+    ];
+
+    const paths = [
+      '/api/channel-geo',
+      '/api/geo',
+      '/api/geo/countries',
+      '/api/views/by-country',
+      '/channel-geo',
+      '/geo',
+      '/geo/countries',
+      '/views/by-country',
+      // Netlify Functions comunes
+      '/.netlify/functions/geo',
+      '/.netlify/functions/channel-geo',
+      '/.netlify/functions/geo-countries',
+      '/.netlify/functions/views-by-country',
+      '/netlify/functions/geo',
+      '/netlify/functions/channel-geo',
+    ];
+
     const tryHTTP = async () => {
-      const paths = [
-        '/api/channel-geo',
-        '/channel-geo',
-        '/api/geo',
-        '/geo',
-        '/api/geo/countries',
-        '/geo/countries',
-        '/api/views/by-country',
-        '/views/by-country',
-      ];
       for (const p of paths) {
-        try {
-          const res = await fetch(`${p}?channel_id=${encodeURIComponent(channelId)}`, {
-            credentials: 'same-origin',
-          });
-          if (!res.ok) continue;
-          const json = await res.json().catch(() => null);
-          const data = parseHTTP(json);
-          if (Array.isArray(data) && data.some(d => Number(d.count) > 0)) {
-            return data;
-          }
-        } catch {}
+        for (const q of baseQs) {
+          try {
+            const url = `${p}?${q}`;
+            const res = await fetch(url, { credentials: 'same-origin' });
+            if (!res.ok) continue;
+            const json = await res.json().catch(() => null);
+            const data = normalize(json).filter(x => x && (x.name ?? '') !== '');
+            if (data.length) return data;
+          } catch { /* siguiente */ }
+        }
       }
       return [];
     };
 
     const trySupabase = async () => {
+      // RPC opcional si existe
       try {
         const { data, error } = await supabase.rpc('channel_views_top_countries', {
-          p_channel_id: channelId,
-          p_limit: 4,
+          p_channel_id: channelId, p_limit: 4,
         });
         if (!error && Array.isArray(data) && data.length) {
-          const rows = data.map(r => ({
+          return data.map(r => ({
             name: r.country_name || r.country || r.country_code || '—',
             count: Number(r.count || r.views || 0),
           }));
-          if (rows.some(r => r.count > 0)) return rows;
         }
       } catch {}
 
-      const tables = ['view_logs', 'views', 'play_logs', 'stats_by_country', 'channel_country_views'];
+      // Fallback genérico a tablas típicas
+      const tables = ['stats_by_country', 'channel_country_views', 'view_logs', 'views', 'play_logs'];
       const cols = ['country_name', 'country', 'country_code'];
       for (const t of tables) {
         for (const c of cols) {
@@ -222,8 +232,7 @@ function CountryBars({ channelId }) {
               .order('count', { ascending: false })
               .limit(4);
             if (!error && Array.isArray(data) && data.length) {
-              const rows = data.map(r => ({ name: r[c] || '—', count: Number(r.count || 0) }));
-              if (rows.some(r => r.count > 0)) return rows;
+              return data.map(r => ({ name: r[c] || '—', count: Number(r.count || 0) }));
             }
           } catch {}
         }
@@ -232,11 +241,15 @@ function CountryBars({ channelId }) {
     };
 
     (async () => {
+      // 1) Mismo origen que el mapa (prioridad)
       let rows = await tryHTTP();
+
+      // 2) Supabase (respaldo)
       if (!rows.length) rows = await trySupabase();
 
+      // Top 4 siempre, y si todo viene en cero, deja un “esqueleto” para que se vea
       const top4 = rows
-        .filter(r => Number(r.count) >= 0)
+        .map(r => ({ name: String(r.name || '—'), count: Number(r.count) || 0 }))
         .sort((a, b) => b.count - a.count)
         .slice(0, 4);
 
@@ -246,17 +259,16 @@ function CountryBars({ channelId }) {
     return () => { alive = false; };
   }, [channelId]);
 
-  // Escala Y según tu regla
+  // Escala Y por tu regla
   const maxCount = items.length ? Math.max(...items.map(i => i.count)) : 0;
   const MAX = bucketMax(maxCount);
 
-  // Dimensiones SVG
+  // SVG
   const W = 520, H = 260, PAD_L = 36, PAD_B = 28;
   const innerW = W - PAD_L - 12;
   const innerH = H - PAD_B - 12;
 
-  // Eje X = número de países (máx 4)
-  const n = Math.max(1, items.length || 1);
+  const n = Math.max(1, (items.length || 1));
   const barW = innerW / (n * 1.6);
   const gap  = (innerW - barW * n) / (n + 1);
 
@@ -281,7 +293,7 @@ function CountryBars({ channelId }) {
       </div>
 
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[260px]">
-        {/* Grid + labels Y */}
+        {/* Grid + etiquetas Y */}
         {Array.from({ length: Math.floor(MAX / step) + 1 }).map((_, i) => {
           const val = i * step;
           const yy = y(val);
@@ -292,12 +304,10 @@ function CountryBars({ channelId }) {
             </g>
           );
         })}
-
-        {/* Eje X */}
         <line x1={PAD_L} x2={W - 6} y1={12 + innerH} y2={12 + innerH} stroke="#9ca3af" strokeWidth="1" />
 
         {/* Barras */}
-        {items.map((it, idx) => {
+        {items.length > 0 ? items.map((it, idx) => {
           const x = PAD_L + gap * (idx + 1) + barW * idx;
           const baseY = 12 + innerH;
           const topY = y(it.count);
@@ -306,26 +316,29 @@ function CountryBars({ channelId }) {
           return (
             <g key={idx}>
               <line x1={x + barW/2} x2={x + barW/2} y1={baseY} y2={baseY + 4} stroke="#9ca3af" strokeWidth="1" />
-              <rect x={x} y={baseY - h} width={barW} height={h} rx="6" ry="6" fill={fill} opacity="0.9" />
+              <rect x={x} y={baseY - h} width={barW} height={h} rx="6" ry="6" fill={fill} opacity="0.95" />
               <text x={x + barW/2} y={H - 10} textAnchor="middle" fontSize="11" fill="#e5e7eb">
                 {it.name}
               </text>
-              {it.count > 0 && (
-                <text x={x + barW/2} y={baseY - h - 6} textAnchor="middle" fontSize="11" fill="#e5e7eb">
-                  {it.count}
-                </text>
-              )}
+              <text x={x + barW/2} y={baseY - h - 6} textAnchor="middle" fontSize="11" fill="#e5e7eb">
+                {it.count}
+              </text>
             </g>
           );
-        })}
+        }) : (
+          // Si aún no hay datos reales, deja el placeholder mínimo para que NO se vea “vacío”
+          <g>
+            <text x={W/2} y={H/2} textAnchor="middle" fontSize="12" fill="#9ca3af">
+              Sin datos suficientes aún.
+            </text>
+          </g>
+        )}
       </svg>
-
-      {items.length === 0 && (
-        <div className="text-xs text-gray-400 px-2 pb-2">Sin datos suficientes aún.</div>
-      )}
     </div>
   );
 }
+// --- fin CountryBars ---
+
 
 
 export default function DashboardPage() {
