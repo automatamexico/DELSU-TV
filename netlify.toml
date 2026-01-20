@@ -14,16 +14,16 @@
   for = "/*"
   [headers.values]
     Content-Security-Policy = '''
-      default-src 'self';
-      script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com;
-      connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co wss://*.supabase.in https://delsutv.netlify.app https://*.streamhoster.com https://cdn.jsdelivr.net https://hispanatv.com https://www.hispanatv.com;
-      img-src 'self' data: https:;
-      style-src 'self' 'unsafe-inline' https:;
-      font-src 'self' data: https:;
-      media-src 'self' blob: data: https://delsutv.netlify.app https://*.streamhoster.com https://hispanatv.com https://www.hispanatv.com
-      https://*.streamlock.net https://5fc584f3f19c9.streamlock.net;
-      frame-ancestors *;
-    '''
+  default-src 'self';
+  script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com;
+  connect-src 'self' https:;
+  img-src 'self' data: https:;
+  style-src 'self' 'unsafe-inline' https:;
+  font-src 'self' data: https:;
+  media-src 'self' blob: data: https:;
+  frame-ancestors *;
+'''
+
     Referrer-Policy = "strict-origin-when-cross-origin"
     Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
     X-Content-Type-Options = "nosniff"
