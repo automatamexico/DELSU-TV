@@ -20,7 +20,8 @@
       img-src 'self' data: https:;
       style-src 'self' 'unsafe-inline' https:;
       font-src 'self' data: https:;
-      media-src 'self' blob: data: https://delsutv.netlify.app https://*.streamhoster.com https://hispanatv.com https://www.hispanatv.com;
+      media-src 'self' blob: data: https://delsutv.netlify.app https://*.streamhoster.com https://hispanatv.com https://www.hispanatv.com
+      https://*.streamlock.net https://5fc584f3f19c9.streamlock.net;
       frame-ancestors *;
     '''
     Referrer-Policy = "strict-origin-when-cross-origin"
