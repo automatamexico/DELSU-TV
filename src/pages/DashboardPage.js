@@ -89,7 +89,6 @@ function computeStars(views) {
    BARRAS TOP PAÍSES (debajo de tarjetas)
    ========================= */
 
-// --- CountryBars (fix: parsea más formatos y siempre pinta si hay datos) ---
 function CountryBars({ channelId }) {
   const [items, setItems] = React.useState([]);
 
@@ -311,8 +310,6 @@ function CountryBars({ channelId }) {
     </div>
   );
 }
-// --- fin CountryBars fix ---
-
 
 export default function DashboardPage() {
   const { user, signOut } = useAuth();
