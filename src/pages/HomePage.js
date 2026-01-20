@@ -1,5 +1,5 @@
 // src/pages/HomePage.jsx
-import React, { useState, Suspense, lazy, useMemo } from "react";
+import React, { useState, Suspense, lazy, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import Header from "../components/Header";
 import CategoryFilter from "../components/CategoryFilter";
@@ -29,6 +29,16 @@ function norm(v) {
 }
 
 export default function HomePage() {
+  // ---- TÍTULO DE LA PESTAÑA ----
+  useEffect(() => {
+    const prev = document.title;
+    document.title = "HispanaTV Home";
+    return () => {
+      document.title = prev || "HispanaTV";
+    };
+  }, []);
+  // -------------------------------
+
   const { profile } = useAuth();
   const userRole = profile?.role || "user";
 
