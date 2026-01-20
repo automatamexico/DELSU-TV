@@ -56,6 +56,31 @@ async function preflightAuthRelaxed() {
   return details;
 }
 
+/* ====== AÑADIDO: favicon + helper ====== */
+const FAVICON_URL =
+  'https://uqzcnlmhmglzflkuzczk.supabase.co/storage/v1/object/public/avatars/favicon.ico';
+
+function setFavicon(href) {
+  let link = document.querySelector('link[rel="icon"]');
+  if (!link) {
+    link = document.createElement('link');
+    link.setAttribute('rel', 'icon');
+    document.head.appendChild(link);
+  }
+  link.setAttribute('type', 'image/x-icon');
+  link.setAttribute('href', href);
+
+  let shortcut = document.querySelector('link[rel="shortcut icon"]');
+  if (!shortcut) {
+    shortcut = document.createElement('link');
+    shortcut.setAttribute('rel', 'shortcut icon');
+    document.head.appendChild(shortcut);
+  }
+  shortcut.setAttribute('type', 'image/x-icon');
+  shortcut.setAttribute('href', href);
+}
+/* ======================================= */
+
 /* =========================
    PANEL: Suspender canal
    ========================= */
@@ -982,6 +1007,24 @@ export default function AdminLoginPage() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
 
+  /* ====== AÑADIDO: título dinámico + favicon ====== */
+  useEffect(() => {
+    const isAdmin = !!(user && profile?.role === 'admin');
+    const newTitle = isAdmin ? 'HispanaTV • Admin' : 'HispanaTV • Admin Login';
+
+    const prevTitle = document.title;
+    const prevIcon = document.querySelector('link[rel="icon"]')?.href;
+
+    document.title = newTitle;
+    setFavicon(FAVICON_URL);
+
+    return () => {
+      document.title = prevTitle || 'HispanaTV';
+      if (prevIcon) setFavicon(prevIcon);
+    };
+  }, [user?.id, profile?.role]);
+  /* ================================================ */
+
   const log = (label, data) => {
     const line = `[${ts()}] ${label}${data !== undefined ? ` | ${safe(data)}` : ''}`;
     setSteps((s) => [...s, line]);
@@ -1070,7 +1113,7 @@ export default function AdminLoginPage() {
               decoding="async"
             />
           </div>
-          <button
+        <button
             onClick={handleLogout}
             className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg"
           >
@@ -1160,7 +1203,7 @@ export default function AdminLoginPage() {
           <motion.button
             type="submit"
             disabled={loading}
-            className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-all duration-300"
+            className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-all duración-300"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
