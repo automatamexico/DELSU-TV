@@ -581,7 +581,7 @@ function AdminChannelForm() {
 
   return (
     <div className="mt-8 bg-gray-800/70 backdrop-blur-lg border border-gray-700 rounded-2xl p-6">
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items中心 gap-2 mb-4">
         <Plus className="w-5 h-5 text-rose-400" />
         <h3 className="text-xl font-semibold">Alta de nuevo canal</h3>
       </div>
@@ -1022,7 +1022,8 @@ export default function AdminLoginPage() {
       document.title = prevTitle || 'HispanaTV';
       if (prevIcon) setFavicon(prevIcon);
     };
-  }, [user?.id, profile?.role]);
+    // ✅ FIX ESLint: incluir `user` además de `profile?.role`
+  }, [user, profile?.role]);
   /* ================================================ */
 
   const log = (label, data) => {
