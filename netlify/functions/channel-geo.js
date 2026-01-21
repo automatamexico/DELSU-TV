@@ -5,44 +5,58 @@ const JSON_HEADERS = {
 };
 
 export default async (request) => {
+  const safeError = (status, msg, detail) =>
+    new Response(
+      JSON.stringify({
+        ok: false,
+        error: msg,
+        detail,
+        // Para que el front NUNCA se caiga:
+        byCountry: [],
+        countries: [],
+      }),
+      { status, headers: JSON_HEADERS }
+    );
+
   try {
     const url = new URL(request.url);
     const channelId = url.searchParams.get("channel_id");
     if (!channelId) {
-      return new Response(JSON.stringify({ ok:false, error:"missing channel_id" }), { status:400, headers: JSON_HEADERS });
+      return safeError(400, "missing channel_id");
     }
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const KEY = Deno.env.get("SUPABASE_SERVICE_KEY") || Deno.env.get("SUPABASE_ANON_KEY");
+    const KEY =
+      Deno.env.get("SUPABASE_SERVICE_KEY") || Deno.env.get("SUPABASE_ANON_KEY");
+
     if (!SUPABASE_URL || !KEY) {
-      return new Response(JSON.stringify({ ok:false, error:"missing supabase env" }), { status:500, headers: JSON_HEADERS });
+      return safeError(500, "missing supabase env");
     }
 
-    // Lee la tabla agregada por país (trae el código ISO-2)
-    const resp = await fetch(
-      `${SUPABASE_URL}/rest/v1/channel_views_geo?channel_id=eq.${channelId}` +
-      `&select=country_name,country_code,views_count`,
-      { headers: { apikey: KEY, Authorization: `Bearer ${KEY}` } }
-    );
+    // Petición directa a tu tabla agregada por país
+    const endpoint =
+      `${SUPABASE_URL}/rest/v1/channel_views_geo` +
+      `?channel_id=eq.${encodeURIComponent(channelId)}` +
+      `&select=country_name,country_code,views_count`;
+
+    const resp = await fetch(endpoint, {
+      headers: {
+        apikey: KEY,
+        Authorization: `Bearer ${KEY}`,
+        Accept: "application/json",
+        Prefer: "return=representation",
+      },
+    });
 
     if (!resp.ok) {
-      const detail = await resp.text();
-      return new Response(JSON.stringify({ ok:false, error:"supabase_error", detail }), { status:500, headers: JSON_HEADERS });
+      const detail = await resp.text().catch(() => "");
+      // No revientas el front: devuelves estructura vacía
+      return safeError(500, "supabase_error", detail);
     }
 
     const rows = await resp.json();
 
-    // Normaliza y ordena
-    const byCountry = (rows || [])
-      .map(r => ({
-        country_name: r.country_name || "",
-        country_code: (r.country_code || "").toUpperCase(),
-        count: Number(r.views_count || 0),
-      }))
-      .filter(r => r.country_name)      // evita vacíos
-      .sort((a,b) => b.count - a.count);
-
-    // (Opcional) fallback por si algún nombre vino sin code
+    // Normaliza resultados
     const NAME_TO_CODE = {
       "MEXICO": "MX",
       "UNITED STATES": "US",
@@ -51,18 +65,29 @@ export default async (request) => {
       "ARGENTINA": "AR",
       "LATVIA": "LV",
     };
-    for (const r of byCountry) {
-      if (!r.country_code) {
-        const k = r.country_name.trim().toUpperCase();
-        r.country_code = NAME_TO_CODE[k] || "";
-      }
-    }
+
+    const byCountry = (rows || [])
+      .map((r) => {
+        const name = String(r.country_name || "").trim();
+        let code = String(r.country_code || "").trim().toUpperCase();
+        if (!code && name) {
+          const k = name.toUpperCase();
+          if (NAME_TO_CODE[k]) code = NAME_TO_CODE[k];
+        }
+        return {
+          country_name: name,
+          country_code: code,
+          count: Number(r.views_count || 0),
+        };
+      })
+      .filter((r) => r.country_name) // evita vacíos
+      .sort((a, b) => b.count - a.count);
 
     return new Response(
-      JSON.stringify({ ok:true, byCountry, countries: byCountry }),
+      JSON.stringify({ ok: true, byCountry, countries: byCountry }),
       { headers: JSON_HEADERS }
     );
   } catch (e) {
-    return new Response(JSON.stringify({ ok:false, error: e?.message || String(e) }), { status:500, headers: JSON_HEADERS });
+    return safeError(500, "unhandled_error", e?.message || String(e));
   }
 };
