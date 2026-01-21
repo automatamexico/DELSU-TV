@@ -41,13 +41,34 @@ export default function ChannelGeoMap({ channelId, className = "" }) {
     };
   }, [channelId]);
 
+  // ── Alias de nombres para empatar con los del topojson ───────────────────
+  const NAME_ALIASES = {
+    "United States": "United States of America",
+    "Russia": "Russian Federation",
+    "Bolivia": "Bolivia (Plurinational State of)",
+    "Venezuela": "Venezuela (Bolivarian Republic of)",
+    "Iran": "Iran (Islamic Republic of)",
+    "Syria": "Syrian Arab Republic",
+    "Tanzania": "United Republic of Tanzania",
+    "South Korea": "Korea, Republic of",
+    "North Korea": "Korea, Democratic People's Republic of",
+    "Cote d'Ivoire": "Côte d'Ivoire",
+    "Cabo Verde": "Cape Verde",
+    "Czechia": "Czech Republic",
+  };
+  const canonName = (s) => {
+    const raw = String(s || "").trim();
+    return NAME_ALIASES[raw] || raw;
+  };
+
   const viewsByCountryName = useMemo(() => {
     const map = new Map();
     for (const r of rows) {
-      const name = (r?.country_name || "").trim();
+      const name = canonName(r?.country_name);
       const v = Number(r?.views_count || 0);
       if (!name) continue;
-      map.set(name.toLowerCase(), (map.get(name.toLowerCase()) || 0) + v);
+      const k = name.toLowerCase();
+      map.set(k, (map.get(k) || 0) + v);
     }
     return map;
   }, [rows]);
