@@ -68,5 +68,6 @@ export const categories = [
   'Deportes',
   'Música',
   'Infantil',
-  'Tecnología'
+  'Tecnología',
+  'Religión'
 ];
