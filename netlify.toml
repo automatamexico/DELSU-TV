@@ -3,12 +3,19 @@
   command = "npm run build"
   publish = "build"
 
+# 1) Override SOLO para el origen HTTP en 8081
 [[redirects]]
-  from = "/hls/nyc.tvstream.mx:*"
-  to = "http://:splat"
+  from = "/hls/nyc.tvstream.mx:8081/*"
+  to   = "http://nyc.tvstream.mx:8081/:splat"
   status = 200
-  force = true
+  force  = true
 
+# (opcional) si algún día usas ese host sin puerto:
+# [[redirects]]
+#   from = "/hls/nyc.tvstream.mx/*"
+#   to   = "http://nyc.tvstream.mx/:splat"
+#   status = 200
+#   force  = true
 # Proxy HLS GENÉRICO: /hls/<host>/<path...> -> https://<host>/<path...>
 [[redirects]]
   from = "/hls/*"
