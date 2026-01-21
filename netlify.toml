@@ -3,10 +3,16 @@
   command = "npm run build"
   publish = "build"
 
-# 1) Override SOLO para el origen HTTP en 8081
+# 1) Overrides SOLO para el origen HTTP en 8081 (dos variantes de matching)
 [[redirects]]
-  from = "/hls/nyc.tvstream.mx:8081/*"
-  to   = "http://nyc.tvstream.mx:8081/:splat"
+  from   = "/hls/nyc.tvstream.mx:8081/*"
+  to     = "http://nyc.tvstream.mx:8081/:splat"
+  status = 200
+  force  = true
+
+[[redirects]]
+  from   = "/hls/nyc.tvstream.mx%3A8081/*"
+  to     = "http://nyc.tvstream.mx:8081/:splat"
   status = 200
   force  = true
 
