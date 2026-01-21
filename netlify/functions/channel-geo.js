@@ -4,6 +4,14 @@ const JSON_HEADERS = {
   "access-control-allow-origin": "*",
 };
 
+const env = (k) => {
+  // Edge: Deno.env.get ; Functions: process.env
+  try {
+    if (typeof Deno !== "undefined" && Deno?.env?.get) return Deno.env.get(k);
+  } catch {}
+  return (typeof process !== "undefined" && process?.env?.[k]) || "";
+};
+
 export default async (request) => {
   const safeError = (status, msg, detail) =>
     new Response(
@@ -11,7 +19,6 @@ export default async (request) => {
         ok: false,
         error: msg,
         detail,
-        // Para que el front NUNCA se caiga:
         byCountry: [],
         countries: [],
       }),
@@ -21,19 +28,12 @@ export default async (request) => {
   try {
     const url = new URL(request.url);
     const channelId = url.searchParams.get("channel_id");
-    if (!channelId) {
-      return safeError(400, "missing channel_id");
-    }
+    if (!channelId) return safeError(400, "missing channel_id");
 
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const KEY =
-      Deno.env.get("SUPABASE_SERVICE_KEY") || Deno.env.get("SUPABASE_ANON_KEY");
+    const SUPABASE_URL = env("SUPABASE_URL");
+    const KEY = env("SUPABASE_SERVICE_KEY") || env("SUPABASE_ANON_KEY");
+    if (!SUPABASE_URL || !KEY) return safeError(500, "missing supabase env");
 
-    if (!SUPABASE_URL || !KEY) {
-      return safeError(500, "missing supabase env");
-    }
-
-    // Petición directa a tu tabla agregada por país
     const endpoint =
       `${SUPABASE_URL}/rest/v1/channel_views_geo` +
       `?channel_id=eq.${encodeURIComponent(channelId)}` +
@@ -50,13 +50,11 @@ export default async (request) => {
 
     if (!resp.ok) {
       const detail = await resp.text().catch(() => "");
-      // No revientas el front: devuelves estructura vacía
       return safeError(500, "supabase_error", detail);
     }
 
     const rows = await resp.json();
 
-    // Normaliza resultados
     const NAME_TO_CODE = {
       "MEXICO": "MX",
       "UNITED STATES": "US",
@@ -80,7 +78,7 @@ export default async (request) => {
           count: Number(r.views_count || 0),
         };
       })
-      .filter((r) => r.country_name) // evita vacíos
+      .filter((r) => r.country_name)
       .sort((a, b) => b.count - a.count);
 
     return new Response(
