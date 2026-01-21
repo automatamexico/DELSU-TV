@@ -6,9 +6,40 @@ const JSON_HEADERS = {
   "access-control-allow-headers": "content-type",
 };
 
+// Normalización de países: corrige códigos no estándar y territorios
+const TERRITORY_TO_PARENT = {
+  // Territorios de EE. UU. → US
+  PR: "US", GU: "US", VI: "US", AS: "US", MP: "US", UM: "US",
+  // Sinónimo común de GB
+  UK: "GB",
+};
+
+const CANONICAL_NAME = {
+  US: "United States of America",
+  GB: "United Kingdom",
+  MX: "Mexico",
+  AR: "Argentina",
+  CR: "Costa Rica",
+  SG: "Singapore",
+  // agrega otros si lo deseas; por defecto usaremos el de Netlify
+};
+
+function normalizeCountry(geo) {
+  // Netlify Edge da iso2 en geo.country.code (a veces UK u otros)
+  const rawCode = (geo?.country?.code || "UN").toUpperCase();
+  const code = TERRITORY_TO_PARENT[rawCode] || rawCode;
+
+  // Si tenemos un nombre canónico, úsalo; si no, cae al de Netlify
+  const name =
+    CANONICAL_NAME[code] ||
+    geo?.country?.name ||
+    "Unknown";
+
+  return { code, name };
+}
+
 export default async (request, context) => {
   try {
-    // Preflight CORS
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: JSON_HEADERS });
     }
@@ -22,10 +53,8 @@ export default async (request, context) => {
       );
     }
 
-    // Geo de Netlify (Edge)
-    const geo = context?.geo || {};
-    const countryCode = (geo.country?.code || "UN").toUpperCase();
-    const countryName = geo.country?.name || "Unknown";
+    // ✅ Geo normalizado (corrige UK→GB y territorios → país padre)
+    const { code: countryCode, name: countryName } = normalizeCountry(context?.geo);
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_KEY");
@@ -36,7 +65,7 @@ export default async (request, context) => {
       );
     }
 
-    // 🔒 Llamada única al RPC atómico (INSERT ON CONFLICT DO UPDATE … +1)
+    // RPC atómico: incrementa (INSERT … ON CONFLICT … +1)
     const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/increment_geo_view`, {
       method: "POST",
       headers: {
@@ -47,8 +76,8 @@ export default async (request, context) => {
       },
       body: JSON.stringify({
         p_channel_id: channelId,
-        p_country_code: countryCode,
-        p_country_name: countryName,
+        p_country_code: countryCode, // ISO-2 consistente (US, MX, AR, GB…)
+        p_country_name: countryName, // Nombre canónico estable
       }),
     });
 
@@ -60,12 +89,8 @@ export default async (request, context) => {
       );
     }
 
-    // ✅ Éxito
     return new Response(
-      JSON.stringify({
-        ok: true,
-        geo: { countryCode, countryName },
-      }),
+      JSON.stringify({ ok: true, geo: { countryCode, countryName } }),
       { headers: JSON_HEADERS }
     );
   } catch (e) {
