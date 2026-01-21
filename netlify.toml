@@ -3,7 +3,7 @@
   command = "npm run build"
   publish = "build"
 
-  from = "/hls/"
+  from = "/hls/nyc.tvstream.mx:*"
   to = "http://:splat"
   status = 200
   force = true
