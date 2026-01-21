@@ -3,6 +3,11 @@
   command = "npm run build"
   publish = "build"
 
+  from = "/hls/"
+  to = "http://:splat"
+  status = 200
+  force = true
+
 # Proxy HLS GENÉRICO: /hls/<host>/<path...> -> https://<host>/<path...>
 [[redirects]]
   from = "/hls/*"
