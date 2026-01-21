@@ -3,12 +3,12 @@
   command = "npm run build"
   publish = "build"
 
-# 1) Overrides SOLO para el origen HTTP en 8081 (dos variantes de matching)
+# Proxy dedicado para orígenes HTTP (no afecta tus /hls/* actuales)
 [[redirects]]
-  from   = "/hls/nyc.tvstream.mx:8081/*"
-  to     = "http://nyc.tvstream.mx:8081/:splat"
+  from = "/hls-http/*"
+  to   = "/.netlify/functions/hls-http?u=:splat"
   status = 200
-  force  = true
+  force = true
 
 [[redirects]]
   from   = "/hls/nyc.tvstream.mx%3A8081/*"
