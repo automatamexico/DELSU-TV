@@ -11,6 +11,26 @@ const fmtNumber = (n) =>
     ? n.toLocaleString("es-MX")
     : Number(n || 0).toLocaleString("es-MX");
 
+// ── Alias de nombres fuera del componente (evita warnings de deps) ──
+const NAME_ALIASES = {
+  "United States": "United States of America",
+  Russia: "Russian Federation",
+  Bolivia: "Bolivia (Plurinational State of)",
+  Venezuela: "Venezuela (Bolivarian Republic of)",
+  Iran: "Iran (Islamic Republic of)",
+  Syria: "Syrian Arab Republic",
+  Tanzania: "United Republic of Tanzania",
+  "South Korea": "Korea, Republic of",
+  "North Korea": "Korea, Democratic People's Republic of",
+  "Cote d'Ivoire": "Côte d'Ivoire",
+  "Cabo Verde": "Cape Verde",
+  Czechia: "Czech Republic",
+};
+const canonName = (s) => {
+  const raw = String(s || "").trim();
+  return NAME_ALIASES[raw] || raw;
+};
+
 export default function ChannelGeoMap({ channelId, className = "" }) {
   const [rows, setRows] = useState([]);
   const [hover, setHover] = useState(null);
@@ -41,26 +61,6 @@ export default function ChannelGeoMap({ channelId, className = "" }) {
     };
   }, [channelId]);
 
-  // ── Alias de nombres para empatar con los del topojson ───────────────────
-  const NAME_ALIASES = {
-    "United States": "United States of America",
-    "Russia": "Russian Federation",
-    "Bolivia": "Bolivia (Plurinational State of)",
-    "Venezuela": "Venezuela (Bolivarian Republic of)",
-    "Iran": "Iran (Islamic Republic of)",
-    "Syria": "Syrian Arab Republic",
-    "Tanzania": "United Republic of Tanzania",
-    "South Korea": "Korea, Republic of",
-    "North Korea": "Korea, Democratic People's Republic of",
-    "Cote d'Ivoire": "Côte d'Ivoire",
-    "Cabo Verde": "Cape Verde",
-    "Czechia": "Czech Republic",
-  };
-  const canonName = (s) => {
-    const raw = String(s || "").trim();
-    return NAME_ALIASES[raw] || raw;
-  };
-
   const viewsByCountryName = useMemo(() => {
     const map = new Map();
     for (const r of rows) {
@@ -71,21 +71,21 @@ export default function ChannelGeoMap({ channelId, className = "" }) {
       map.set(k, (map.get(k) || 0) + v);
     }
     return map;
-  }, [rows]);
+  }, [rows]); // ← sin warning
 
   // 🎨 Colores:
-  // 0 → azul tenue (igual que antes)
+  // 0 → azul tenue
   // 1–3 → rojo
   // 4–10 → verde
   // 11–50 → amarillo
   // 51+ → rosa
   const colorFor = (views) => {
     const v = Number(views || 0);
-    if (v <= 0) return "rgba(59,130,246,0.08)";   // azul muy tenue
-    if (v <= 3) return "rgba(239,68,68,0.75)";    // rojo
-    if (v <= 10) return "rgba(34,197,94,0.75)";   // verde
-    if (v <= 50) return "rgba(234,179,8,0.8)";    // amarillo
-    return "rgba(236,72,153,0.9)";                // rosa
+    if (v <= 0) return "rgba(59,130,246,0.08)";
+    if (v <= 3) return "rgba(239,68,68,0.75)";
+    if (v <= 10) return "rgba(34,197,94,0.75)";
+    if (v <= 50) return "rgba(234,179,8,0.8)";
+    return "rgba(236,72,153,0.9)";
   };
 
   return (
@@ -160,14 +160,14 @@ export default function ChannelGeoMap({ channelId, className = "" }) {
         )}
       </div>
 
-      {/* Leyenda con los mismos colores */}
+      {/* Leyenda */}
       <div className="mt-2 grid grid-cols-5 gap-2 text-[10px] md:text-[11px] text-gray-300">
         {[
-          { l: "0", c: "rgba(59,130,246,0.08)" },   // azul tenue
-          { l: "1–3", c: "rgba(239,68,68,0.75)" },  // rojo
-          { l: "4–10", c: "rgba(34,197,94,0.75)" }, // verde
-          { l: "11–50", c: "rgba(234,179,8,0.8)" }, // amarillo
-          { l: "51+", c: "rgba(236,72,153,0.9)" },  // rosa
+          { l: "0", c: "rgba(59,130,246,0.08)" },
+          { l: "1–3", c: "rgba(239,68,68,0.75)" },
+          { l: "4–10", c: "rgba(34,197,94,0.75)" },
+          { l: "11–50", c: "rgba(234,179,8,0.8)" },
+          { l: "51+", c: "rgba(236,72,153,0.9)" },
         ].map((b) => (
           <div key={b.l} className="flex items-center gap-2">
             <span
