@@ -57,3 +57,42 @@
 [[edge_functions]]
 path = "/log-view"
 function = "log-view"
+
+# === CACHE FUERTE para assets versionados (hash en nombre) ===
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.woff2"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.svg"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# === NO cachear HTML del SPA ===
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cache-Control = "no-store"
+
+# === Datos JSON (corto) ===
+[[headers]]
+  for = "/**/*.json"
+  [headers.values]
+    Cache-Control = "public, max-age=60"
+
