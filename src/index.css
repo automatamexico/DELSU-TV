@@ -1,47 +1,59 @@
-/* Placeholder mínimo para satisfacer el import de src/index.js
-   No usa Tailwind ni PostCSS. Seguro para build en Netlify. */
+/* ==== Estilos base opcionales (si ya usas Tailwind desde styles.css, deja esto solo con tus reglas) ==== */
 
-:root {
-  --app-ready: 1;
-}
-
-/* Opcional: color de fondo base para evitar “flash” blanco */
-html, body, #root {
-  height: 100%;
-  background: #000; /* tu app ya usa fondos oscuros */
-  margin: 0;
-}
-
-/* Suaviza scroll (cosmético) */
-html { scroll-behavior: smooth; }
-
-/* Tipografía base opcional */
-body {
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* --- Carousel rows --- */
+/* -------- Carrusel: animaciones -------- */
 @keyframes slide-left {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-50%); }
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); } /* recorre media pista (está duplicada) */
 }
 @keyframes slide-right {
-  from { transform: translateX(-50%); }
-  to   { transform: translateX(0); }
+  0%   { transform: translateX(-50%); }
+  100% { transform: translateX(0); }
 }
 
-/* Suaviza bordes y oculta overflow lateral con degradé */
-.carousel-mask {
-  -webkit-mask-image: linear-gradient(to right, transparent 0, black 60px, black calc(100% - 60px), transparent 100%);
-  mask-image: linear-gradient(to right, transparent 0, black 60px, black calc(100% - 60px), transparent 100%);
-}
-
+/* La pista que se mueve (el contenedor que tiene la animación) */
 .carousel-track {
   will-change: transform;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
 }
-.carousel-track:hover {
-  animation-play-state: paused; /* pausa cuando pasas el mouse */
+
+/* Contenedor que recorta los bordes (el que envuelve la pista) */
+.carousel-mask {
+  position: relative;
+  overflow: hidden;
 }
+
+/* Vignette/biselado en los lados para un fade bonito (opcional) */
+.carousel-mask::before,
+.carousel-mask::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 40px;          /* ancho del degradado lateral */
+  height: 100%;
+  pointer-events: none; /* no bloquea clicks */
+  z-index: 2;
+}
+
+/* Ajusta el color del fondo del fade según tu tema.
+   Este ejemplo usa un gris muy oscuro (rgb(17,24,39) ~ Tailwind bg-gray-900) */
+.carousel-mask::before {
+  left: 0;
+  background: linear-gradient(to right, rgba(17,24,39,0.95), rgba(17,24,39,0));
+}
+.carousel-mask::after {
+  right: 0;
+  background: linear-gradient(to left, rgba(17,24,39,0.95), rgba(17,24,39,0));
+}
+
+/* Pausar animación al pasar el mouse (opcional) */
+.carousel-mask:hover .carousel-track {
+  animation-play-state: paused;
+}
+
+/* Aseguramos que las tarjetas dentro del carrusel respeten su ancho/alto asignado */
+.carousel-slot {
+  flex: 0 0 auto; /* equivalente a flex-none */
+}
+
+/* Si quieres que las imágenes nunca se estiren raro, ya lo manejas con Tailwind (object-contain). */
