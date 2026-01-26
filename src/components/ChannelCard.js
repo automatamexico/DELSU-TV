@@ -134,7 +134,7 @@ export default function ChannelCard({ channel, onClick }) {
   const starCount = calcStarsFromViews(views);
 
   return (
-    <div className="group w-full text-left rounded-xl overflow-hidden bg-gray-900/40 border border-gray-800 hover:border-gray-700 focus:outline-none focus:ring-2 focus:ring-rose-500/40 transition">
+   <div className="group w-full h-full text-left rounded-xl overflow-hidden bg-gray-900/40 border border-gray-800 hover:border-gray-700 focus:outline-none focus:ring-2 focus:ring-rose-500/40 transition">
       {/* === PÓSTER (ÚNICO QUE ABRE EL REPRODUCTOR) === */}
       <button
         type="button"
