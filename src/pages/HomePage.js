@@ -8,9 +8,6 @@ import { useChannels } from "../hooks/useChannels";
 import { useAuth } from "../context/AuthContext";
 import { categories } from "../data/channels";
 
-// >>> NUEVO: carrusel por filas
-import CarouselGridLimited from "../components/CarouselGridLimited";
-
 const PlayerModal = lazy(() => import("../components/PlayerModal"));
 
 function ChannelsSkeleton() {
@@ -29,70 +26,6 @@ function ChannelsSkeleton() {
 
 function norm(v) {
   return String(v || "").trim().toLowerCase();
-}
-
-/* =======================
-   Helper local para el carrusel
-   - No toca tus componentes existentes
-   - Usa imagen si existe (intenta varias llaves comunes) y cae a iniciales
-   ======================= */
-function getPosterFromChannel(c) {
-  return (
-    c?.poster ||
-    c?.poster_url ||
-    c?.image ||
-    c?.image_url ||
-    c?.logo ||
-    c?.logo_url ||
-    c?.thumbnail ||
-    c?.thumb ||
-    null
-  );
-}
-
-function ChannelCardLite({ channel, onClick }) {
-  const poster = getPosterFromChannel(channel);
-  const title = channel?.name || channel?.title || channel?.canal || "Canal";
-  const country = channel?.country || channel?.pais || "";
-
-  return (
-    <button
-      type="button"
-      onClick={() => onClick?.(channel)}
-      className="group w-full text-left"
-      title={title}
-    >
-      <div className="w-full rounded-xl overflow-hidden border border-gray-700/50 bg-gray-900/60 shadow hover:shadow-lg hover:border-indigo-400/60 transition">
-        <div
-          className="w-full bg-black/70"
-          style={{ aspectRatio: "16 / 9" }}
-        >
-          {poster ? (
-            <img
-              src={poster}
-              alt={title}
-              className="w-full h-full object-cover"
-              loading="lazy"
-              decoding="async"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-gray-400">
-              {title?.slice(0, 2)?.toUpperCase() || "?"}
-            </div>
-          )}
-        </div>
-
-        <div className="px-3 py-2">
-          <div className="text-sm font-medium text-gray-100 truncate group-hover:text-white">
-            {title}
-          </div>
-          {country ? (
-            <div className="text-[11px] text-gray-400 truncate">{country}</div>
-          ) : null}
-        </div>
-      </div>
-    </button>
-  );
 }
 
 export default function HomePage() {
@@ -200,29 +133,7 @@ export default function HomePage() {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.35 }}
           >
-            {/* =========================
-               NUEVO: CARRUSEL (sin quitar tu grid)
-               - Máx 10 filas
-               - Dirección alternada por fila
-               ========================== */}
-            <section className="px-2 sm:px-4 lg:px-6 space-y-3 mb-6">
-              <CarouselGridLimited
-                items={countryFilteredChannels}
-                maxRows={10}
-                rowHeight={320}     // ajusta si necesitas más/menos alto
-                cardWidth={260}     // ajusta al ancho de tus pósters
-                gap={16}
-                baseSpeed={40}      // segundos; menor = más rápido
-                renderItem={(ch) => (
-                  <ChannelCardLite
-                    channel={ch}
-                    onClick={handleChannelClick}
-                  />
-                )}
-              />
-            </section>
-
-            {/* Tu grilla original queda tal cual */}
+            {/* Pasamos los canales ya filtrados por suspensión + país */}
             <ChannelGrid
               channels={countryFilteredChannels}
               onChannelClick={handleChannelClick}
