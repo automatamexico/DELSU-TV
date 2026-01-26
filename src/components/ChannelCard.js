@@ -130,7 +130,7 @@ export default function ChannelCard({ channel, onClick }) {
   const hasAnySocial = Boolean(fbUrl || ytUrl || tkUrl || webUrl);
 
   /* Calificación desde vistas */
- const views = channel?.views_count ?? channel?.view_count ?? channel?.views ?? 0;
+  const views = channel?.views_count ?? channel?.view_count ?? channel?.views ?? 0;
   const starCount = calcStarsFromViews(views);
 
   return (
@@ -142,12 +142,21 @@ export default function ChannelCard({ channel, onClick }) {
         className="relative block w-full text-left"
         aria-label={`Abrir reproductor: ${title}`}
       >
-        {/* ↓↓↓ ÚNICO CAMBIO: 5% menos alto */}
-        <div className="aspect-[3/4.2] md:aspect-[2/3.15] w-full overflow-hidden bg-gray-800">
+        {/* 
+          CONTENEDOR CON RELACIÓN DE ASPECTO:
+          - Mantiene el espacio reservado para que el layout no “salte”.
+          - Conservamos tus clases actuales y añadimos aspect-ratio nativo
+            como fallback para navegadores que lo soportan.
+        */}
+        <div
+          className="aspect-[3/4.2] md:aspect-[2/3.15] w-full overflow-hidden bg-gray-800"
+          style={{ aspectRatio: "3 / 4" }}  // 👈 fallback/garantía
+        >
           <img
             src={poster}
             alt={title}
             loading="lazy"
+            decoding="async"
             className="w-full h-full object-contain object-center transition-transform duration-300 group-hover:scale-[1.02]"
           />
         </div>
@@ -175,6 +184,7 @@ export default function ChannelCard({ channel, onClick }) {
                   src={flagIconUrl}
                   alt={country}
                   loading="lazy"
+                  decoding="async"
                   className="h-5 w-5 object-contain rounded-sm border border-white/10"
                 />
               ) : null}
@@ -208,6 +218,7 @@ export default function ChannelCard({ channel, onClick }) {
                       src={rokuIcon}
                       alt="Roku"
                       loading="lazy"
+                      decoding="async"
                       className="h-5 w-auto object-contain"
                     />
                   </button>
@@ -216,6 +227,7 @@ export default function ChannelCard({ channel, onClick }) {
                     src={rokuIcon}
                     alt="Roku"
                     loading="lazy"
+                    decoding="async"
                     className="h-5 w-auto object-contain"
                   />
                 )
@@ -243,6 +255,7 @@ export default function ChannelCard({ channel, onClick }) {
                     src={fbIconUrl}
                     alt="Facebook"
                     loading="lazy"
+                    decoding="async"
                     className="h-5 w-5 object-contain"
                   />
                 </button>
@@ -259,6 +272,7 @@ export default function ChannelCard({ channel, onClick }) {
                     src={ytIconUrl}
                     alt="YouTube"
                     loading="lazy"
+                    decoding="async"
                     className="h-5 w-5 object-contain"
                   />
                 </button>
@@ -275,6 +289,7 @@ export default function ChannelCard({ channel, onClick }) {
                     src={tkIconUrl}
                     alt="TikTok"
                     loading="lazy"
+                    decoding="async"
                     className="h-5 w-5 object-contain"
                   />
                 </button>
@@ -291,6 +306,7 @@ export default function ChannelCard({ channel, onClick }) {
                     src={webIconUrl}
                     alt="Sitio web"
                     loading="lazy"
+                    decoding="async"
                     className="h-5 w-5 object-contain"
                   />
                 </button>
