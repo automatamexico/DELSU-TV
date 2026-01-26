@@ -1,5 +1,3 @@
-MODIFICADO HOME
-
 // src/pages/HomePage.jsx
 import React, { useState, Suspense, lazy, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
