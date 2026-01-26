@@ -1,26 +1,21 @@
+// src/components/CarouselGridLimited.jsx
 import React, { useMemo } from "react";
 
 /**
- * items        : array completo de canales (pasas TODO el listado)
- * renderItem   : (item) => JSX (tu ChannelCard)
- * maxRows      : máximo de filas que quieres mostrar (10 por defecto)
- * rowHeight    : alto de cada fila (DEBE alcanzar la card completa)
- * cardWidth    : ancho fijo por tarjeta dentro del carrusel
- * gap          : separación horizontal entre tarjetas
- * baseSpeed    : segundos por bucle (cuanto menor, más rápido)
- * className    : clases extra para el contenedor
- *
- * NOTA CLAVE: si ves recortes/choques, sube rowHeight; si se ven muy
- * apretadas, cambia cardWidth (360–400 suele ir bien para tus cards).
+ * items:      array de canales
+ * renderItem: (item) => <ChannelCard .../>
+ * maxRows:    número máximo de filas (default 10)
+ * cardWidth:  ancho fijo de cada tarjeta (debe coincidir con el ancho visual de tu card)
+ * gap:        separación horizontal entre tarjetas
+ * baseSpeed:  segundos en recorrer media pista (la pista está duplicada)
  */
 export default function CarouselGridLimited({
   items = [],
   renderItem,
   maxRows = 10,
-  rowHeight = 560,   // <-- alto para tu tarjeta completa (poster + texto)
-  cardWidth = 360,   // <-- ancho “slot” coherente con tu card grande
-  gap = 16,
-  baseSpeed = 40,    // segundos por vuelta; 30–45 suele verse bien
+  cardWidth = 360,   // <-- subí el valor para tu card grande (ajústalo si tu card es más ancha o más angosta)
+  gap = 24,          // un poco más de aire entre tarjetas
+  baseSpeed = 40,
   className = "",
 }) {
   const rows = useMemo(() => {
@@ -40,15 +35,15 @@ export default function CarouselGridLimited({
   return (
     <div className={className}>
       {rows.map((rowItems, idx) => {
-        const reverse = idx % 2 === 1;   // alterna dirección por fila
+        const reverse = idx % 2 === 1;
+        const speed = Math.max(20, baseSpeed);
         return (
           <RowCarousel
             key={`row-${idx}`}
             items={rowItems}
             renderItem={renderItem}
             reverse={reverse}
-            speed={Math.max(10, baseSpeed)}
-            rowHeight={rowHeight}
+            speed={speed}
             cardWidth={cardWidth}
             gap={gap}
           />
@@ -58,42 +53,36 @@ export default function CarouselGridLimited({
   );
 }
 
-/** Fila con marquee infinito (duplicada para loop continuo) */
-function RowCarousel({
-  items,
-  renderItem,
-  reverse,
-  speed,
-  rowHeight,
-  cardWidth,
-  gap,
-}) {
+function RowCarousel({ items, renderItem, reverse, speed, cardWidth, gap }) {
+  // pista duplicada para loop infinito
   const doubled = useMemo(() => [...items, ...items], [items]);
+
   const animName = reverse ? "slide-right" : "slide-left";
+  const animStyle = {
+    animationName: animName,
+    animationDuration: `${speed}s`,
+    animationTimingFunction: "linear",
+    animationIterationCount: "infinite",
+  };
 
   return (
     <div
-      className="relative overflow-hidden carousel-mask rounded-xl border border-gray-700/40 bg-gray-900/30"
-      style={{ height: rowHeight, marginBottom: 16 }}
+      className="carousel-mask rounded-xl border border-gray-700/40 bg-gray-900/30 mb-8"
+      /* SIN height fija: la altura viene de las tarjetas */
     >
-      <div
-        className="absolute inset-0 flex items-stretch will-change-transform"
-        style={{
-          animationName: animName,
-          animationTimingFunction: "linear",
-          animationIterationCount: "infinite",
-          animationDuration: `${speed}s`,
-        }}
-      >
-        {/* Pista duplicada (200%) */}
+      {/* Pista en flujo normal, NO absoluta */}
+      <div className="carousel-track flex items-stretch" style={animStyle}>
+        {/* Duplicado para 200% */}
         <div className="flex items-stretch" style={{ gap, paddingInline: gap }}>
           {doubled.map((it, i) => (
             <div
               key={i}
-              className="flex-none"
-              style={{ width: cardWidth }}  // ancho fijo por tarjeta
+              className="carousel-slot"
+              style={{
+                flex: `0 0 ${cardWidth}px`,  // no se encoge ni crece
+                width: cardWidth,            // asegura ancho fijo
+              }}
             >
-              {/* Tu card se monta tal cual (completa) */}
               {renderItem(it)}
             </div>
           ))}
