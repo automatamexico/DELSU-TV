@@ -1,29 +1,31 @@
 import React, { useMemo } from "react";
 
 /**
- * items:   array de tus canales (cualquier forma)
- * renderItem: (item) => JSX (tu card/PosterCanal)
- * maxRows: 10 por defecto
- * rowHeight: alto aproximado de cada fila (para que todo quede compacto)
- * cardWidth: ancho mínimo de cada card (para spacing consistente)
- * gap: separación horizontal entre cards
- * baseSpeed: segundos para que la pista recorra el 50% (se auto duplica para loop)
+ * items        : array completo de canales (pasas TODO el listado)
+ * renderItem   : (item) => JSX (tu ChannelCard)
+ * maxRows      : máximo de filas que quieres mostrar (10 por defecto)
+ * rowHeight    : alto de cada fila (DEBE alcanzar la card completa)
+ * cardWidth    : ancho fijo por tarjeta dentro del carrusel
+ * gap          : separación horizontal entre tarjetas
+ * baseSpeed    : segundos por bucle (cuanto menor, más rápido)
+ * className    : clases extra para el contenedor
+ *
+ * NOTA CLAVE: si ves recortes/choques, sube rowHeight; si se ven muy
+ * apretadas, cambia cardWidth (360–400 suele ir bien para tus cards).
  */
 export default function CarouselGridLimited({
   items = [],
   renderItem,
   maxRows = 10,
-  rowHeight = 280,
-  cardWidth = 240,
+  rowHeight = 560,   // <-- alto para tu tarjeta completa (poster + texto)
+  cardWidth = 360,   // <-- ancho “slot” coherente con tu card grande
   gap = 16,
-  baseSpeed = 40,
+  baseSpeed = 40,    // segundos por vuelta; 30–45 suele verse bien
   className = "",
 }) {
-  // Dividimos el listado completo en hasta maxRows filas balanceadas
   const rows = useMemo(() => {
     if (!items.length) return [];
-    const rowsCount = Math.min(maxRows, Math.max(1, Math.ceil(items.length / 1))); // al menos 1 fila
-    // Calculamos cuántos elementos por fila (balanceado)
+    const rowsCount = Math.min(maxRows, Math.max(1, Math.ceil(items.length / 1)));
     const perRow = Math.ceil(items.length / rowsCount);
     const buckets = [];
     for (let i = 0; i < rowsCount; i++) {
@@ -38,16 +40,14 @@ export default function CarouselGridLimited({
   return (
     <div className={className}>
       {rows.map((rowItems, idx) => {
-        const reverse = idx % 2 === 1;          // filas alternadas
-        const speed = Math.max(20, baseSpeed);   // no dejes que sea demasiado lento
-
+        const reverse = idx % 2 === 1;   // alterna dirección por fila
         return (
           <RowCarousel
             key={`row-${idx}`}
             items={rowItems}
             renderItem={renderItem}
             reverse={reverse}
-            speed={speed}
+            speed={Math.max(10, baseSpeed)}
             rowHeight={rowHeight}
             cardWidth={cardWidth}
             gap={gap}
@@ -58,7 +58,7 @@ export default function CarouselGridLimited({
   );
 }
 
-/** Fila individual con marquee infinito (duplica contenido para loop) */
+/** Fila con marquee infinito (duplicada para loop continuo) */
 function RowCarousel({
   items,
   renderItem,
@@ -68,15 +68,8 @@ function RowCarousel({
   cardWidth,
   gap,
 }) {
-  // Dos copias de la misma pista para poder hacer loop continuo
   const doubled = useMemo(() => [...items, ...items], [items]);
-
-  // Inline style para animación con duración configurable
   const animName = reverse ? "slide-right" : "slide-left";
-  const animStyle = {
-    animationName: animName,
-    animationDuration: `${speed}s`,
-  };
 
   return (
     <div
@@ -84,21 +77,23 @@ function RowCarousel({
       style={{ height: rowHeight, marginBottom: 16 }}
     >
       <div
-        className="absolute inset-0 flex carousel-track"
+        className="absolute inset-0 flex items-stretch will-change-transform"
         style={{
-          ...animStyle,
+          animationName: animName,
           animationTimingFunction: "linear",
           animationIterationCount: "infinite",
+          animationDuration: `${speed}s`,
         }}
       >
-        {/* Pista 200% (duplicada) */}
-        <div className="flex" style={{ gap, paddingInline: gap }}>
+        {/* Pista duplicada (200%) */}
+        <div className="flex items-stretch" style={{ gap, paddingInline: gap }}>
           {doubled.map((it, i) => (
             <div
               key={i}
-              className="shrink-0"
-              style={{ width: cardWidth }}
+              className="flex-none"
+              style={{ width: cardWidth }}  // ancho fijo por tarjeta
             >
+              {/* Tu card se monta tal cual (completa) */}
               {renderItem(it)}
             </div>
           ))}
