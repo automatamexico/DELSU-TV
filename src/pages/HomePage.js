@@ -3,9 +3,9 @@ import React, { useState, Suspense, lazy, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import Header from "../components/Header";
 import CategoryFilter from "../components/CategoryFilter";
-import ChannelGrid from "../components/ChannelGrid";
-import ChannelCard from "../components/ChannelCard";
+// ⬇️ usamos el carrusel y la tarjeta
 import CarouselGridLimited from "../components/CarouselGridLimited";
+import ChannelCard from "../components/ChannelCard";
 import { useChannels } from "../hooks/useChannels";
 import { useAuth } from "../context/AuthContext";
 import { categories } from "../data/channels";
@@ -58,16 +58,16 @@ export default function HomePage() {
 
   const [selectedChannel, setSelectedChannel] = useState(null);
 
-  // Ocultar suspendidos
+  // Ocultar canales suspendidos
   const visibleChannels = useMemo(
     () => (channels || []).filter((c) => !c?.is_suspended),
     [channels]
   );
 
-  // Estado País
+  // Estado de País seleccionado
   const [selectedCountry, setSelectedCountry] = useState("");
 
-  // Países únicos (para el filtro)
+  // Lista de países únicos + bandera desde canales visibles
   const countryItems = useMemo(() => {
     const map = new Map();
     (visibleChannels || []).forEach((c) => {
@@ -86,36 +86,13 @@ export default function HomePage() {
     );
   }, [visibleChannels]);
 
-  // Filtro adicional por país (sobre lo que ya venga filtrado del hook)
+  // Filtrado adicional por país
   const countryFilteredChannels = useMemo(() => {
     if (!selectedCountry) return visibleChannels;
     return (visibleChannels || []).filter(
       (c) => norm(c?.country || c?.pais) === norm(selectedCountry)
     );
   }, [visibleChannels, selectedCountry]);
-
-  // ¿Estamos en Home sin filtros? (sin búsqueda, sin país, categoría = Todos/empty)
-  const isHomeNoFilters = useMemo(() => {
-    const cat = (selectedCategory || "").trim().toLowerCase();
-    const isCatAll = cat === "" || cat === "todos";
-    const hasSearch = !!norm(searchTerm);
-    const hasCountry = !!norm(selectedCountry);
-    return isCatAll && !hasSearch && !hasCountry;
-  }, [selectedCategory, searchTerm, selectedCountry]);
-
-  // Deduplicador estable por id/slug/título (evita que un canal se repita)
-  const uniqueFiltered = useMemo(() => {
-    const seen = new Set();
-    return (countryFilteredChannels || []).filter((c) => {
-      const key = norm(
-        c?.id ?? c?.slug ?? c?.title ?? c?.name ?? c?.channel_name ?? ""
-      );
-      if (!key) return false;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }, [countryFilteredChannels]);
 
   const handleChannelClick = (channel) => setSelectedChannel(channel);
   const handleClosePlayer = () => setSelectedChannel(null);
@@ -158,27 +135,17 @@ export default function HomePage() {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.35 }}
           >
-            {isHomeNoFilters ? (
-              // HOME: Carrusel (únicamente cuando NO hay filtros)
-              <CarouselGridLimited
-                items={uniqueFiltered}
-                className="px-4 pb-6"
-                // Ajusta tamaños si lo necesitas, estos conservan la card completa
-                rowHeight={460}
-                cardWidth={320}
-                gap={20}
-                baseSpeed={40}
-                renderItem={(item) => (
-                  <ChannelCard channel={item} onClick={handleChannelClick} />
-                )}
-              />
-            ) : (
-              // FILTRADO: Grid normal, sin carrusel, sin duplicados
-              <ChannelGrid
-                channels={uniqueFiltered}
-                onChannelClick={handleChannelClick}
-              />
-            )}
+            {/* Carrusel en 10 filas. Cada fila recorre todo el listado y alterna dirección */}
+            <CarouselGridLimited
+              items={countryFilteredChannels}
+              maxRows={10}
+              cardWidth={360}   // ancho donde la card cabe completa (poster + texto)
+              gap={24}
+              baseSpeed={40}
+              renderItem={(ch) => (
+                <ChannelCard channel={ch} onClick={handleChannelClick} />
+              )}
+            />
           </motion.main>
         </>
       )}
