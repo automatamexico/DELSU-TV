@@ -4,8 +4,8 @@ import { motion } from "framer-motion";
 import Header from "../components/Header";
 import CategoryFilter from "../components/CategoryFilter";
 import ChannelGrid from "../components/ChannelGrid";
-import ChannelCard from "../components/ChannelCard";                 // ← añadido
-import CarouselGridLimited from "../components/CarouselGridLimited"; // ← añadido
+import ChannelCard from "../components/ChannelCard";
+import CarouselGridLimited from "../components/CarouselGridLimited";
 import { useChannels } from "../hooks/useChannels";
 import { useAuth } from "../context/AuthContext";
 import { categories } from "../data/channels";
@@ -58,16 +58,16 @@ export default function HomePage() {
 
   const [selectedChannel, setSelectedChannel] = useState(null);
 
-  // NUEVO: ocultar canales suspendidos
+  // Ocultar canales suspendidos
   const visibleChannels = useMemo(
     () => (channels || []).filter((c) => !c?.is_suspended),
     [channels]
   );
 
-  // NUEVO: estado de País seleccionado
+  // País seleccionado
   const [selectedCountry, setSelectedCountry] = useState("");
 
-  // NUEVO: lista de países únicos + bandera desde los canales (solo visibles)
+  // Países únicos para el filtro
   const countryItems = useMemo(() => {
     const map = new Map();
     (visibleChannels || []).forEach((c) => {
@@ -86,7 +86,7 @@ export default function HomePage() {
     );
   }, [visibleChannels]);
 
-  // NUEVO: filtrado adicional por país (sobre los visibles)
+  // Filtrado adicional por país
   const countryFilteredChannels = useMemo(() => {
     if (!selectedCountry) return visibleChannels;
     return (visibleChannels || []).filter(
@@ -99,10 +99,12 @@ export default function HomePage() {
 
   // === Desactivar carrusel cuando hay búsqueda/filtro activo ===
   const hasSearch = norm(searchTerm).length > 0;
-  const cat = norm(selectedCategory);
+  const catNorm = norm(selectedCategory);
   const hasCategory =
-    !!cat && cat !== "todas" && cat !== "todos" && cat !== "all";
+    !!catNorm && !/^(todas|todos|all|categoria|categoría)?$/.test(catNorm);
   const hasCountry = norm(selectedCountry).length > 0;
+
+  // Si cualquiera está activo, NO hay carrusel
   const isFiltering = hasSearch || hasCategory || hasCountry;
 
   return (
@@ -143,14 +145,14 @@ export default function HomePage() {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.35 }}
           >
-            {/* Si hay filtros/búsqueda → grid normal (SIN carrusel) */}
             {isFiltering ? (
+              // >>> GRID NORMAL SIN CARRUSEL <<<
               <ChannelGrid
                 channels={countryFilteredChannels}
                 onChannelClick={handleChannelClick}
               />
             ) : (
-              // Si NO hay filtros/búsqueda → carrusel (todas las filas recorren todos los canales)
+              // >>> CARRUSEL (todas las filas recorren todos los canales) <<<
               <div className="p-4">
                 <CarouselGridLimited
                   items={countryFilteredChannels}
@@ -158,7 +160,7 @@ export default function HomePage() {
                     <ChannelCard channel={it} onClick={handleChannelClick} />
                   )}
                   maxRows={10}
-                  cardWidth={360} // mantiene tu card completa (poster + info)
+                  cardWidth={360} // mantiene la card completa (poster + info)
                   gap={24}
                   baseSpeed={40}
                 />
