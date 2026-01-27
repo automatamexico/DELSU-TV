@@ -176,7 +176,7 @@ export default function HomePage() {
               // ✅ HOME (Todos + sin país + sin búsqueda): carrusel
               <CarouselGridLimited
                 items={countryFilteredChannels}
-                maxRows={10}
+                maxRows={5}
                 cardWidth={360} // ancho donde la card cabe completa (poster + texto)
                 gap={24}
                 baseSpeed={40}
