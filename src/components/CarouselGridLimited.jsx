@@ -3,21 +3,22 @@ import React, { useMemo } from "react";
 
 /**
  * items:      array de canales
- * renderItem: (item) => <ChannelCard .../>
- * maxRows:    número máximo de filas (default 10)
- * cardWidth:  ancho fijo de cada tarjeta (debe coincidir con el ancho visual de tu card)
- * gap:        separación horizontal entre tarjetas
- * baseSpeed:  segundos del marquee (más alto = más lento)
+ * renderItem: (item) => JSX (tu ChannelCard)
+ * maxRows:    cuántas filas como máximo (default 10)
+ * cardWidth:  ancho fijo de cada tarjeta (debe ser >= al diseño de tu ChannelCard)
+ * gap:        espacio horizontal entre tarjetas (px)
+ * baseSpeed:  segundos de desplazamiento (menor = más rápido)
  */
 export default function CarouselGridLimited({
   items = [],
   renderItem,
   maxRows = 10,
-  cardWidth = 360,  // AJUSTA si tu card es más ancha (ej. 380)
+  cardWidth = 360,   // grande para que quepa poster + texto
   gap = 24,
   baseSpeed = 40,
   className = "",
 }) {
+  // dividimos el listado completo en hasta `maxRows` filas (balanceado)
   const rows = useMemo(() => {
     if (!items.length) return [];
     const rowsCount = Math.min(maxRows, Math.max(1, Math.ceil(items.length / 1)));
@@ -35,10 +36,11 @@ export default function CarouselGridLimited({
   return (
     <div className={className}>
       {rows.map((rowItems, idx) => {
-        const reverse = idx % 2 === 1;
-        const speed = Math.max(16, baseSpeed);
+        const reverse = idx % 2 === 1; // alterna dirección por fila
+        const speed = Math.max(18, baseSpeed);
+
         return (
-          <RowCarousel
+          <CarouselRow
             key={`row-${idx}`}
             items={rowItems}
             renderItem={renderItem}
@@ -53,37 +55,41 @@ export default function CarouselGridLimited({
   );
 }
 
-function RowCarousel({ items, renderItem, reverse, speed, cardWidth, gap }) {
-  // pista duplicada para loop continuo
+function CarouselRow({ items, renderItem, reverse, speed, cardWidth, gap }) {
+  // duplicamos el contenido para bucle infinito
   const doubled = useMemo(() => [...items, ...items], [items]);
 
   const animName = reverse ? "slide-right" : "slide-left";
-  const animStyle = {
-    animationName: animName,
-    animationDuration: `${speed}s`,
-    animationTimingFunction: "linear",
-    animationIterationCount: "infinite",
-    willChange: "transform",
-  };
 
   return (
-    <div className="carousel-mask rounded-xl border border-gray-700/40 bg-gray-900/30 mb-8 overflow-hidden">
-      {/* Pista nowrap (marquee) */}
-      <div className="carousel-strip" style={animStyle}>
+    <div className="overflow-hidden rounded-xl border border-gray-700/40 bg-gray-900/30 mb-6">
+      {/*
+        IMPORTANTE:
+        - Sin absolute.
+        - Altura automática (depende del contenido).
+        - No se pisa con la fila de abajo.
+      */}
+      <div
+        className="whitespace-nowrap will-change-transform"
+        style={{
+          animationName: animName,
+          animationDuration: `${speed}s`,
+          animationTimingFunction: "linear",
+          animationIterationCount: "infinite",
+        }}
+      >
+        {/* pista duplicada */}
         {doubled.map((it, i) => (
-          <span
+          <div
             key={i}
-            className="carousel-slot inline-block align-top"
+            className="inline-block align-top"
             style={{
               width: cardWidth,
               marginRight: gap,
             }}
           >
-            {/* Marca para neutralizar hover-scale dentro del carrusel */}
-            <div className="in-carousel h-full w-full overflow-hidden">
-              {renderItem(it)}
-            </div>
-          </span>
+            {renderItem(it)}
+          </div>
         ))}
       </div>
     </div>
