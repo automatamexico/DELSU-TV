@@ -1,5 +1,5 @@
 // src/components/CarouselGridLimited.jsx
-import React, { useMemo } from "react";
+import React, { useMemo, useRef, useState, useCallback } from "react";
 
 /**
  * items:      arreglo completo de canales
@@ -67,7 +67,7 @@ export default function CarouselGridLimited({
   );
 }
 
-/** Fila con marquee infinito (duplica contenido para loop continuo) */
+/** Fila con marquee infinito + arrastre manual (mouse/touch) */
 function RowCarousel({
   items,
   renderItem,
@@ -77,21 +77,98 @@ function RowCarousel({
   gap,
 }) {
   const doubled = useMemo(() => [...items, ...items], [items]);
+
+  // ---- Drag-to-scroll ----
+  const scrollRef = useRef(null);
+  const [dragging, setDragging] = useState(false);
+  const dragState = useRef({ x: 0, scrollLeft: 0 });
+
+  const onPointerDown = useCallback((e) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setDragging(true);
+    el.setPointerCapture?.(e.pointerId);
+    dragState.current.x = e.clientX;
+    dragState.current.scrollLeft = el.scrollLeft;
+  }, []);
+
+  const onPointerMove = useCallback((e) => {
+    if (!dragging) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    const dx = e.clientX - dragState.current.x;
+    el.scrollLeft = dragState.current.scrollLeft - dx;
+  }, [dragging]);
+
+  const endDrag = useCallback((e) => {
+    if (!dragging) return;
+    const el = scrollRef.current;
+    setDragging(false);
+    try { el?.releasePointerCapture?.(e.pointerId); } catch {}
+  }, [dragging]);
+
+  // soporte touch (por si el navegador no promueve pointer events)
+  const onTouchStart = useCallback((e) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setDragging(true);
+    dragState.current.x = e.touches[0].clientX;
+    dragState.current.scrollLeft = el.scrollLeft;
+  }, []);
+  const onTouchMove = useCallback((e) => {
+    if (!dragging) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    const dx = e.touches[0].clientX - dragState.current.x;
+    el.scrollLeft = dragState.current.scrollLeft - dx;
+  }, [dragging]);
+  const onTouchEnd = useCallback(() => setDragging(false), []);
+
+  // rueda -> desplazar horizontal
+  const onWheel = useCallback((e) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    // Si hay scroll vertical en la rueda, conviértelo a horizontal
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+      el.scrollLeft += e.deltaY;
+      e.preventDefault();
+    }
+  }, []);
+
+  // animación continua (pausada mientras arrastras)
   const animName = reverse ? "slide-right" : "slide-left";
   const animStyle = {
     animationName: animName,
     animationDuration: `${speed}s`,
     animationTimingFunction: "linear",
     animationIterationCount: "infinite",
+    animationPlayState: dragging ? "paused" : "running",
     willChange: "transform",
   };
 
   return (
-    // SIN altura fija: usa la altura natural de tus ChannelCard (póster + info)
+    // ahora es scrollable horizontalmente y NO recorta el contenido
     <div
-      className="relative overflow-hidden carousel-mask rounded-xl border border-gray-700/40 bg-gray-900/30 mb-4"
+      ref={scrollRef}
+      className={`relative overflow-x-auto overflow-y-visible carousel-mask rounded-xl border border-gray-700/40 bg-gray-900/30 mb-4 ${
+        dragging ? "cursor-grabbing" : "cursor-grab"
+      }`}
+      style={{ scrollbarWidth: "none" }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      onWheel={onWheel}
     >
-      {/* SIN absolute/inset: el contenedor crece según el contenido */}
+      {/* escondemos la barra en navegadores WebKit */}
+      <style>{`
+        .carousel-mask::-webkit-scrollbar { display: none; }
+      `}</style>
+
+      {/* Track animado (duplicado para loop). La animación se pausa al arrastrar */}
       <div className="flex carousel-track" style={animStyle}>
         <div className="flex" style={{ gap, paddingInline: gap }}>
           {doubled.map((it, i) => (
