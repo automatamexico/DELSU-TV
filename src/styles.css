@@ -1,3 +1,51 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ===== Carrusel ===== */
+
+/* La pista es inline-block + nowrap para estabilidad */
+.carousel-strip {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+/* Forzar que lo que haya dentro del slot NO se pase del ancho del slot */
+.carousel-slot > *,
+.carousel-slot > * > * {
+  max-width: 100%;
+  width: 100%;
+}
+
+/* Animaciones (ya las tenías, pero por claridad las dejo) */
+@keyframes slide-left {
+  0%   { transform: translateX(0%); }
+  100% { transform: translateX(-50%); } /* recorremos la mitad (pista duplicada) */
+}
+
+@keyframes slide-right {
+  0%   { transform: translateX(-50%); }
+  100% { transform: translateX(0%); }
+}
+
+/* Fade de bordes opcional */
+.carousel-mask {
+  position: relative;
+}
+.carousel-mask::before,
+.carousel-mask::after {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 48px;
+  pointer-events: none;
+  z-index: 1;
+}
+.carousel-mask::before {
+  left: 0;
+  background: linear-gradient(to right, rgba(17,24,39,1), rgba(17,24,39,0));
+}
+.carousel-mask::after {
+  right: 0;
+  background: linear-gradient(to left, rgba(17,24,39,1), rgba(17,24,39,0));
+}
