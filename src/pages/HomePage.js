@@ -138,7 +138,7 @@ export default function HomePage() {
             {/* Carrusel en 10 filas. Cada fila recorre todo el listado y alterna dirección */}
             <CarouselGridLimited
               items={countryFilteredChannels}
-              maxRows={10}
+              maxRows={5}
               cardWidth={360}   // ancho donde la card cabe completa (poster + texto)
               gap={24}
               baseSpeed={40}
