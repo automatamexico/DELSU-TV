@@ -13,14 +13,13 @@ export default function CarouselGridLimited({
   items = [],
   renderItem,
   maxRows = 10,
-  cardWidth = 360,  // ajusta a tu ancho real de card
+  cardWidth = 360,  // AJUSTA si tu card es más ancha (ej. 380)
   gap = 24,
   baseSpeed = 40,
   className = "",
 }) {
   const rows = useMemo(() => {
     if (!items.length) return [];
-    // balanceo simple en hasta maxRows filas:
     const rowsCount = Math.min(maxRows, Math.max(1, Math.ceil(items.length / 1)));
     const perRow = Math.ceil(items.length / rowsCount);
     const buckets = [];
@@ -69,7 +68,7 @@ function RowCarousel({ items, renderItem, reverse, speed, cardWidth, gap }) {
 
   return (
     <div className="carousel-mask rounded-xl border border-gray-700/40 bg-gray-900/30 mb-8 overflow-hidden">
-      {/* Pista en flujo normal (NO absolute), marquee por transform */}
+      {/* Pista nowrap (marquee) */}
       <div className="carousel-strip" style={animStyle}>
         {doubled.map((it, i) => (
           <span
@@ -78,10 +77,10 @@ function RowCarousel({ items, renderItem, reverse, speed, cardWidth, gap }) {
             style={{
               width: cardWidth,
               marginRight: gap,
-              // el slot define el ancho: el hijo no puede excederlo
             }}
           >
-            <div className="h-full w-full carousel-card-wrap">
+            {/* Marca para neutralizar hover-scale dentro del carrusel */}
+            <div className="in-carousel h-full w-full overflow-hidden">
               {renderItem(it)}
             </div>
           </span>
