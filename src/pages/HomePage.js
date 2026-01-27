@@ -26,11 +26,8 @@ function ChannelsSkeleton() {
   );
 }
 
-function norm(v) {
-  return String(v || "").trim().toLowerCase();
-}
+const norm = (v) => String(v || "").trim().toLowerCase();
 
-// quitar duplicados por id/slug/title
 function dedupeChannels(list = []) {
   const seen = new Set();
   const out = [];
@@ -49,15 +46,12 @@ function dedupeChannels(list = []) {
 }
 
 export default function HomePage() {
-  // ---- TÍTULO DE LA PESTAÑA ----
+  // Título
   useEffect(() => {
     const prev = document.title;
     document.title = "HispanaTV Home";
-    return () => {
-      document.title = prev || "HispanaTV";
-    };
+    return () => (document.title = prev || "HispanaTV");
   }, []);
-  // -------------------------------
 
   const { profile } = useAuth();
   const userRole = profile?.role || "user";
@@ -82,10 +76,10 @@ export default function HomePage() {
     [channels]
   );
 
-  // País seleccionado
+  // País
   const [selectedCountry, setSelectedCountry] = useState("");
 
-  // Países para filtro
+  // Países para el filtro
   const countryItems = useMemo(() => {
     const map = new Map();
     (visibleChannels || []).forEach((c) => {
@@ -104,7 +98,7 @@ export default function HomePage() {
     );
   }, [visibleChannels]);
 
-  // Filtrado por país (sobre lo que ya trae useChannels)
+  // Filtrado por país sobre la lista ya procesada por useChannels
   const countryFilteredChannels = useMemo(() => {
     if (!selectedCountry) return visibleChannels;
     return (visibleChannels || []).filter(
@@ -118,21 +112,14 @@ export default function HomePage() {
     [countryFilteredChannels]
   );
 
-  // Señales de filtro activo
-  const hasSearch = norm(searchTerm).length > 0;
-  const catNorm = norm(selectedCategory);
-  const hasCategory =
-    !!catNorm && !/^(todas|todos|all|categoria|categoría)?$/.test(catNorm);
-  const hasCountry = norm(selectedCountry).length > 0;
+  // ¿Hay cualquier filtro activo? (apaga SIEMPRE el carrusel)
+  const hasSearch = !!norm(searchTerm);
+  const hasCountry = !!norm(selectedCountry);
+  const cat = norm(selectedCategory);
+  const hasCategory = !!cat && !["todos", "todas", "all"].includes(cat);
+  const isFiltering = hasSearch || hasCountry || hasCategory;
 
-  // Si hay cualquier filtro o el tamaño cambió vs. total visible => NO carrusel
-  const isFiltering =
-    hasSearch ||
-    hasCategory ||
-    hasCountry ||
-    finalChannels.length !== visibleChannels.length;
-
-  const handleChannelClick = (channel) => setSelectedChannel(channel);
+  const handleChannelClick = (ch) => setSelectedChannel(ch);
   const handleClosePlayer = () => setSelectedChannel(null);
 
   return (
@@ -162,7 +149,6 @@ export default function HomePage() {
             categories={categories}
             selectedCategory={selectedCategory}
             onCategoryChange={setSelectedCategory}
-            /* País */
             selectedCountry={selectedCountry}
             onCountryChange={setSelectedCountry}
             countryItems={countryItems}
@@ -174,13 +160,13 @@ export default function HomePage() {
             transition={{ duration: 0.35 }}
           >
             {isFiltering ? (
-              // >>> Sólo resultados (sin carrusel) y sin duplicados <<<
+              // SOLO GRID (sin carrusel) cuando hay filtros. Nada se repite.
               <ChannelGrid
                 channels={finalChannels}
                 onChannelClick={handleChannelClick}
               />
             ) : (
-              // >>> Carrusel normal (sin filtros) <<<
+              // Carrusel únicamente cuando NO hay filtros
               <div className="p-4">
                 <CarouselGridLimited
                   items={finalChannels}
