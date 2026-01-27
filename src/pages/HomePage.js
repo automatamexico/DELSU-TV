@@ -94,13 +94,19 @@ export default function HomePage() {
     );
   }, [visibleChannels, selectedCountry]);
 
-  // ✅ ¿Hay filtros activos? (categoría, país o búsqueda)
+  // ✅ "Todos" NO cuenta como filtro activo (es el estado Home)
+  const isTodosCategory = useMemo(() => {
+    const c = norm(selectedCategory);
+    return c === "" || c === "todos" || c === "todo" || c === "all";
+  }, [selectedCategory]);
+
+  // ✅ ¿Hay filtros activos? (categoría ≠ Todos, país o búsqueda)
   const hasActiveFilters = useMemo(() => {
     const hasSearch = norm(searchTerm).length > 0;
-    const hasCategory = norm(selectedCategory).length > 0;
+    const hasCategory = !isTodosCategory; // solo cuenta si NO es Todos/All
     const hasCountry = norm(selectedCountry).length > 0;
     return hasSearch || hasCategory || hasCountry;
-  }, [searchTerm, selectedCategory, selectedCountry]);
+  }, [searchTerm, selectedCountry, isTodosCategory]);
 
   // ✅ Evitar repetidos al mostrar resultados filtrados (por id o por url)
   const uniqueFilteredChannels = useMemo(() => {
@@ -167,7 +173,7 @@ export default function HomePage() {
             transition={{ duration: 0.35 }}
           >
             {!hasActiveFilters ? (
-              // ✅ HOME sin filtros: carrusel
+              // ✅ HOME (Todos + sin país + sin búsqueda): carrusel
               <CarouselGridLimited
                 items={countryFilteredChannels}
                 maxRows={10}
