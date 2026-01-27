@@ -2,62 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ===== Carrusel estable ===== */
-
-.carousel-strip {
-  display: inline-block;
-  white-space: nowrap;
-}
-
-.carousel-slot > *,
-.carousel-slot > * > * {
-  max-width: 100%;
-  width: 100%;
-}
-
-/* Recorta cualquier cosa que se salga (badges, hover, etc.) */
-.in-carousel {
-  overflow: hidden;
-}
-
-/* Neutraliza el "zoom" en hover SOLO dentro del carrusel */
-.in-carousel .group:hover img,
-.in-carousel .group:focus img {
-  transform: none !important;
-}
-
-/* Si tu ChannelCard aplica transiciones/transform al wrapper, neutralízalas aquí también */
-.in-carousel .group:hover,
-.in-carousel .group:focus {
-  transform: none !important;
-}
-
-/* Animaciones del marquee */
+/* === Carrusel (keyframes) === */
 @keyframes slide-left {
-  0%   { transform: translateX(0%); }
-  100% { transform: translateX(-50%); }
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
 }
 @keyframes slide-right {
-  0%   { transform: translateX(-50%); }
-  100% { transform: translateX(0%); }
-}
-
-/* Bisel/fade lateral opcional */
-.carousel-mask { position: relative; }
-.carousel-mask::before,
-.carousel-mask::after {
-  content: "";
-  position: absolute;
-  top: 0; bottom: 0;
-  width: 48px;
-  pointer-events: none;
-  z-index: 1;
-}
-.carousel-mask::before {
-  left: 0;
-  background: linear-gradient(to right, rgba(17,24,39,1), rgba(17,24,39,0));
-}
-.carousel-mask::after {
-  right: 0;
-  background: linear-gradient(to left, rgba(17,24,39,1), rgba(17,24,39,0));
+  from { transform: translateX(-50%); }
+  to   { transform: translateX(0); }
 }
