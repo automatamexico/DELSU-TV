@@ -35,6 +35,9 @@ export default function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
 
+            {/* ✅ Apps */}
+            <Route path="/apps" element={<AppsPage />} />
+
             {/* Perfil requiere sesión */}
             <Route element={<ProtectedRoute />}>
               <Route path="/profile" element={<ProfilePage />} />
