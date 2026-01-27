@@ -84,13 +84,21 @@ function RowCarousel({
   const dragState = useRef({ x: 0, scrollLeft: 0 });
 
   const onPointerDown = useCallback((e) => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setDragging(true);
-    el.setPointerCapture?.(e.pointerId);
-    dragState.current.x = e.clientX;
-    dragState.current.scrollLeft = el.scrollLeft;
-  }, []);
+  const el = scrollRef.current;
+  if (!el) return;
+
+  // ✅ Si el usuario está clickeando un elemento interactivo, NO capturamos el puntero
+  // (deja que el <button> del ChannelCard reciba el click y abra el player)
+  const interactive = e.target?.closest?.(
+    "button, a, input, textarea, select, label, [role='button'], [data-no-drag='true']"
+  );
+  if (interactive) return;
+
+  setDragging(true);
+  el.setPointerCapture?.(e.pointerId);
+  dragState.current.x = e.clientX;
+  dragState.current.scrollLeft = el.scrollLeft;
+}, []);
 
   const onPointerMove = useCallback((e) => {
     if (!dragging) return;
@@ -109,19 +117,18 @@ function RowCarousel({
 
   // soporte touch (por si el navegador no promueve pointer events)
   const onTouchStart = useCallback((e) => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setDragging(true);
-    dragState.current.x = e.touches[0].clientX;
-    dragState.current.scrollLeft = el.scrollLeft;
-  }, []);
-  const onTouchMove = useCallback((e) => {
-    if (!dragging) return;
-    const el = scrollRef.current;
-    if (!el) return;
-    const dx = e.touches[0].clientX - dragState.current.x;
-    el.scrollLeft = dragState.current.scrollLeft - dx;
-  }, [dragging]);
+  const el = scrollRef.current;
+  if (!el) return;
+
+  const interactive = e.target?.closest?.(
+    "button, a, input, textarea, select, label, [role='button'], [data-no-drag='true']"
+  );
+  if (interactive) return;
+
+  setDragging(true);
+  dragState.current.x = e.touches[0].clientX;
+  dragState.current.scrollLeft = el.scrollLeft;
+}, []);
   const onTouchEnd = useCallback(() => setDragging(false), []);
 
   // rueda -> desplazar horizontal
