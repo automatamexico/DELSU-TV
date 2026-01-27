@@ -3,7 +3,9 @@ import React, { useState, Suspense, lazy, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import Header from "../components/Header";
 import CategoryFilter from "../components/CategoryFilter";
-import ChannelGrid from "../components/ChannelGrid";
+// ⬇️ usamos el carrusel y la tarjeta
+import CarouselGridLimited from "../components/CarouselGridLimited";
+import ChannelCard from "../components/ChannelCard";
 import { useChannels } from "../hooks/useChannels";
 import { useAuth } from "../context/AuthContext";
 import { categories } from "../data/channels";
@@ -56,16 +58,16 @@ export default function HomePage() {
 
   const [selectedChannel, setSelectedChannel] = useState(null);
 
-  // NUEVO: ocultar canales suspendidos
+  // Ocultar canales suspendidos
   const visibleChannels = useMemo(
     () => (channels || []).filter((c) => !c?.is_suspended),
     [channels]
   );
 
-  // NUEVO: estado de País seleccionado
+  // Estado de País seleccionado
   const [selectedCountry, setSelectedCountry] = useState("");
 
-  // NUEVO: lista de países únicos + bandera desde los canales (solo visibles)
+  // Lista de países únicos + bandera desde canales visibles
   const countryItems = useMemo(() => {
     const map = new Map();
     (visibleChannels || []).forEach((c) => {
@@ -84,7 +86,7 @@ export default function HomePage() {
     );
   }, [visibleChannels]);
 
-  // NUEVO: filtrado adicional por país (sobre los visibles)
+  // Filtrado adicional por país
   const countryFilteredChannels = useMemo(() => {
     if (!selectedCountry) return visibleChannels;
     return (visibleChannels || []).filter(
@@ -133,10 +135,16 @@ export default function HomePage() {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.35 }}
           >
-            {/* Pasamos los canales ya filtrados por suspensión + país */}
-            <ChannelGrid
-              channels={countryFilteredChannels}
-              onChannelClick={handleChannelClick}
+            {/* Carrusel en 10 filas. Cada fila recorre todo el listado y alterna dirección */}
+            <CarouselGridLimited
+              items={countryFilteredChannels}
+              maxRows={10}
+              cardWidth={360}   // ancho donde la card cabe completa (poster + texto)
+              gap={24}
+              baseSpeed={40}
+              renderItem={(ch) => (
+                <ChannelCard channel={ch} onClick={handleChannelClick} />
+              )}
             />
           </motion.main>
         </>
