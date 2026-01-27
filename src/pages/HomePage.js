@@ -3,9 +3,9 @@ import React, { useState, Suspense, lazy, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import Header from "../components/Header";
 import CategoryFilter from "../components/CategoryFilter";
-import ChannelGrid from "../components/ChannelGrid";
-import ChannelCard from "../components/ChannelCard";
+// ⬇️ usamos el carrusel y la tarjeta
 import CarouselGridLimited from "../components/CarouselGridLimited";
+import ChannelCard from "../components/ChannelCard";
 import { useChannels } from "../hooks/useChannels";
 import { useAuth } from "../context/AuthContext";
 import { categories } from "../data/channels";
@@ -64,10 +64,10 @@ export default function HomePage() {
     [channels]
   );
 
-  // País seleccionado
+  // Estado de País seleccionado
   const [selectedCountry, setSelectedCountry] = useState("");
 
-  // Países únicos para el filtro
+  // Lista de países únicos + bandera desde canales visibles
   const countryItems = useMemo(() => {
     const map = new Map();
     (visibleChannels || []).forEach((c) => {
@@ -96,16 +96,6 @@ export default function HomePage() {
 
   const handleChannelClick = (channel) => setSelectedChannel(channel);
   const handleClosePlayer = () => setSelectedChannel(null);
-
-  // === Desactivar carrusel cuando hay búsqueda/filtro activo ===
-  const hasSearch = norm(searchTerm).length > 0;
-  const catNorm = norm(selectedCategory);
-  const hasCategory =
-    !!catNorm && !/^(todas|todos|all|categoria|categoría)?$/.test(catNorm);
-  const hasCountry = norm(selectedCountry).length > 0;
-
-  // Si cualquiera está activo, NO hay carrusel
-  const isFiltering = hasSearch || hasCategory || hasCountry;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
@@ -145,27 +135,17 @@ export default function HomePage() {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.35 }}
           >
-            {isFiltering ? (
-              // >>> GRID NORMAL SIN CARRUSEL <<<
-              <ChannelGrid
-                channels={countryFilteredChannels}
-                onChannelClick={handleChannelClick}
-              />
-            ) : (
-              // >>> CARRUSEL (todas las filas recorren todos los canales) <<<
-              <div className="p-4">
-                <CarouselGridLimited
-                  items={countryFilteredChannels}
-                  renderItem={(it) => (
-                    <ChannelCard channel={it} onClick={handleChannelClick} />
-                  )}
-                  maxRows={10}
-                  cardWidth={360} // mantiene la card completa (poster + info)
-                  gap={24}
-                  baseSpeed={40}
-                />
-              </div>
-            )}
+            {/* Carrusel en 10 filas. Cada fila recorre todo el listado y alterna dirección */}
+            <CarouselGridLimited
+              items={countryFilteredChannels}
+              maxRows={10}
+              cardWidth={360}   // ancho donde la card cabe completa (poster + texto)
+              gap={24}
+              baseSpeed={40}
+              renderItem={(ch) => (
+                <ChannelCard channel={ch} onClick={handleChannelClick} />
+              )}
+            />
           </motion.main>
         </>
       )}
