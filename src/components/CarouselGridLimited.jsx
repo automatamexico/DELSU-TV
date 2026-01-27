@@ -21,10 +21,7 @@ export default function CarouselGridLimited({
   const allItems = useMemo(() => (Array.isArray(items) ? items : []), [items]);
   const total = allItems.length;
 
-  const rowsCount = useMemo(
-    () => Math.max(1, Math.min(maxRows, 10)),
-    [maxRows]
-  );
+  const rowsCount = useMemo(() => Math.max(1, Math.min(maxRows, 10)), [maxRows]);
 
   // Cada fila muestra TODOS los items con un offset aleatorio distinto
   const rows = useMemo(() => {
@@ -68,14 +65,7 @@ export default function CarouselGridLimited({
 }
 
 /** Fila con marquee infinito + arrastre manual (mouse/touch) */
-function RowCarousel({
-  items,
-  renderItem,
-  reverse,
-  speed,
-  cardWidth,
-  gap,
-}) {
+function RowCarousel({ items, renderItem, reverse, speed, cardWidth, gap }) {
   const doubled = useMemo(() => [...items, ...items], [items]);
 
   // ---- Drag-to-scroll ----
@@ -83,52 +73,82 @@ function RowCarousel({
   const [dragging, setDragging] = useState(false);
   const dragState = useRef({ x: 0, scrollLeft: 0 });
 
-  const onPointerDown = useCallback((e) => {
-  const el = scrollRef.current;
-  if (!el) return;
+  // ✅ Elementos que NO deben iniciar drag (para no tragarse clicks)
+  const isInteractiveTarget = useCallback((e) => {
+    return Boolean(
+      e?.target?.closest?.(
+        "button, a, input, textarea, select, label, [role='button'], [data-no-drag='true']"
+      )
+    );
+  }, []);
 
-  // ✅ Si el usuario está clickeando un elemento interactivo, NO capturamos el puntero
-  // (deja que el <button> del ChannelCard reciba el click y abra el player)
-  const interactive = e.target?.closest?.(
-    "button, a, input, textarea, select, label, [role='button'], [data-no-drag='true']"
+  const onPointerDown = useCallback(
+    (e) => {
+      const el = scrollRef.current;
+      if (!el) return;
+
+      // ✅ Si el usuario clickea un elemento interactivo, NO capturamos puntero
+      if (isInteractiveTarget(e)) return;
+
+      setDragging(true);
+      el.setPointerCapture?.(e.pointerId);
+      dragState.current.x = e.clientX;
+      dragState.current.scrollLeft = el.scrollLeft;
+    },
+    [isInteractiveTarget]
   );
-  if (interactive) return;
 
-  setDragging(true);
-  el.setPointerCapture?.(e.pointerId);
-  dragState.current.x = e.clientX;
-  dragState.current.scrollLeft = el.scrollLeft;
-}, []);
+  const onPointerMove = useCallback(
+    (e) => {
+      if (!dragging) return;
+      const el = scrollRef.current;
+      if (!el) return;
+      const dx = e.clientX - dragState.current.x;
+      el.scrollLeft = dragState.current.scrollLeft - dx;
+    },
+    [dragging]
+  );
 
-  const onPointerMove = useCallback((e) => {
-    if (!dragging) return;
-    const el = scrollRef.current;
-    if (!el) return;
-    const dx = e.clientX - dragState.current.x;
-    el.scrollLeft = dragState.current.scrollLeft - dx;
-  }, [dragging]);
-
-  const endDrag = useCallback((e) => {
-    if (!dragging) return;
-    const el = scrollRef.current;
-    setDragging(false);
-    try { el?.releasePointerCapture?.(e.pointerId); } catch {}
-  }, [dragging]);
+  const endDrag = useCallback(
+    (e) => {
+      if (!dragging) return;
+      const el = scrollRef.current;
+      setDragging(false);
+      try {
+        el?.releasePointerCapture?.(e.pointerId);
+      } catch {}
+    },
+    [dragging]
+  );
 
   // soporte touch (por si el navegador no promueve pointer events)
-  const onTouchStart = useCallback((e) => {
-  const el = scrollRef.current;
-  if (!el) return;
+  const onTouchStart = useCallback(
+    (e) => {
+      const el = scrollRef.current;
+      if (!el) return;
 
-  const interactive = e.target?.closest?.(
-    "button, a, input, textarea, select, label, [role='button'], [data-no-drag='true']"
+      // ✅ Respeta botones/links (no iniciar drag si fue click en algo interactivo)
+      if (isInteractiveTarget(e)) return;
+
+      setDragging(true);
+      dragState.current.x = e.touches[0].clientX;
+      dragState.current.scrollLeft = el.scrollLeft;
+    },
+    [isInteractiveTarget]
   );
-  if (interactive) return;
 
-  setDragging(true);
-  dragState.current.x = e.touches[0].clientX;
-  dragState.current.scrollLeft = el.scrollLeft;
-}, []);
+  // ✅ TE FALTABA ESTA FUNCIÓN (por eso Netlify decía: onTouchMove is not defined)
+  const onTouchMove = useCallback(
+    (e) => {
+      if (!dragging) return;
+      const el = scrollRef.current;
+      if (!el) return;
+      const dx = e.touches[0].clientX - dragState.current.x;
+      el.scrollLeft = dragState.current.scrollLeft - dx;
+    },
+    [dragging]
+  );
+
   const onTouchEnd = useCallback(() => setDragging(false), []);
 
   // rueda -> desplazar horizontal
