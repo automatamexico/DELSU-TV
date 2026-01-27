@@ -10,8 +10,9 @@ import AdminLoginPage from "./pages/AdminLoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import ProfilePage from "./pages/ProfilePage";
 
-// ✅ NUEVA PÁGINA
+// ✅ Apps
 import AppsPage from "./pages/AppsPage";
+import ChannelAppPage from "./pages/ChannelAppPage";
 
 // Rutas protegidas
 import ProtectedRoute from "./routes/ProtectedRoute";
@@ -35,8 +36,9 @@ export default function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
 
-            {/* ✅ Apps */}
+            {/* ✅ Apps (público) */}
             <Route path="/apps" element={<AppsPage />} />
+            <Route path="/apps/:id" element={<ChannelAppPage />} />
 
             {/* Perfil requiere sesión */}
             <Route element={<ProtectedRoute />}>
