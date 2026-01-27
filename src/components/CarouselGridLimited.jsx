@@ -7,19 +7,20 @@ import React, { useMemo } from "react";
  * maxRows:    número máximo de filas (default 10)
  * cardWidth:  ancho fijo de cada tarjeta (debe coincidir con el ancho visual de tu card)
  * gap:        separación horizontal entre tarjetas
- * baseSpeed:  segundos en recorrer media pista (la pista está duplicada)
+ * baseSpeed:  segundos del marquee (más alto = más lento)
  */
 export default function CarouselGridLimited({
   items = [],
   renderItem,
   maxRows = 10,
-  cardWidth = 360,   // <-- subí el valor para tu card grande (ajústalo si tu card es más ancha o más angosta)
-  gap = 24,          // un poco más de aire entre tarjetas
+  cardWidth = 360,  // ajusta a tu ancho real de card
+  gap = 24,
   baseSpeed = 40,
   className = "",
 }) {
   const rows = useMemo(() => {
     if (!items.length) return [];
+    // balanceo simple en hasta maxRows filas:
     const rowsCount = Math.min(maxRows, Math.max(1, Math.ceil(items.length / 1)));
     const perRow = Math.ceil(items.length / rowsCount);
     const buckets = [];
@@ -36,7 +37,7 @@ export default function CarouselGridLimited({
     <div className={className}>
       {rows.map((rowItems, idx) => {
         const reverse = idx % 2 === 1;
-        const speed = Math.max(20, baseSpeed);
+        const speed = Math.max(16, baseSpeed);
         return (
           <RowCarousel
             key={`row-${idx}`}
@@ -54,7 +55,7 @@ export default function CarouselGridLimited({
 }
 
 function RowCarousel({ items, renderItem, reverse, speed, cardWidth, gap }) {
-  // pista duplicada para loop infinito
+  // pista duplicada para loop continuo
   const doubled = useMemo(() => [...items, ...items], [items]);
 
   const animName = reverse ? "slide-right" : "slide-left";
@@ -63,30 +64,28 @@ function RowCarousel({ items, renderItem, reverse, speed, cardWidth, gap }) {
     animationDuration: `${speed}s`,
     animationTimingFunction: "linear",
     animationIterationCount: "infinite",
+    willChange: "transform",
   };
 
   return (
-    <div
-      className="carousel-mask rounded-xl border border-gray-700/40 bg-gray-900/30 mb-8"
-      /* SIN height fija: la altura viene de las tarjetas */
-    >
-      {/* Pista en flujo normal, NO absoluta */}
-      <div className="carousel-track flex items-stretch" style={animStyle}>
-        {/* Duplicado para 200% */}
-        <div className="flex items-stretch" style={{ gap, paddingInline: gap }}>
-          {doubled.map((it, i) => (
-            <div
-              key={i}
-              className="carousel-slot"
-              style={{
-                flex: `0 0 ${cardWidth}px`,  // no se encoge ni crece
-                width: cardWidth,            // asegura ancho fijo
-              }}
-            >
+    <div className="carousel-mask rounded-xl border border-gray-700/40 bg-gray-900/30 mb-8 overflow-hidden">
+      {/* Pista en flujo normal (NO absolute), marquee por transform */}
+      <div className="carousel-strip" style={animStyle}>
+        {doubled.map((it, i) => (
+          <span
+            key={i}
+            className="carousel-slot inline-block align-top"
+            style={{
+              width: cardWidth,
+              marginRight: gap,
+              // el slot define el ancho: el hijo no puede excederlo
+            }}
+          >
+            <div className="h-full w-full carousel-card-wrap">
               {renderItem(it)}
             </div>
-          ))}
-        </div>
+          </span>
+        ))}
       </div>
     </div>
   );
