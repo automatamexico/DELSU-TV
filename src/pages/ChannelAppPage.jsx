@@ -6,10 +6,6 @@ import { QRCodeCanvas } from "qrcode.react";
 // Ajusta este import si tu supabase client está en otro path:
 import { supabase } from "../lib/supabaseClient";
 
-function norm(v) {
-  return String(v || "").trim();
-}
-
 function normalizeUrl(url) {
   if (!url) return "";
   const u = String(url).trim();
@@ -18,15 +14,15 @@ function normalizeUrl(url) {
 }
 
 export default function ChannelAppPage() {
-  const { slug } = useParams();
+  const { id } = useParams(); // ✅ antes: slug
   const [channel, setChannel] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // URL estable de ESTA página (para QR)
+  // URL estable de ESTA página (para QR) — ✅ por ID
   const pageUrl = useMemo(() => {
     if (typeof window === "undefined") return "";
-    return `${window.location.origin}/apps/${slug}`;
-  }, [slug]);
+    return `${window.location.origin}/apps/${id}`;
+  }, [id]);
 
   useEffect(() => {
     let alive = true;
@@ -34,12 +30,11 @@ export default function ChannelAppPage() {
     async function load() {
       setLoading(true);
 
-      // OJO: ajusta nombre de tabla/campo según tu DB
-      // Aquí asumo que tienes `channels` y un campo `slug`
+      // ✅ tu tabla NO tiene slug: buscamos por ID
       const { data, error } = await supabase
         .from("channels")
         .select("*")
-        .eq("slug", slug)
+        .eq("id", id)
         .maybeSingle();
 
       if (!alive) return;
@@ -57,7 +52,7 @@ export default function ChannelAppPage() {
     return () => {
       alive = false;
     };
-  }, [slug]);
+  }, [id]);
 
   const title =
     channel?.title ||
@@ -68,20 +63,20 @@ export default function ChannelAppPage() {
   const description =
     channel?.description || channel?.descripcion || channel?.about || "";
 
+  // ✅ tú dijiste que tu poster está en el campo "poster"
   const poster =
-    channel?.poster_url ||
     channel?.poster ||
+    channel?.poster_url ||
     channel?.thumbnail ||
     "/poster-fallback.jpg";
 
-  // ✅ Link de descarga (estable)
-  // RECOMENDADO: guardar en DB un campo como `apk_url` o `apk_public_url`
-  // Alternativa: construirlo desde un bucket/path fijo.
+  // Link de descarga (estable)
   const apkUrl = normalizeUrl(
     channel?.apk_url ||
-    channel?.apk_public_url ||
-    channel?.android_apk_url ||
-    ""
+      channel?.apk_public_url ||
+      channel?.android_apk_url ||
+      channel?.apk ||
+      ""
   );
 
   // Logo de HispanaTV (ajústalo a tu ruta real)
@@ -100,7 +95,7 @@ export default function ChannelAppPage() {
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6 text-center">
         <div className="text-2xl font-bold text-gray-900">Canal no encontrado</div>
         <p className="mt-2 text-gray-600">
-          Ese slug no existe (o se fue por unas palomitas y no regresó).
+          Ese ID no existe (o no coincide con tu tabla channels).
         </p>
         <Link
           to="/apps"
@@ -166,9 +161,7 @@ export default function ChannelAppPage() {
               </button>
             )}
 
-            <div className="mt-2 text-sm text-gray-500">
-              (Android APK)
-            </div>
+            <div className="mt-2 text-sm text-gray-500">(Android APK)</div>
 
             {!apkUrl && (
               <div className="mt-3 text-sm text-red-600">
@@ -186,9 +179,7 @@ export default function ChannelAppPage() {
               <QRCodeCanvas value={pageUrl} size={180} includeMargin />
             </div>
 
-            <div className="mt-3 text-xs text-gray-500 break-all">
-              {pageUrl}
-            </div>
+            <div className="mt-3 text-xs text-gray-500 break-all">{pageUrl}</div>
           </div>
 
           {/* Footer: Desarrollado por */}
@@ -200,16 +191,11 @@ export default function ChannelAppPage() {
               loading="lazy"
               decoding="async"
             />
-            <div className="mt-2 text-sm text-gray-600">
-              Desarrollado por
-            </div>
+            <div className="mt-2 text-sm text-gray-600">Desarrollado por</div>
           </div>
 
           {/* Link opcional a lista */}
-          <Link
-            to="/apps"
-            className="mt-8 text-sm text-blue-700 hover:underline"
-          >
+          <Link to="/apps" className="mt-8 text-sm text-blue-700 hover:underline">
             Ver todas las apps disponibles
           </Link>
         </div>
