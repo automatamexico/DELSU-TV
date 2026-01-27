@@ -2,36 +2,48 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ===== Carrusel ===== */
+/* ===== Carrusel estable ===== */
 
-/* La pista es inline-block + nowrap para estabilidad */
 .carousel-strip {
   display: inline-block;
   white-space: nowrap;
 }
 
-/* Forzar que lo que haya dentro del slot NO se pase del ancho del slot */
 .carousel-slot > *,
 .carousel-slot > * > * {
   max-width: 100%;
   width: 100%;
 }
 
-/* Animaciones (ya las tenías, pero por claridad las dejo) */
-@keyframes slide-left {
-  0%   { transform: translateX(0%); }
-  100% { transform: translateX(-50%); } /* recorremos la mitad (pista duplicada) */
+/* Recorta cualquier cosa que se salga (badges, hover, etc.) */
+.in-carousel {
+  overflow: hidden;
 }
 
+/* Neutraliza el "zoom" en hover SOLO dentro del carrusel */
+.in-carousel .group:hover img,
+.in-carousel .group:focus img {
+  transform: none !important;
+}
+
+/* Si tu ChannelCard aplica transiciones/transform al wrapper, neutralízalas aquí también */
+.in-carousel .group:hover,
+.in-carousel .group:focus {
+  transform: none !important;
+}
+
+/* Animaciones del marquee */
+@keyframes slide-left {
+  0%   { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
 @keyframes slide-right {
   0%   { transform: translateX(-50%); }
   100% { transform: translateX(0%); }
 }
 
-/* Fade de bordes opcional */
-.carousel-mask {
-  position: relative;
-}
+/* Bisel/fade lateral opcional */
+.carousel-mask { position: relative; }
 .carousel-mask::before,
 .carousel-mask::after {
   content: "";
