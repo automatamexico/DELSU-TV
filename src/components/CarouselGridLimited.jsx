@@ -20,35 +20,40 @@ export default function CarouselGridLimited({
   baseSpeed = 40,
   className = "",
 }) {
-  // Si no hay items, no renderizamos
-  if (!items?.length) return null;
+  // Aseguramos un array estable para no condicionar hooks
+  const allItems = Array.isArray(items) ? items : [];
+  const total = allItems.length;
 
-  // Número de filas a renderizar (hasta maxRows)
+  // Definimos cantidad de filas (constante) → nunca condiciona hooks
   const rowsCount = Math.max(1, Math.min(maxRows, 10));
 
-  // Para que **cada fila recorra TODOS los items** pero empiece en un punto distinto,
-  // generamos un "offset" aleatorio por fila y ROTAMOS el array.
+  // Generamos filas: cada fila usa TODOS los items, pero rotados
   const rows = useMemo(() => {
-    // pequeña función de rotación
+    // Si no hay items, devolvemos filas vacías (mismo shape)
+    if (total === 0) {
+      return Array.from({ length: rowsCount }, () => []);
+    }
+
     const rotate = (arr, k) => {
       if (!arr.length) return arr;
       const m = ((k % arr.length) + arr.length) % arr.length;
       return arr.slice(m).concat(arr.slice(0, m));
     };
 
-    // un offset aleatorio para cada fila (recalcula si cambia la lista)
-    const offsets = Array.from({ length: rowsCount }, () =>
-      Math.floor(Math.random() * items.length)
-    );
+    // offset aleatorio por fila (recalcula cuando cambian los items)
+    return Array.from({ length: rowsCount }, () => {
+      const off = Math.floor(Math.random() * total);
+      return rotate(allItems, off);
+    });
+  }, [allItems, rowsCount, total]);
 
-    // para cada fila devolvemos TODOS los items, pero rotados con su offset
-    return offsets.map((off) => rotate(items, off));
-  }, [items, rowsCount]);
+  // Ya llamamos hooks arriba; ahora sí podemos salir sin condicionar hooks
+  if (total === 0) return null;
 
   return (
     <div className={className}>
       {rows.map((rowItems, idx) => {
-        const reverse = idx % 2 === 1;      // alternamos dirección
+        const reverse = idx % 2 === 1; // alterna dirección
         const speed = Math.max(20, baseSpeed);
         return (
           <RowCarousel
