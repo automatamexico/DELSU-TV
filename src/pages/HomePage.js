@@ -94,6 +94,37 @@ export default function HomePage() {
     );
   }, [visibleChannels, selectedCountry]);
 
+  // ✅ ¿Hay filtros activos? (categoría, país o búsqueda)
+  const hasActiveFilters = useMemo(() => {
+    const hasSearch = norm(searchTerm).length > 0;
+    const hasCategory = norm(selectedCategory).length > 0;
+    const hasCountry = norm(selectedCountry).length > 0;
+    return hasSearch || hasCategory || hasCountry;
+  }, [searchTerm, selectedCategory, selectedCountry]);
+
+  // ✅ Evitar repetidos al mostrar resultados filtrados (por id o por url)
+  const uniqueFilteredChannels = useMemo(() => {
+    const seen = new Set();
+    const out = [];
+    for (const c of countryFilteredChannels || []) {
+      const key =
+        c?.id ??
+        c?.channel_id ??
+        c?.uuid ??
+        c?.stream_url ??
+        c?.m3u8_url ??
+        c?.url ??
+        c?.title ??
+        c?.name ??
+        JSON.stringify(c);
+
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(c);
+    }
+    return out;
+  }, [countryFilteredChannels]);
+
   const handleChannelClick = (channel) => setSelectedChannel(channel);
   const handleClosePlayer = () => setSelectedChannel(null);
 
@@ -135,17 +166,38 @@ export default function HomePage() {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.35 }}
           >
-            {/* Carrusel en 10 filas. Cada fila recorre todo el listado y alterna dirección */}
-            <CarouselGridLimited
-              items={countryFilteredChannels}
-              maxRows={5}
-              cardWidth={360}   // ancho donde la card cabe completa (poster + texto)
-              gap={24}
-              baseSpeed={40}
-              renderItem={(ch) => (
-                <ChannelCard channel={ch} onClick={handleChannelClick} />
-              )}
-            />
+            {!hasActiveFilters ? (
+              // ✅ HOME sin filtros: carrusel
+              <CarouselGridLimited
+                items={countryFilteredChannels}
+                maxRows={10}
+                cardWidth={360} // ancho donde la card cabe completa (poster + texto)
+                gap={24}
+                baseSpeed={40}
+                renderItem={(ch) => (
+                  <ChannelCard channel={ch} onClick={handleChannelClick} />
+                )}
+              />
+            ) : (
+              // ✅ Con filtros/búsqueda: grid fijo (sin carrusel) y SIN repetidos
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 p-4">
+                {uniqueFilteredChannels.map((ch) => (
+                  <ChannelCard
+                    key={
+                      ch?.id ??
+                      ch?.channel_id ??
+                      ch?.uuid ??
+                      ch?.stream_url ??
+                      ch?.url ??
+                      ch?.title ??
+                      ch?.name
+                    }
+                    channel={ch}
+                    onClick={handleChannelClick}
+                  />
+                ))}
+              </div>
+            )}
           </motion.main>
         </>
       )}
