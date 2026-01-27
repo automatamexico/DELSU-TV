@@ -10,6 +10,9 @@ import AdminLoginPage from "./pages/AdminLoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import ProfilePage from "./pages/ProfilePage";
 
+// ✅ NUEVA PÁGINA
+import AppsPage from "./pages/AppsPage";
+
 // Rutas protegidas
 import ProtectedRoute from "./routes/ProtectedRoute";
 // import ProtectedRouteAdmin from "./routes/ProtectedRouteAdmin"; // <- eliminado porque no se usa
