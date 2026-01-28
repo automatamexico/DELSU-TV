@@ -242,7 +242,7 @@ export default function ChannelCard({ channel, onClick }) {
                       alt="Android"
                       loading="lazy"
                       decoding="async"
-                      className="h-8 w-8 object-contain"
+                      className="h-20 w-20 object-contain"
                     />
                   </button>
                 </div>
