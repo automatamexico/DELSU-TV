@@ -18,11 +18,6 @@ export default function ChannelAppPage() {
   const [channel, setChannel] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  export default function ChannelAppPage() {
-  const { id } = useParams();
-  const [channel, setChannel] = useState(null);
-  const [loading, setLoading] = useState(true);
-
   // ✅ Título de pestaña para esta sección
   useEffect(() => {
     const prev = document.title;
@@ -185,13 +180,10 @@ export default function ChannelAppPage() {
             <div className="mt-4 inline-flex items-center justify-center bg-white p-5 rounded-2xl shadow">
               <QRCodeCanvas value={pageUrl} size={180} includeMargin />
             </div>
-
-            {/* ✅ ya NO mostramos la URL debajo */}
           </div>
 
           {/* Footer */}
           <div className="mt-12 flex flex-col items-center">
-            {/* ✅ Logo clicable -> vuelve al Home */}
             <Link to="/" aria-label="Ir al Home (HispanaTV)" title="HispanaTV">
               <img
                 src={hispanaLogo}
