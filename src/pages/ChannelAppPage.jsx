@@ -14,11 +14,11 @@ function normalizeUrl(url) {
 }
 
 export default function ChannelAppPage() {
-  const { id } = useParams(); // ✅ antes: slug
+  const { id } = useParams();
   const [channel, setChannel] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // URL estable de ESTA página (para QR) — ✅ por ID
+  // URL estable de ESTA página (para QR) — por ID
   const pageUrl = useMemo(() => {
     if (typeof window === "undefined") return "";
     return `${window.location.origin}/apps/${id}`;
@@ -30,7 +30,6 @@ export default function ChannelAppPage() {
     async function load() {
       setLoading(true);
 
-      // ✅ tu tabla NO tiene slug: buscamos por ID
       const { data, error } = await supabase
         .from("channels")
         .select("*")
@@ -55,22 +54,17 @@ export default function ChannelAppPage() {
   }, [id]);
 
   const title =
-    channel?.title ||
-    channel?.name ||
-    channel?.channel_name ||
-    "Canal";
+    channel?.title || channel?.name || channel?.channel_name || "Canal";
 
   const description =
     channel?.description || channel?.descripcion || channel?.about || "";
 
-  // ✅ tú dijiste que tu poster está en el campo "poster"
   const poster =
     channel?.poster ||
     channel?.poster_url ||
     channel?.thumbnail ||
     "/poster-fallback.jpg";
 
-  // Link de descarga (estable)
   const apkUrl = normalizeUrl(
     channel?.apk_url ||
       channel?.apk_public_url ||
@@ -79,8 +73,9 @@ export default function ChannelAppPage() {
       ""
   );
 
-  // Logo de HispanaTV (ajústalo a tu ruta real)
-  const hispanaLogo = "/hispanatv-logo.png";
+  // ✅ Logo de HispanaTV desde Supabase Storage (URL fija)
+  const hispanaLogo =
+    "https://uqzcnlmhmglzflkuzczk.supabase.co/storage/v1/object/public/avatars/posters/logo_hispana.png";
 
   if (loading) {
     return (
@@ -98,10 +93,10 @@ export default function ChannelAppPage() {
           Ese ID no existe (o no coincide con tu tabla channels).
         </p>
         <Link
-          to="/apps"
+          to="/"
           className="mt-6 inline-flex items-center justify-center rounded-full px-5 py-2.5 bg-blue-600 text-white font-semibold hover:bg-blue-700 transition"
         >
-          Ver todas las apps
+          Ir al Home
         </Link>
       </div>
     );
@@ -109,10 +104,9 @@ export default function ChannelAppPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Contenido centrado tipo landing */}
       <div className="max-w-3xl mx-auto px-4 py-10">
         <div className="flex flex-col items-center text-center">
-          {/* Poster / imagen superior */}
+          {/* Poster superior */}
           <div className="w-full flex justify-center">
             <div className="rounded-2xl overflow-hidden shadow-md bg-white">
               <img
@@ -175,29 +169,29 @@ export default function ChannelAppPage() {
             <div className="text-base font-semibold">O escanea el código QR:</div>
 
             <div className="mt-4 inline-flex items-center justify-center bg-white p-5 rounded-2xl shadow">
-              {/* QR fijo: apunta a esta página */}
               <QRCodeCanvas value={pageUrl} size={180} includeMargin />
             </div>
 
-            <div className="mt-3 text-xs text-gray-500 break-all">{pageUrl}</div>
+            {/* ✅ ya NO mostramos la URL debajo */}
           </div>
 
-          {/* Footer: Desarrollado por */}
+          {/* Footer */}
           <div className="mt-12 flex flex-col items-center">
-            <img
-              src={hispanaLogo}
-              alt="HispanaTV"
-              className="h-10 w-auto object-contain"
-              loading="lazy"
-              decoding="async"
-            />
-            <div className="mt-2 text-sm text-gray-600">Desarrollado por</div>
-          </div>
+            {/* ✅ Logo clicable -> vuelve al Home */}
+            <Link to="/" aria-label="Ir al Home (HispanaTV)" title="HispanaTV">
+              <img
+                src={hispanaLogo}
+                alt="HispanaTV"
+                className="h-10 w-auto object-contain hover:opacity-90 transition"
+                loading="lazy"
+                decoding="async"
+              />
+            </Link>
 
-          {/* Link opcional a lista */}
-          <Link to="/apps" className="mt-8 text-sm text-blue-700 hover:underline">
-            Ver todas las apps disponibles
-          </Link>
+            <div className="mt-2 text-sm text-gray-600">
+              Desarrollado por el equipo técnico de Hispana TV
+            </div>
+          </div>
         </div>
       </div>
     </div>
