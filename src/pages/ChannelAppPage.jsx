@@ -18,6 +18,20 @@ export default function ChannelAppPage() {
   const [channel, setChannel] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  export default function ChannelAppPage() {
+  const { id } = useParams();
+  const [channel, setChannel] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // ✅ Título de pestaña para esta sección
+  useEffect(() => {
+    const prev = document.title;
+    document.title = "Hispana Tv - Apps";
+    return () => {
+      document.title = prev || "Hispana TV";
+    };
+  }, []);
+
   // URL estable de ESTA página (para QR) — por ID
   const pageUrl = useMemo(() => {
     if (typeof window === "undefined") return "";
