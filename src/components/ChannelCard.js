@@ -166,7 +166,7 @@ export default function ChannelCard({ channel, onClick }) {
 
       {/* === CUERPO (NO ABRE REPRODUCTOR) === */}
       <div className="p-3">
-        <div className="flex items-end justify-between gap-3">
+        <div className="flex items-start justify-between gap-3">
           {/* Izquierda: título, país, descripción */}
           <div className="min-w-0">
             <h3 className="text-[15px] font-semibold text-white line-clamp-1">{title}</h3>
