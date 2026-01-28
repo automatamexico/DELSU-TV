@@ -988,6 +988,192 @@ function ChannelStatusPanel() {
     </div>
   );
 }
+/* =========================
+   PANEL: Link de pago (Stripe)
+   ========================= */
+function PaymentLinkPanel() {
+  const [channels, setChannels] = useState([]);
+  const [selectedId, setSelectedId] = useState("");
+  const [mode, setMode] = useState(""); // "add" | "change"
+  const [link, setLink] = useState("");
+  const [current, setCurrent] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const reload = async () => {
+    setMsg("");
+    const { data, error } = await supabase
+      .from("channels")
+      .select("id,name,country,payment_link")
+      .order("name", { ascending: true })
+      .limit(400);
+
+    if (error) setMsg(`❌ Error: ${error.message}`);
+    else setChannels(data || []);
+  };
+
+  useEffect(() => {
+    reload();
+  }, []);
+
+  useEffect(() => {
+    const c = channels.find((x) => x.id === selectedId);
+    const curr = c?.payment_link || "";
+    setCurrent(curr);
+    // si cambias de canal, no te piso tu input si ya estabas editando
+    if (!mode) setLink(curr);
+  }, [selectedId, channels]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const save = async () => {
+    if (!selectedId) {
+      setMsg("❌ Selecciona un canal.");
+      return;
+    }
+    const clean = (link || "").trim();
+    if (!clean) {
+      setMsg("❌ Ingresa un link válido.");
+      return;
+    }
+
+    setLoading(true);
+    setMsg("");
+    try {
+      const { error } = await supabase
+        .from("channels")
+        .update({ payment_link: clean })
+        .eq("id", selectedId);
+
+      if (error) throw error;
+
+      setMsg("✅ Link de pago guardado.");
+      setMode("");
+      await reload();
+    } catch (e) {
+      setMsg(`❌ ${e.message || String(e)}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="mt-6 bg-gray-800/70 backdrop-blur-lg border border-gray-700 rounded-2xl p-6">
+      <div className="flex items-center gap-2 mb-4">
+        <Plus className="w-5 h-5 text-sky-400" />
+        <h3 className="text-xl font-semibold">Link de pago</h3>
+      </div>
+
+      {msg && (
+        <div
+          className={`mb-4 p-3 rounded-lg text-sm ${
+            msg.startsWith("✅")
+              ? "bg-emerald-900/40 border border-emerald-700 text-emerald-200"
+              : "bg-red-900/40 border border-red-700 text-red-200"
+          }`}
+        >
+          {msg}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Canal */}
+        <div className="md:col-span-1">
+          <label className="block text-sm text-gray-300 mb-1">Canal</label>
+          <select
+            value={selectedId}
+            onChange={(e) => {
+              setSelectedId(e.target.value);
+              setMode("");
+            }}
+            className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-rose-500/40"
+          >
+            <option value="">— Selecciona —</option>
+            {channels.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+                {c.country ? ` (${c.country})` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Estado actual */}
+        <div className="md:col-span-2">
+          <label className="block text-sm text-gray-300 mb-1">Link actual</label>
+          <div className="w-full bg-gray-700/30 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-200 break-all">
+            {current ? current : "— Sin link asignado —"}
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={!selectedId || loading}
+              onClick={() => {
+                setMode("add");
+                setLink("");
+              }}
+              className="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 disabled:opacity-50 font-semibold"
+            >
+              Agregar link de pago
+            </button>
+
+            <button
+              type="button"
+              disabled={!selectedId || loading}
+              onClick={() => {
+                setMode("change");
+                setLink(current || "");
+              }}
+              className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 font-semibold"
+            >
+              Cambiar link de pago
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Input aparece SOLO si eliges una opción */}
+      {mode && (
+        <div className="mt-4">
+          <label className="block text-sm text-gray-300 mb-1">
+            {mode === "add" ? "Nuevo link de pago" : "Editar link de pago"}
+          </label>
+          <input
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+            placeholder="https://buy.stripe.com/..."
+            className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500/40"
+          />
+
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              disabled={loading}
+              onClick={save}
+              className="px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 font-semibold"
+            >
+              {loading ? "Guardando…" : "Guardar link"}
+            </button>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => {
+                setMode("");
+                setLink(current || "");
+              }}
+              className="px-5 py-2.5 rounded-lg border border-gray-600 hover:bg-gray-700 disabled:opacity-50 font-semibold"
+            >
+              Cancelar
+            </button>
+          </div>
+
+          <p className="text-xs text-gray-400 mt-2">
+            Tip: pega aquí el link de Stripe (Payment Link / Checkout / lo que uses).
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /* =========================
    PÁGINA (LOGIN + FORM ADMIN)
@@ -1216,3 +1402,4 @@ export default function AdminLoginPage() {
     </div>
   );
 }
+
