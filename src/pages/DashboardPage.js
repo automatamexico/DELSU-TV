@@ -6,6 +6,19 @@ import { supabase } from '../supabaseClient';
 import ChannelGeoMap from "../components/ChannelGeoMap";
 import PageTitle from "../components/PageTitle"; // ← agregado
 
+// ✅ Link pago: helpers (no rompe nada)
+function normalizeUrl(url) {
+  if (!url) return "";
+  const u = String(url).trim();
+  if (/^https?:\/\//i.test(u)) return u;
+  return `https://${u}`;
+}
+function goToPaymentLink(rawUrl) {
+  const url = normalizeUrl(rawUrl);
+  if (!url) return;
+  window.location.href = url; // misma pestaña
+}
+
 // 🔹 MiniPlayer: autoplay, loop, proporción 16:9 y botón SOLO para mute
 function MiniPlayer({ src }) {
   const videoRef = React.useRef(null);
@@ -373,7 +386,7 @@ export default function DashboardPage() {
         const { data, error } = await supabase
           .from('channels')
           .select(
-            'id,name,poster,stream_url,country,category,is_suspended,billing_next_due_date,views_count'
+            'id,name,poster,stream_url,country,category,is_suspended,billing_next_due_date,views_count,payment_link'
           )
           .eq('owner_user_id', user.id)
           .order('created_at', { ascending: false });
@@ -485,17 +498,18 @@ export default function DashboardPage() {
                           <span className="font-semibold">Calificación del Canal:</span>
                           <Stars value={computeStars(c.views_count)} />
                         </div>
-                          
-                         <button
-  onClick={() => goToPaymentLink(c.payment_link)}
-  disabled={!c.payment_link}
-  className={
-    (c.payment_link ? "bg-blue-600 hover:bg-blue-700" : "bg-gray-600 cursor-not-allowed") +
-    " text-white font-semibold px-4 py-2 rounded-lg"
-  }
-  title={c.payment_link ? "Ir a pago (Stripe)" : "Este canal aún no tiene link de pago"}
->
-  Pagar Renovación
+
+                        <div className="pt-1">
+                          <button
+                            onClick={() => goToPaymentLink(c.payment_link)}
+                            disabled={!c.payment_link}
+                            className={
+                              (c.payment_link ? "bg-blue-600 hover:bg-blue-700" : "bg-gray-600 cursor-not-allowed") +
+                              " text-white font-semibold px-4 py-2 rounded-lg"
+                            }
+                            title={c.payment_link ? "Ir a pago (Stripe)" : "Este canal aún no tiene link de pago"}
+                          >
+                            Pagar Renovación
                           </button>
                         </div>
                       </div>
