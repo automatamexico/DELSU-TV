@@ -487,8 +487,16 @@ export default function DashboardPage() {
                         </div>
 
                         <div className="pt-1">
-                          <button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg">
-                            Pagar Renovación
+                         <button
+  onClick={() => goToPaymentLink(c.payment_link)}
+  disabled={!c.payment_link}
+  className={
+    (c.payment_link ? "bg-blue-600 hover:bg-blue-700" : "bg-gray-600 cursor-not-allowed") +
+    " text-white font-semibold px-4 py-2 rounded-lg"
+  }
+  title={c.payment_link ? "Ir a pago (Stripe)" : "Este canal aún no tiene link de pago"}
+>
+  Pagar Renovación
                           </button>
                         </div>
                       </div>
