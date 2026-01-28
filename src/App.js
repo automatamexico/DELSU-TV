@@ -1,6 +1,6 @@
 // src/App.js
 import React from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 
 // Páginas (ajusta si tus nombres difieren)
@@ -37,7 +37,7 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
 
             {/* ✅ Apps (público) */}
-            <Route path="/apps" element={<AppsPage />} />
+            <Route path="/apps" element={<Navigate to="/" replace />} />
             <Route path="/apps/:id" element={<ChannelAppPage />} />
 
             {/* Perfil requiere sesión */}
