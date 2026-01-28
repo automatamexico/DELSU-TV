@@ -16,7 +16,7 @@ function normalizeUrl(url) {
 function goToPaymentLink(rawUrl) {
   const url = normalizeUrl(rawUrl);
   if (!url) return;
-  window.location.href = url; // misma pestaña
+  window.open(url, "_blank", "noopener,noreferrer"); // ✅ otra pestaña
 }
 
 // 🔹 MiniPlayer: autoplay, loop, proporción 16:9 y botón SOLO para mute
