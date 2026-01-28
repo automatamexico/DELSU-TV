@@ -90,7 +90,7 @@ export default function ChannelCard({ channel, onClick }) {
 
   const rokuLink = channel?.roku_link_url || channel?.roku_url || channel?.roku_link || null;
 
-  // ✅ Android APK (url)
+  // ✅ Android APK (url) - se usa SOLO para decidir si mostramos el icono
   const apkUrl =
     channel?.apk_url ||
     channel?.apk_public_url ||
@@ -101,6 +101,10 @@ export default function ChannelCard({ channel, onClick }) {
   // ✅ Icono Android (fijo)
   const androidIconRaw =
     "https://uqzcnlmhmglzflkuzczk.supabase.co/storage/v1/object/public/avatars/android.png";
+
+  // ✅ Link a tu página de Apps por ID (NO descarga directa)
+  const appPageUrl =
+    channel?.id ? `https://hispanatv.com/apps/${channel.id}` : null;
 
   // Redes (ícono + url)
   const fbIcon = channel?.facebook_icon_url || channel?.facebook_icon || null;
@@ -227,14 +231,15 @@ export default function ChannelCard({ channel, onClick }) {
                 )
               ) : null}
 
-              {/* ✅ Android (abajito del Roku, sin descuadrar) */}
-              {apkUrl ? (
+              {/* ✅ Android (abajito del Roku, sin descuadrar)
+                  AHORA abre https://hispanatv.com/apps/<id> */}
+              {apkUrl && appPageUrl ? (
                 <div className="mt-2 flex justify-end">
                   <button
                     type="button"
-                    onClick={(e) => openPopupControlled(e, apkUrl)}
+                    onClick={(e) => openPopupControlled(e, appPageUrl)}
                     className="inline-flex items-center"
-                    aria-label="Descargar App Android"
+                    aria-label="Ver App Android"
                     title="Android"
                   >
                     <img
