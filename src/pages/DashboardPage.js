@@ -485,8 +485,7 @@ export default function DashboardPage() {
                           <span className="font-semibold">Calificación del Canal:</span>
                           <Stars value={computeStars(c.views_count)} />
                         </div>
-
-                        <div className="pt-1">
+                          
                          <button
   onClick={() => goToPaymentLink(c.payment_link)}
   disabled={!c.payment_link}
