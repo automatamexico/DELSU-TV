@@ -11,7 +11,6 @@ import DashboardPage from "./pages/DashboardPage";
 import ProfilePage from "./pages/ProfilePage";
 
 // ✅ Apps
-import AppsPage from "./pages/AppsPage";
 import ChannelAppPage from "./pages/ChannelAppPage";
 
 // Rutas protegidas
