@@ -1,124 +1,94 @@
-import React, { useEffect, useRef, useState, useMemo } from "react";
+// src/components/VideoPlayer.js
+import React, { useEffect, useMemo, useRef, useState } from "react";
+// Si usas hls.js, mantenlo. Si no existe en tu proyecto, deja el import como estaba.
 import Hls from "hls.js";
 
-// ✅ Normaliza el stream para evitar que pase por /hls/... (Netlify) y reducir "parones" por proxy.
-// Si en la BD viene como "/hls/DOMINIO/ruta.m3u8" o sin protocolo, lo convertimos a URL directa.
-function resolveStreamUrl(raw) {
-  if (!raw) return "";
-  let u = String(raw).trim();
-
-  // Caso: /hls/<host>/<path>  (o URL-encoded)
-  if (u.startsWith("/hls/")) {
-    u = u.slice(5); // quita "/hls/"
-    try {
-      u = decodeURIComponent(u);
-    } catch {}
-    if (/^https?:\/\//i.test(u)) return u;
-    // algunos orígenes no van por https (ej. :8081)
-    if (/:\\d{2,5}\//.test(u) && !u.startsWith("http")) return `http://${u}`;
-    return `https://${u}`;
-  }
-
-  // Caso: sin protocolo
-  if (!/^https?:\/\//i.test(u)) {
-    // si trae puerto, mejor intentar http primero
-    if (/:\\d{2,5}(\/|$)/.test(u)) return `http://${u}`;
-    return `https://${u}`;
-  }
-
-  return u;
-}
-
-export default function VideoPlayer({ channel, className = "" }) {
+export default function VideoPlayer({ channel, onClose }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
+  const [needUserGesture, setNeedUserGesture] = useState(false);
+  const [nativeError, setNativeError] = useState(null);
 
-  const sourceUrl = useMemo(() => {
-    return resolveStreamUrl(channel?.stream_url) || "";
+  // 🔒 Bloquear menú contextual (clic derecho)
+  const blockContext = (e) => e.preventDefault();
+
+  const streamUrl = useMemo(() => {
+    return channel?.stream_url || channel?.stream || channel?.url || "";
   }, [channel]);
 
-  const [isMuted, setIsMuted] = useState(true);
-  const [error, setError] = useState(null);
-
-  const toggleMute = () => {
-    const v = videoRef.current;
-    if (!v) return;
-    v.muted = !v.muted;
-    setIsMuted(v.muted);
+  // Limpieza
+  const destroyHls = () => {
+    try {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+    } catch {}
   };
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
-    setError(null);
+    setNeedUserGesture(false);
+    setNativeError(null);
 
-    // Limpia instancia anterior
-    if (hlsRef.current) {
+    // Reset video source
+    destroyHls();
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+
+    if (!streamUrl) return;
+
+    // Preferencia: HLS nativo (Safari/iOS)
+    const canNativeHls =
+      video.canPlayType("application/vnd.apple.mpegurl") ||
+      video.canPlayType("application/x-mpegURL");
+
+    // Intentar reproducción (puede requerir gesto del usuario)
+    const tryPlay = async () => {
       try {
-        hlsRef.current.destroy();
-      } catch {}
-      hlsRef.current = null;
-    }
-
-    if (!sourceUrl) return;
-
-    // 🔧 Config tolerante a redes variables (menos "parones")
-    const hlsConfig = {
-      // 🔧 Más tolerancia a variaciones de red y evita parones por buffer corto
-      lowLatencyMode: true,
-      enableWorker: true,
-
-      // Buffer
-      maxBufferLength: 90,
-      maxMaxBufferLength: 180,
-      backBufferLength: 30,
-      maxBufferSize: 60 * 1000 * 1000, // 60MB
-
-      // Live sync (reduce saltos/pausas cuando el live se aleja)
-      liveSyncDurationCount: 3,
-      liveMaxLatencyDurationCount: 10,
-
-      // Retries
-      fragLoadingMaxRetry: 6,
-      fragLoadingRetryDelay: 1000,
-      fragLoadingMaxRetryTimeout: 64000,
-      manifestLoadingMaxRetry: 6,
-      manifestLoadingRetryDelay: 1000,
-      manifestLoadingMaxRetryTimeout: 64000,
-      levelLoadingMaxRetry: 6,
-      levelLoadingRetryDelay: 1000,
-      levelLoadingMaxRetryTimeout: 64000,
+        await video.play();
+      } catch (e) {
+        // Autoplay bloqueado -> pedir click
+        setNeedUserGesture(true);
+      }
     };
 
-    // Safari iOS/macOS a veces maneja HLS nativo
-    const canNativeHls = video.canPlayType("application/vnd.apple.mpegurl");
-
     if (canNativeHls) {
-      video.src = sourceUrl;
-      video.muted = true;
-      setIsMuted(true);
-
-      const p = video.play();
-      if (p && typeof p.catch === "function") p.catch(() => {});
-      return;
+      video.src = streamUrl;
+      video.addEventListener("error", () => {
+        setNativeError("Error nativo reproduciendo HLS.");
+      });
+      tryPlay();
+      return () => {
+        video.removeEventListener("error", () => {});
+      };
     }
 
+    // hls.js para Chrome/Edge/Firefox
     if (Hls.isSupported()) {
-      const hls = new Hls(hlsConfig);
+      const hls = new Hls({
+        // Ajustes recomendados para LIVE
+        enableWorker: true,
+        lowLatencyMode: false,
+        backBufferLength: 30,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
+        liveSyncDurationCount: 3,
+        liveMaxLatencyDurationCount: 10,
+      });
+
       hlsRef.current = hls;
 
       hls.attachMedia(video);
       hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-        try {
-          hls.loadSource(sourceUrl);
-        } catch (e) {
-          setError(e?.message || "Error cargando stream.");
-        }
+        hls.loadSource(streamUrl);
       });
 
-      hls.on(Hls.Events.ERROR, (_, data) => {
-        // Si se puede recuperar, lo intenta; si no, reporta.
+      hls.on(Hls.Events.ERROR, (event, data) => {
+        // Si hay errores fatales, intentar recuperarse
         if (data?.fatal) {
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
             try {
@@ -129,62 +99,98 @@ export default function VideoPlayer({ channel, className = "" }) {
               hls.recoverMediaError();
             } catch {}
           } else {
-            setError("Error fatal en reproducción (HLS).");
-            try {
-              hls.destroy();
-            } catch {}
-            hlsRef.current = null;
+            destroyHls();
           }
         }
       });
 
-      // autoplay (silenciado)
-      video.muted = true;
-      setIsMuted(true);
-      const p = video.play();
-      if (p && typeof p.catch === "function") p.catch(() => {});
-    } else {
-      setError("Tu navegador no soporta HLS.");
+      // Intentar play
+      tryPlay();
+
+      return () => {
+        destroyHls();
+      };
     }
 
-    return () => {
-      if (hlsRef.current) {
-        try {
-          hlsRef.current.destroy();
-        } catch {}
-        hlsRef.current = null;
-      }
-    };
-  }, [sourceUrl]);
+    // Si no soporta nada:
+    setNativeError("Tu navegador no soporta reproducción HLS.");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [streamUrl]);
 
+  const onUserGesturePlay = async () => {
+    const v = videoRef.current;
+    if (!v) return;
+    try {
+      await v.play();
+      setNeedUserGesture(false);
+    } catch {
+      // sigue bloqueado
+      setNeedUserGesture(true);
+    }
+  };
+
+  // 👇 UI simple con controles nativos
   return (
-    <div className={`relative w-full ${className}`}>
-      <video
-        ref={videoRef}
-        className="w-full h-full object-cover rounded-xl"
-        autoPlay
-        playsInline
-        muted
-        controls={false}
-        preload="metadata"
-      />
+    <div
+      className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+      onContextMenu={blockContext}
+    >
+      <div className="relative w-full max-w-5xl bg-black rounded-2xl overflow-hidden shadow-2xl">
+        {/* Cerrar */}
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 z-20 bg-white/10 hover:bg-white/20 text-white px-3 py-1 rounded-lg text-sm"
+        >
+          Cerrar
+        </button>
 
-      {/* Botón mute/unmute */}
-      <button
-        onClick={toggleMute}
-        className="absolute bottom-2 right-2 px-3 py-1 text-xs rounded bg-black/60 hover:bg-black/80 border border-white/20"
-        aria-label={isMuted ? "Quitar mute" : "Silenciar"}
-        title={isMuted ? "Quitar mute" : "Silenciar"}
-        type="button"
-      >
-        {isMuted ? "Quitar mute" : "Silenciar"}
-      </button>
+        {/* Video */}
+        <video
+          ref={videoRef}
+          className="w-full h-[60vh] md:h-[70vh] object-contain bg-black"
+          controls
+          playsInline
+          preload="metadata"
+          controlsList="nodownload noplaybackrate"
+          disablePictureInPicture
+          onContextMenu={blockContext}
+        />
 
-      {error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-sm p-3 rounded-xl">
-          {error}
+        {/* Overlay: click para iniciar si autoplay bloqueado */}
+        {needUserGesture && (
+          <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/60">
+            <button
+              onClick={onUserGesturePlay}
+              className="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-3 rounded-xl"
+            >
+              Tocar para reproducir
+            </button>
+          </div>
+        )}
+
+        {/* Error */}
+        {nativeError && (
+          <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/70">
+            <div className="text-white text-center p-6">
+              <div className="text-lg font-semibold mb-2">No se pudo reproducir</div>
+              <div className="text-sm opacity-80">{nativeError}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Hint */}
+        <div className="p-3 text-xs text-gray-300 bg-gray-900/70 flex items-center justify-between">
+          <span className="truncate">
+            {channel?.name ? `Reproduciendo: ${channel.name}` : "Reproduciendo canal"}
+          </span>
+          <span className="opacity-70">Full + Volumen desde controles del video</span>
         </div>
-      )}
+      </div>
     </div>
   );
 }
+
+/**
+ * ✅ Opcional: si quieres mostrar "buffering" podrías escuchar "waiting"/"playing",
+ * pero ojo: overlays sin pointer-events bloquean el control del player.
+ */
