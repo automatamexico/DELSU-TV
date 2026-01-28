@@ -100,7 +100,7 @@ export default function ChannelCard({ channel, onClick }) {
 
   // ✅ Icono Android (fijo)
   const androidIconRaw =
-    "https://uqzcnlmhmglzflkuzczk.supabase.co/storage/v1/object/public/avatars/android.png";
+    "https://uqzcnlmhmglzflkuzczk.supabase.co/storage/v1/object/public/avatars/android1.png";
 
   // ✅ Link a tu página de Apps por ID (NO descarga directa)
   const appPageUrl =
