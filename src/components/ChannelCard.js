@@ -38,11 +38,11 @@ function openPopupControlled(e, rawUrl) {
 /* --------------------- Calificación (novedad) --------------------- */
 function calcStarsFromViews(views) {
   const v = Number.isFinite(views) ? views : 0;
-  if (v <= 10) return 0;         // 0–10 -> 0★
-  if (v <= 100) return 1;        // 11–100 -> 1★
-  if (v <= 200) return 3;        // 101–200 -> 3★
-  if (v <= 300) return 4;        // 201–300 -> 4★
-  return 5;                      // >300 -> 5★
+  if (v <= 10) return 0; // 0–10 -> 0★
+  if (v <= 100) return 1; // 11–100 -> 1★
+  if (v <= 200) return 3; // 101–200 -> 3★
+  if (v <= 300) return 4; // 201–300 -> 4★
+  return 5; // >300 -> 5★
 }
 
 function Stars({ count = 0 }) {
@@ -66,23 +66,15 @@ function Stars({ count = 0 }) {
 export default function ChannelCard({ channel, onClick }) {
   // Básicos
   const title =
-    channel?.title ||
-    channel?.name ||
-    channel?.channel_name ||
-    "Canal sin nombre";
+    channel?.title || channel?.name || channel?.channel_name || "Canal sin nombre";
 
   const poster =
-    channel?.poster_url ||
-    channel?.poster ||
-    channel?.thumbnail ||
-    "/poster-fallback.jpg";
+    channel?.poster_url || channel?.poster || channel?.thumbnail || "/poster-fallback.jpg";
 
-  const category =
-    channel?.category || channel?.categoria || channel?.genre || "—";
+  const category = channel?.category || channel?.categoria || channel?.genre || "—";
 
   const country = channel?.country || channel?.pais || "—";
-  const description =
-    channel?.description || channel?.descripcion || channel?.about || "";
+  const description = channel?.description || channel?.descripcion || channel?.about || "";
 
   // Bandera
   const banderaUrl = channel?.url_bandera || channel?.bandera_url || null;
@@ -96,15 +88,25 @@ export default function ChannelCard({ channel, onClick }) {
     channel?.roku ||
     null;
 
-  const rokuLink =
-    channel?.roku_link_url || channel?.roku_url || channel?.roku_link || null;
+  const rokuLink = channel?.roku_link_url || channel?.roku_url || channel?.roku_link || null;
+
+  // ✅ Android APK (url)
+  const apkUrl =
+    channel?.apk_url ||
+    channel?.apk_public_url ||
+    channel?.android_apk_url ||
+    channel?.apk ||
+    null;
+
+  // ✅ Icono Android (fijo)
+  const androidIconRaw =
+    "https://uqzcnlmhmglzflkuzczk.supabase.co/storage/v1/object/public/avatars/android.png";
 
   // Redes (ícono + url)
   const fbIcon = channel?.facebook_icon_url || channel?.facebook_icon || null;
   const fbUrl = channel?.facebook_url || null;
 
-  const ytIcon =
-    channel?.youtube_icon_url || channel?.youtube_icon || channel?.yt_icon;
+  const ytIcon = channel?.youtube_icon_url || channel?.youtube_icon || channel?.yt_icon;
   const ytUrl = channel?.youtube_url || channel?.yt_url || null;
 
   const tkIcon = channel?.tiktok_icon_url || channel?.tiktok_icon || null;
@@ -114,11 +116,7 @@ export default function ChannelCard({ channel, onClick }) {
   const webUrl = channel?.website_url || channel?.web_url || null;
 
   // Versión para bust cache (si tienes ese campo en DB)
-  const version =
-    channel?.icon_version ||
-    channel?.updated_at ||
-    channel?.last_updated ||
-    "";
+  const version = channel?.icon_version || channel?.updated_at || channel?.last_updated || "";
 
   const rokuIcon = withBust(rokuIconRaw, version);
   const fbIconUrl = withBust(fbIcon, version);
@@ -127,6 +125,9 @@ export default function ChannelCard({ channel, onClick }) {
   const webIconUrl = withBust(webIcon, version);
   const flagIconUrl = withBust(banderaUrl, version);
 
+  // ✅ Android icon con bust opcional (no estorba)
+  const androidIcon = withBust(androidIconRaw, version);
+
   const hasAnySocial = Boolean(fbUrl || ytUrl || tkUrl || webUrl);
 
   /* Calificación desde vistas */
@@ -134,7 +135,7 @@ export default function ChannelCard({ channel, onClick }) {
   const starCount = calcStarsFromViews(views);
 
   return (
-   <div className="group w-full h-full text-left rounded-xl overflow-hidden bg-gray-900/40 border border-gray-800 hover:border-gray-700 focus:outline-none focus:ring-2 focus:ring-rose-500/40 transition">
+    <div className="group w-full h-full text-left rounded-xl overflow-hidden bg-gray-900/40 border border-gray-800 hover:border-gray-700 focus:outline-none focus:ring-2 focus:ring-rose-500/40 transition">
       {/* === PÓSTER (ÚNICO QUE ABRE EL REPRODUCTOR) === */}
       <button
         type="button"
@@ -142,15 +143,9 @@ export default function ChannelCard({ channel, onClick }) {
         className="relative block w-full text-left"
         aria-label={`Abrir reproductor: ${title}`}
       >
-        {/* 
-          CONTENEDOR CON RELACIÓN DE ASPECTO:
-          - Mantiene el espacio reservado para que el layout no “salte”.
-          - Conservamos tus clases actuales y añadimos aspect-ratio nativo
-            como fallback para navegadores que lo soportan.
-        */}
         <div
           className="aspect-[3/4.2] md:aspect-[2/3.15] w-full overflow-hidden bg-gray-800"
-          style={{ aspectRatio: "3 / 4" }}  // 👈 fallback/garantía
+          style={{ aspectRatio: "3 / 4" }}
         >
           <img
             src={poster}
@@ -174,9 +169,7 @@ export default function ChannelCard({ channel, onClick }) {
         <div className="flex items-end justify-between gap-3">
           {/* Izquierda: título, país, descripción */}
           <div className="min-w-0">
-            <h3 className="text-[15px] font-semibold text-white line-clamp-1">
-              {title}
-            </h3>
+            <h3 className="text-[15px] font-semibold text-white line-clamp-1">{title}</h3>
 
             <div className="mt-0.5 flex items-center gap-2 text-[12px] text-gray-300">
               {flagIconUrl ? (
@@ -198,13 +191,14 @@ export default function ChannelCard({ channel, onClick }) {
             ) : null}
           </div>
 
-          {/* Derecha: Roku (click → popup) */}
-          {(rokuIcon || rokuLink) && (
+          {/* Derecha: Roku + Android (click → popup) */}
+          {(rokuIcon || rokuLink || apkUrl) && (
             <div className="ml-auto shrink-0 text-right">
               <div className="text-[12px] font-medium text-gray-300 mb-1">
                 También disponible en
               </div>
 
+              {/* Roku */}
               {rokuIcon ? (
                 rokuLink ? (
                   <button
@@ -232,6 +226,27 @@ export default function ChannelCard({ channel, onClick }) {
                   />
                 )
               ) : null}
+
+              {/* ✅ Android (abajito del Roku, sin descuadrar) */}
+              {apkUrl ? (
+                <div className="mt-2 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={(e) => openPopupControlled(e, apkUrl)}
+                    className="inline-flex items-center"
+                    aria-label="Descargar App Android"
+                    title="Android"
+                  >
+                    <img
+                      src={androidIcon}
+                      alt="Android"
+                      loading="lazy"
+                      decoding="async"
+                      className="h-6 w-6 object-contain"
+                    />
+                  </button>
+                </div>
+              ) : null}
             </div>
           )}
         </div>
@@ -239,9 +254,7 @@ export default function ChannelCard({ channel, onClick }) {
         {/* Footer redes (click → popup) */}
         {hasAnySocial && (
           <div className="mt-3">
-            <div className="text-[12px] font-semibold text-gray-300">
-              Síguenos en
-            </div>
+            <div className="text-[12px] font-semibold text-gray-300">Síguenos en</div>
             <div className="mt-2 flex items-center gap-3">
               {fbUrl && fbIconUrl && (
                 <button
@@ -320,9 +333,7 @@ export default function ChannelCard({ channel, onClick }) {
           <div className="text-[12px] text-gray-300">
             <span className="font-semibold mr-1">Calificación:</span>
             <Stars count={starCount} />
-            <span className="ml-2 text-gray-500">
-              ({Number(views) || 0} vistas)
-            </span>
+            <span className="ml-2 text-gray-500">({Number(views) || 0} vistas)</span>
           </div>
         </div>
         {/* ----------------------------------------------- */}
