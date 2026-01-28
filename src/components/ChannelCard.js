@@ -213,7 +213,7 @@ export default function ChannelCard({ channel, onClick }) {
                       alt="Roku"
                       loading="lazy"
                       decoding="async"
-                      className="h-7 w-auto object-contain"
+                      className="h-14 w-auto object-contain"
                     />
                   </button>
                 ) : (
@@ -222,7 +222,7 @@ export default function ChannelCard({ channel, onClick }) {
                     alt="Roku"
                     loading="lazy"
                     decoding="async"
-                    className="h-7 w-auto object-contain"
+                    className="h-14 w-auto object-contain"
                   />
                 )
               ) : null}
@@ -242,7 +242,7 @@ export default function ChannelCard({ channel, onClick }) {
                       alt="Android"
                       loading="lazy"
                       decoding="async"
-                      className="h-20 w-20 object-contain"
+                      className="h-27 w-27 object-contain"
                     />
                   </button>
                 </div>
