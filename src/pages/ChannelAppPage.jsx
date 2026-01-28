@@ -182,7 +182,7 @@ export default function ChannelAppPage() {
               <img
                 src={hispanaLogo}
                 alt="HispanaTV"
-                className="h-10 w-auto object-contain hover:opacity-90 transition"
+                className="h-30 w-auto object-contain hover:opacity-90 transition"
                 loading="lazy"
                 decoding="async"
               />
