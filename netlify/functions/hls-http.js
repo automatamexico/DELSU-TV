@@ -1,84 +1,144 @@
 // netlify/functions/hls-http.js
+// HLS proxy + playlist rewriter
+//
+// Why this exists:
+// Some HLS providers allow playback when you paste the .m3u8 in a browser tab,
+// but they block XHR/fetch requests from arbitrary Origins (CORS). hls.js uses
+// XHR/fetch to load the manifest + segments, so the same stream can fail inside
+// your site.
+//
+// This function proxies the request and (if the response is a .m3u8 playlist)
+// rewrites ALL nested URIs (variants/segments/keys) so *every* subsequent request
+// also goes through this proxy.
+
+function isAbsUrl(s) {
+  return /^https?:\/\//i.test(s);
+}
+
+function proxify(absUrl) {
+  // Matches your netlify.toml redirect:
+  // /hls-http/*  -> /.netlify/functions/hls-http?u=:splat
+  return `/hls-http/${encodeURIComponent(absUrl)}`;
+}
+
+function resolveUrl(base, maybeRelative) {
+  try {
+    return new URL(maybeRelative, base).toString();
+  } catch {
+    return maybeRelative;
+  }
+}
+
+function rewriteM3U8(text, baseUrl) {
+  const lines = String(text || '').split(/\r?\n/);
+  const out = [];
+
+  for (let line of lines) {
+    const raw = line;
+    line = line.trim();
+    if (!line) {
+      out.push(raw);
+      continue;
+    }
+
+    // Rewrite EXT-X-KEY URI="..."
+    if (line.startsWith('#EXT-X-KEY') && line.includes('URI="')) {
+      out.push(
+        raw.replace(/URI="([^"]+)"/g, (_m, uri) => {
+          const abs = isAbsUrl(uri) ? uri : resolveUrl(baseUrl, uri);
+          return `URI="${proxify(abs)}"`;
+        })
+      );
+      continue;
+    }
+
+    // Comments stay as-is
+    if (line.startsWith('#')) {
+      out.push(raw);
+      continue;
+    }
+
+    // Any non-comment line in m3u8 is a URI (variant or segment)
+    const abs = isAbsUrl(line) ? line : resolveUrl(baseUrl, line);
+    out.push(proxify(abs));
+  }
+
+  return out.join('\n');
+}
+
 export async function handler(event) {
   try {
-    // /hls-http/<host[:port]>/<path...>  -> http://<host[:port]>/<path...>
-    const u = event.queryStringParameters?.u || "";
+    const u = event.queryStringParameters?.u;
     if (!u) {
+      return { statusCode: 400, body: 'Missing u' };
+    }
+
+    // Decode target
+    const targetUrl = decodeURIComponent(u);
+
+    // Forward some headers (helps some CDNs)
+    const inHeaders = event.headers || {};
+    const range = inHeaders.range || inHeaders.Range;
+
+    const res = await fetch(targetUrl, {
+      method: 'GET',
+      headers: {
+        ...(range ? { Range: range } : {}),
+        // A permissive UA helps with picky origins
+        'User-Agent': inHeaders['user-agent'] || inHeaders['User-Agent'] || 'Mozilla/5.0',
+        'Accept': inHeaders.accept || inHeaders.Accept || '*/*',
+        'Accept-Language': inHeaders['accept-language'] || inHeaders['Accept-Language'] || 'es-MX,es;q=0.9,en;q=0.8',
+        // Some vendors validate referer/origin — keep it simple
+        'Referer': targetUrl,
+        'Origin': new URL(targetUrl).origin,
+      },
+    });
+
+    const contentType = res.headers.get('content-type') || '';
+    const isM3U8 = /application\/(vnd\.apple\.mpegurl|x-mpegURL)/i.test(contentType) || /\.m3u8($|\?)/i.test(targetUrl);
+
+    // Read body
+    const bodyBuf = Buffer.from(await res.arrayBuffer());
+
+    // If playlist: rewrite nested URIs
+    if (isM3U8) {
+      const text = bodyBuf.toString('utf8');
+      const rewritten = rewriteM3U8(text, targetUrl);
+
       return {
-        statusCode: 400,
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ok: false, error: "missing u" }),
+        statusCode: res.status,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': '*',
+          'Access-Control-Allow-Methods': 'GET,HEAD,OPTIONS',
+          'Content-Type': 'application/vnd.apple.mpegurl; charset=utf-8',
+          'Cache-Control': 'no-store, max-age=0',
+        },
+        body: rewritten,
       };
     }
 
-    // Asegura http:// y decodifica cualquier %3A del puerto
-    const raw = decodeURIComponent(u);
-    const target = raw.startsWith("http://") || raw.startsWith("https://")
-      ? raw
-      : `http://${raw}`;
-
-    const url = new URL(target);
-
-    // Construye cabeceras “amigables” para orígenes viejos
-    const fwdHeaders = {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
-      "Accept": "*/*",
-      "Origin": "null",            // algunos orígenes fallan si hay origin https
-      "Referer": "",
-      "Host": url.host,            // mantiene Host del origen (incluye :8081)
-      "Connection": "keep-alive",
-    };
-
-    // Soporta Range si el player lo pide
-    const incomingRange = event.headers?.range || event.headers?.Range;
-    if (incomingRange) fwdHeaders["Range"] = incomingRange;
-
-    // Sigue redirecciones del origen
-    const resp = await fetch(target, {
-      method: "GET",
-      headers: fwdHeaders,
-      redirect: "follow",
-    });
-
-    const buf = await resp.arrayBuffer();
-
-    // Propaga el content-type correcto (m3u8 / ts / aac, etc.)
-    const ct =
-      resp.headers.get("content-type") ||
-      (target.endsWith(".m3u8")
-        ? "application/vnd.apple.mpegurl"
-        : "video/mp2t");
-
-    const outHeaders = {
-      "content-type": ct,
-      // evita cache agresivo en edge mientras pruebas
-      "cache-control": "no-store, must-revalidate",
-      // CORS seguro (mismo origen de tu app)
-      "access-control-allow-origin": "*",
-    };
-
-    // Si hay rango parcial, propaga códigos/headers de rango
-    const status =
-      resp.status === 206 || incomingRange ? 206 : resp.status || 200;
-
-    const cl = resp.headers.get("content-length");
-    if (cl) outHeaders["content-length"] = cl;
-
-    const cr = resp.headers.get("content-range");
-    if (cr) outHeaders["content-range"] = cr;
-
+    // Non-playlist: return raw
     return {
-      statusCode: status,
-      headers: outHeaders,
-      body: Buffer.from(buf).toString("base64"),
+      statusCode: res.status,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': '*',
+        'Access-Control-Allow-Methods': 'GET,HEAD,OPTIONS',
+        'Content-Type': contentType || 'application/octet-stream',
+        ...(range ? { 'Accept-Ranges': 'bytes' } : {}),
+        'Cache-Control': 'no-store, max-age=0',
+      },
+      body: bodyBuf.toString('base64'),
       isBase64Encoded: true,
     };
-  } catch (e) {
+  } catch (err) {
     return {
-      statusCode: 502,
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ ok: false, error: String(e) }),
+      statusCode: 500,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+      },
+      body: `Proxy error: ${err?.message || String(err)}`,
     };
   }
 }
