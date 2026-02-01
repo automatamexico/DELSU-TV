@@ -1,35 +1,54 @@
-import React, { useEffect, useRef, useState, useMemo } from "react";
+// src/components/VideoPlayer.js
+import React, { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 
-// 🔧 Convierte una URL a su versión proxificada
-function proxifyUrl(url) {
-  if (!url) return "";
-  const encoded = encodeURIComponent(url.trim());
-  return `/hls-http/${encoded}`;
+// ✅ Imagen de fondo (pon aquí tu logo o un fondo bonito)
+const OFFLINE_BG =
+  "https://uqzcnlmhmglzflkuzczk.supabase.co/storage/v1/object/public/avatars/logo_hispana_blanco.png";
+
+// 🔹 Detecta si la URL ya pasa por proxy o si es externa
+function needsProxy(url) {
+  if (!url) return false;
+  const u = String(url).trim();
+  return (
+    !u.includes("/hls-http/") &&
+    !u.startsWith("/") &&
+    !u.includes("netlify.app") &&
+    !u.includes("hispanatv.com")
+  );
 }
 
-// 🔧 Determina si la URL es externa (no del dominio actual)
-function isExternalUrl(url) {
+// 🔹 Crea la versión proxificada de una URL
+function proxify(url) {
   try {
-    const u = new URL(url, window.location.origin);
-    return u.origin !== window.location.origin;
+    const encoded = encodeURIComponent(String(url).trim());
+    return `/hls-http/${encoded}`;
   } catch {
-    return false;
+    return url;
   }
 }
 
 export default function VideoPlayer({ channel, onClose }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
-  const [sourceUrl, setSourceUrl] = useState("");
-  const [errorMsg, setErrorMsg] = useState(null);
+
+  const rawUrl = channel?.stream_url || channel?.url || "";
+  const [streamUrl, setStreamUrl] = useState(rawUrl);
+  const [usingProxy, setUsingProxy] = useState(false);
+
+  // 👇 Estado de "offline poster"
+  const [offline, setOffline] = useState(false);
   const [needUserGesture, setNeedUserGesture] = useState(false);
 
-  // Al montar, decide la URL inicial
+  const blockContext = (e) => e.preventDefault();
+
+  // Cada vez que cambie el canal, resetea estados
   useEffect(() => {
-    if (!channel?.stream_url) return;
-    setSourceUrl(channel.stream_url.trim());
-  }, [channel?.stream_url]);
+    setStreamUrl(rawUrl);
+    setUsingProxy(false);
+    setOffline(false);
+    setNeedUserGesture(false);
+  }, [rawUrl]);
 
   const destroyHls = () => {
     try {
@@ -40,22 +59,45 @@ export default function VideoPlayer({ channel, onClose }) {
     } catch {}
   };
 
-  const initPlayback = async (url, isRetry = false) => {
+  // ✅ No mostramos errores técnicos: solo "offline"
+  const goOffline = () => {
+    setOffline(true);
+    setNeedUserGesture(false);
+  };
+
+  // ✅ Fallback automático: directo -> proxy -> offline
+  const handleLoadError = () => {
+    if (!usingProxy && needsProxy(rawUrl)) {
+      console.log("⚠️ Stream directo falló. Reintentando por proxy…");
+      setUsingProxy(true);
+      setStreamUrl(proxify(rawUrl));
+      setOffline(false);
+      return;
+    }
+    console.log("⛔ Stream falló incluso con proxy. Mostrando offline.");
+    goOffline();
+  };
+
+  useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || !streamUrl) return;
+
+    setOffline(false);
+    setNeedUserGesture(false);
 
     destroyHls();
-    video.pause();
-    video.removeAttribute("src");
-    video.load();
-    setErrorMsg(null);
 
-    const canNativeHls =
-      video.canPlayType("application/vnd.apple.mpegurl") ||
-      video.canPlayType("application/x-mpegURL");
+    // Limpia handlers previos
+    video.onerror = null;
+    video.onplaying = null;
+    video.oncanplay = null;
+    video.onstalled = null;
+    video.onwaiting = null;
 
-    // Función para lanzar reproducción
-    const playVideo = async () => {
+    // Autoplay normalmente requiere muted primero
+    video.muted = true;
+
+    const tryPlay = async () => {
       try {
         await video.play();
       } catch {
@@ -63,24 +105,35 @@ export default function VideoPlayer({ channel, onClose }) {
       }
     };
 
+    // Si empieza a reproducir, ocultamos offline
+    video.onplaying = () => {
+      setOffline(false);
+      setNeedUserGesture(false);
+    };
+
+    const canNativeHls =
+      video.canPlayType("application/vnd.apple.mpegurl") ||
+      video.canPlayType("application/x-mpegURL");
+
     // 🎬 Caso 1: HLS nativo (Safari/iOS)
     if (canNativeHls) {
-      video.src = url;
-      video.muted = true;
-      video.addEventListener("error", async () => {
-        if (!isRetry && isExternalUrl(url)) {
-          console.warn("Reintentando con proxy...");
-          const proxy = proxifyUrl(url);
-          setSourceUrl(proxy);
-        } else {
-          setErrorMsg("Error nativo reproduciendo HLS.");
-        }
-      });
-      playVideo();
-      return;
+      video.src = streamUrl;
+
+      // Si llega a poder reproducir, intentamos play
+      video.oncanplay = tryPlay;
+
+      // Si truena, proxy/offline
+      video.onerror = handleLoadError;
+
+      return () => {
+        video.onerror = null;
+        video.onplaying = null;
+        video.oncanplay = null;
+        destroyHls();
+      };
     }
 
-    // 🎬 Caso 2: HLS.js (Chrome, Edge, Firefox, etc.)
+    // 🎬 Caso 2: Hls.js
     if (Hls.isSupported()) {
       const hls = new Hls({
         enableWorker: true,
@@ -97,39 +150,50 @@ export default function VideoPlayer({ channel, onClose }) {
 
       hls.on(Hls.Events.MEDIA_ATTACHED, () => {
         try {
-          hls.loadSource(url);
-        } catch (e) {
-          setErrorMsg("Error cargando fuente HLS.");
+          hls.loadSource(streamUrl);
+          tryPlay();
+        } catch {
+          handleLoadError();
         }
       });
 
       hls.on(Hls.Events.ERROR, (_, data) => {
-        if (data?.fatal) {
-          console.warn("HLS fatal:", data);
-          if (!isRetry && isExternalUrl(url)) {
-            console.warn("Reintentando con proxy...");
-            const proxy = proxifyUrl(url);
-            setSourceUrl(proxy);
-          } else {
-            setErrorMsg("Error fatal en reproducción HLS.");
-          }
+        // No mostramos errores, solo decidimos qué hacer
+        if (!data?.fatal) return;
+
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+          handleLoadError();
+          return;
         }
+
+        if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+          try {
+            hls.recoverMediaError();
+          } catch {
+            handleLoadError();
+          }
+          return;
+        }
+
+        handleLoadError();
       });
 
-      video.muted = true;
-      playVideo();
-      return;
+      return () => {
+        destroyHls();
+        video.onerror = null;
+        video.onplaying = null;
+        video.oncanplay = null;
+      };
     }
 
-    setErrorMsg("Tu navegador no soporta HLS.");
-  };
+    // Si nada soporta HLS, lo tratamos como offline (sin mensaje técnico)
+    goOffline();
 
-  useEffect(() => {
-    if (!sourceUrl) return;
-    initPlayback(sourceUrl, false);
-    return () => destroyHls();
+    return () => {
+      destroyHls();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceUrl]);
+  }, [streamUrl]);
 
   const onUserGesturePlay = async () => {
     const v = videoRef.current;
@@ -145,53 +209,93 @@ export default function VideoPlayer({ channel, onClose }) {
   return (
     <div
       className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
-      onContextMenu={(e) => e.preventDefault()}
+      onContextMenu={blockContext}
     >
       <div className="relative w-full max-w-5xl bg-black rounded-2xl overflow-hidden shadow-2xl">
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 z-20 bg-white/10 hover:bg-white/20 text-white px-3 py-1 rounded-lg text-sm"
+          className="absolute top-3 right-3 z-30 bg-white/10 hover:bg-white/20 text-white px-3 py-1 rounded-lg text-sm"
         >
           Cerrar
         </button>
 
-        <video
-          ref={videoRef}
-          className="w-full h-[60vh] md:h-[70vh] object-contain bg-black"
-          controls
-          playsInline
-          preload="metadata"
-          controlsList="nodownload noplaybackrate"
-          disablePictureInPicture
-        />
+        <div className="relative">
+          <video
+            ref={videoRef}
+            className="w-full h-[60vh] md:h-[70vh] object-contain bg-black"
+            controls
+            playsInline
+            preload="metadata"
+            controlsList="nodownload noplaybackrate"
+            disablePictureInPicture
+            onContextMenu={blockContext}
+          />
 
-        {needUserGesture && (
-          <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/60">
-            <button
-              onClick={onUserGesturePlay}
-              className="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-3 rounded-xl"
-            >
-              Tocar para reproducir
-            </button>
-          </div>
-        )}
+          {/* ✅ Overlay OFFLINE (no muestra errores técnicos) */}
+          {offline && (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black">
+              <div
+                className="absolute inset-0 opacity-20"
+                style={{
+                  backgroundImage: `url('${OFFLINE_BG}')`,
+                  backgroundSize: "contain",
+                  backgroundRepeat: "no-repeat",
+                  backgroundPosition: "center",
+                  filter: "blur(1px)",
+                }}
+              />
+              <div className="relative z-10 flex flex-col items-center justify-center px-6 text-center">
+                <img
+                  src={OFFLINE_BG}
+                  alt="HispanaTV"
+                  className="w-40 md:w-56 object-contain mb-6 opacity-90"
+                  draggable={false}
+                />
+                <div className="text-2xl md:text-3xl font-bold text-white">
+                  Canal fuera de línea
+                </div>
+                <div className="mt-2 text-sm md:text-base text-gray-300 max-w-lg">
+                  En este momento no hay señal. Intenta más tarde.
+                </div>
 
-        {errorMsg && (
-          <div className="absolute inset-0 flex items-center justify-center z-10 bg-black/70">
-            <div className="text-white text-center p-6">
-              <div className="text-lg font-semibold mb-2">No se pudo reproducir</div>
-              <div className="text-sm opacity-80">{errorMsg}</div>
+                {/* Botón opcional: reintentar */}
+                <button
+                  onClick={() => {
+                    // Reintento manual: directo primero; si falla, el sistema proxifica solo
+                    setUsingProxy(false);
+                    setStreamUrl(rawUrl);
+                    setOffline(false);
+                  }}
+                  className="mt-6 bg-white/10 hover:bg-white/20 text-white px-5 py-2 rounded-xl border border-white/15"
+                >
+                  Reintentar
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {/* Overlay de gesto de usuario (autoplay bloqueado) */}
+          {needUserGesture && !offline && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60">
+              <button
+                onClick={onUserGesturePlay}
+                className="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-3 rounded-xl"
+              >
+                Tocar para reproducir
+              </button>
+            </div>
+          )}
+        </div>
 
         <div className="p-3 text-xs text-gray-300 bg-gray-900/70 flex items-center justify-between">
           <span className="truncate">
-            {channel?.name
-              ? `Reproduciendo: ${channel.name}`
-              : "Reproduciendo canal"}
+            {channel?.name ? `Reproduciendo: ${channel.name}` : "Reproduciendo canal"}
           </span>
-          <span className="opacity-70">Full + Volumen desde controles del video</span>
+          {usingProxy ? (
+            <span className="text-amber-400">↪ Modo proxy activado</span>
+          ) : (
+            <span className="opacity-70">Full + Volumen desde controles del video</span>
+          )}
         </div>
       </div>
     </div>
