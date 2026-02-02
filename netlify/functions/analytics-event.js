@@ -1,4 +1,4 @@
-// netlify/functions/analytics-events.js
+// netlify/functions/analytics-event.js
 const { createClient } = require("@supabase/supabase-js");
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -8,194 +8,140 @@ const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
   auth: { persistSession: false },
 });
 
-const ok = (body, statusCode = 200) => ({
+const json = (statusCode, body) => ({
   statusCode,
   headers: {
     "Content-Type": "application/json",
     "Cache-Control": "no-store",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers":
+      "content-type, x-requested-with, authorization",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
   },
   body: JSON.stringify(body),
 });
 
-const bad = (message, statusCode = 400, extra = {}) =>
-  ok({ ok: false, error: message, ...extra }, statusCode);
+const ok = (body) => json(200, { ok: true, ...body });
+const bad = (msg, code = 400, extra = {}) => json(code, { ok: false, error: msg, ...extra });
 
-const pad2 = (n) => String(n).padStart(2, "0");
-
-function isoWeekKey(date) {
-  // ISO week number
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-  return `${d.getUTCFullYear()}-W${pad2(weekNo)}`;
-}
-
-function bucketLabel(dtISO, period) {
-  const d = new Date(dtISO);
-  if (Number.isNaN(d.getTime())) return "—";
-  if (period === "day") return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-  if (period === "week") return isoWeekKey(d);
-  if (period === "month") return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
-  return `${d.getFullYear()}`;
-}
-
-function daysBackByPeriod(period) {
-  if (period === "day") return 35;
-  if (period === "week") return 180;
-  if (period === "month") return 540;
-  return 3650;
-}
-
-function normalizeCountry(v) {
-  const s = (v ?? "").toString().trim();
-  if (!s) return "__UNKNOWN__";
-  if (/^[a-z]{2}$/i.test(s)) return s.toUpperCase();
-  return s;
-}
-
-function countryLabel(code) {
-  if (code === "ALL") return "ALL";
-  if (code === "__UNKNOWN__") return "Desconocido";
-  // mínimo viable (puedes ampliar)
-  const map = {
-    MX: "México",
-    US: "Estados Unidos",
-    ES: "España",
-    AR: "Argentina",
-    CO: "Colombia",
-    PE: "Perú",
-    CL: "Chile",
-    EC: "Ecuador",
-    GT: "Guatemala",
-    HN: "Honduras",
-    SV: "El Salvador",
-    PA: "Panamá",
-    DO: "República Dominicana",
-    VE: "Venezuela",
-    BR: "Brasil",
-    CA: "Canadá",
-  };
-  if (/^[A-Z]{2}$/.test(code)) {
-    return map[code] ? `${map[code]} (${code})` : code;
+function safeParse(body) {
+  try {
+    return body ? JSON.parse(body) : {};
+  } catch {
+    return {};
   }
-  return code;
+}
+
+function clampStr(v, max = 300) {
+  const s = (v ?? "").toString().trim();
+  if (!s) return null;
+  return s.length > max ? s.slice(0, max) : s;
+}
+
+function isUUID(v) {
+  const s = (v ?? "").toString().trim();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
+}
+
+function getHeader(headers, name) {
+  if (!headers) return "";
+  const key = Object.keys(headers).find((k) => k.toLowerCase() === name.toLowerCase());
+  return key ? headers[key] : "";
+}
+
+function extractCountry(headers) {
+  // Netlify / Cloudflare / varios (por si cambia el proveedor o el edge)
+  const candidates = [
+    getHeader(headers, "x-nf-country"),      // Netlify (muy común)
+    getHeader(headers, "x-nf-geo"),          // Netlify (a veces JSON)
+    getHeader(headers, "cf-ipcountry"),      // Cloudflare
+    getHeader(headers, "x-country-code"),
+    getHeader(headers, "x-vercel-ip-country"),
+    getHeader(headers, "x-appengine-country"),
+  ].filter(Boolean);
+
+  for (const c of candidates) {
+    const v = String(c).trim();
+
+    // Caso x-nf-geo: puede venir JSON
+    if (v.startsWith("{") && v.endsWith("}")) {
+      try {
+        const j = JSON.parse(v);
+        const code =
+          (j && (j.country && String(j.country)) ) ||
+          (j && (j.country_code && String(j.country_code))) ||
+          "";
+        if (/^[a-z]{2}$/i.test(code)) return code.toUpperCase();
+      } catch {}
+    }
+
+    // Caso simple: "MX"
+    if (/^[a-z]{2}$/i.test(v)) return v.toUpperCase();
+  }
+
+  return null;
 }
 
 exports.handler = async (event) => {
   try {
+    if (event.httpMethod === "OPTIONS") {
+      return json(200, { ok: true });
+    }
+
+    if (event.httpMethod !== "POST") {
+      return bad("Method not allowed", 405);
+    }
+
     if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
       return bad("Faltan env vars SUPABASE_URL / SUPABASE_SERVICE_KEY", 500);
     }
 
-    const qs = event.queryStringParameters || {};
+    const body = safeParse(event.body);
 
-    const period = (qs.period || "day").toLowerCase(); // day|week|month|year
-    const eventType = (qs.event_type || "page_view").toLowerCase(); // page_view|play
-    const country = (qs.country || "ALL").trim(); // ALL | MX | __UNKNOWN__ | "Mexico"
-    const daysBack = Number(qs.days_back || daysBackByPeriod(period));
-
-    const from = new Date();
-    from.setDate(from.getDate() - (Number.isFinite(daysBack) ? daysBack : 35));
-    const since = from.toISOString();
-
-    // Traer datos
-    let q = sb
-      .from("analytics_events")
-      .select("created_at, country, session_id, event_type")
-      .gte("created_at", since)
-      .order("created_at", { ascending: true })
-      .limit(50000);
-
-    q = q.eq("event_type", eventType);
-
-    // Filtro país (si aplica)
-    if (country && country !== "ALL") {
-      if (country === "__UNKNOWN__") {
-        // null o vacío
-        q = q.or("country.is.null,country.eq.");
-      } else {
-        q = q.eq("country", country);
-      }
+    // ✅ Solo aceptamos estos eventos
+    const event_type = clampStr(body.event_type, 20);
+    if (!event_type || !["page_view", "play"].includes(event_type)) {
+      return bad("event_type inválido. Usa: page_view | play");
     }
 
-    const { data, error } = await q;
+    // page_path (para page_view)
+    const page_path = clampStr(body.page_path, 300);
+
+    // channel_id (solo si es play)
+    let channel_id = null;
+    if (event_type === "play") {
+      const cid = body.channel_id;
+      if (cid && isUUID(cid)) channel_id = String(cid).trim();
+      // si no viene, lo dejamos null (no rompas tu app por eso)
+    }
+
+    // session_id (ideal para “personas únicas”)
+    const session_id = clampStr(body.session_id, 120);
+
+    // user_agent (para debug / antispam básico)
+    const user_agent = clampStr(
+      body.user_agent || getHeader(event.headers, "user-agent"),
+      400
+    );
+
+    // ✅ País: lo detectamos del edge. Si no existe, dejamos NULL (tu reader lo mostrará como "Desconocido")
+    const country = extractCountry(event.headers);
+
+    const payload = {
+      event_type,
+      page_path: page_path || null,
+      channel_id,
+      country: country || null,
+      session_id: session_id || null,
+      user_agent: user_agent || null,
+      // user_id lo puedes llenar después si algún día quieres ligar a auth
+      // user_id: null,
+    };
+
+    const { error } = await sb.from("analytics_events").insert([payload]);
     if (error) return bad(error.message, 500);
 
-    const list = Array.isArray(data) ? data : [];
-
-    // Countries: construir desde TODO lo que regresó el query (si filtraste, obvio será reducido)
-    // -> Para dropdown completo SIEMPRE, hacemos un query extra SOLO de países en el rango (sin filtrar)
-    const { data: cdata, error: cerr } = await sb
-      .from("analytics_events")
-      .select("country")
-      .gte("created_at", since)
-      .eq("event_type", eventType)
-      .limit(50000);
-
-    if (cerr) return bad(cerr.message, 500);
-
-    const uniq = new Map();
-    uniq.set("ALL", { value: "ALL", label: "ALL" });
-
-    let unknownCount = 0;
-    (cdata || []).forEach((r) => {
-      const norm = normalizeCountry(r.country);
-      if (norm === "__UNKNOWN__") unknownCount++;
-      if (!uniq.has(norm)) uniq.set(norm, { value: norm, label: countryLabel(norm) });
-    });
-
-    const countries = Array.from(uniq.values());
-    const all = countries.find((x) => x.value === "ALL");
-    const rest = countries
-      .filter((x) => x.value !== "ALL")
-      .sort((a, b) => a.label.localeCompare(b.label, "es", { sensitivity: "base" }));
-    const countriesOut = all ? [all, ...rest] : rest;
-
-    // Series (agregados)
-    // - page_view: contar sesiones únicas por bucket (aprox “personas”)
-    // - play: contar eventos
-    const map = new Map();
-
-    if (eventType === "page_view") {
-      // bucket => Set(session_id)
-      for (const r of list) {
-        const k = bucketLabel(r.created_at, period);
-        if (!map.has(k)) map.set(k, new Set());
-        const sid = (r.session_id || "").toString().trim();
-        map.get(k).add(sid || `__NO_SID__:${r.created_at}:${Math.random()}`);
-      }
-      const series = Array.from(map.entries()).map(([bucket, set]) => ({
-        bucket,
-        total: set.size,
-      }));
-      const total = series.reduce((a, b) => a + (b.total || 0), 0);
-
-      return ok({
-        ok: true,
-        meta: { period, event_type: eventType, country, since, unknownCount },
-        countries: countriesOut,
-        series,
-        total,
-      });
-    } else {
-      // plays: bucket => count
-      for (const r of list) {
-        const k = bucketLabel(r.created_at, period);
-        map.set(k, (map.get(k) || 0) + 1);
-      }
-      const series = Array.from(map.entries()).map(([bucket, total]) => ({ bucket, total }));
-      const total = series.reduce((a, b) => a + (b.total || 0), 0);
-
-      return ok({
-        ok: true,
-        meta: { period, event_type: eventType, country, since, unknownCount },
-        countries: countriesOut,
-        series,
-        total,
-      });
-    }
+    return ok({ saved: true, country: country || null });
   } catch (e) {
     return bad(e.message || String(e), 500);
   }
