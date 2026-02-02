@@ -1,7 +1,7 @@
-
 // src/components/VideoPlayer.js
 import React, { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
+import { logEvent } from "../utils/analytics"; // ✅ AÑADIDO: registrar play
 
 // ✅ Imagen de fondo (pon aquí tu logo o un fondo bonito)
 const OFFLINE_BG =
@@ -33,6 +33,9 @@ export default function VideoPlayer({ channel, onClose }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
 
+  // ✅ Evita duplicar plays (buffer, recover, proxy, etc.)
+  const playedLoggedRef = useRef(false);
+
   const rawUrl = channel?.stream_url || channel?.url || "";
   const [streamUrl, setStreamUrl] = useState(rawUrl);
   const [usingProxy, setUsingProxy] = useState(false);
@@ -49,6 +52,7 @@ export default function VideoPlayer({ channel, onClose }) {
     setUsingProxy(false);
     setOffline(false);
     setNeedUserGesture(false);
+    playedLoggedRef.current = false; // ✅ reset para contar play del nuevo canal
   }, [rawUrl]);
 
   const destroyHls = () => {
@@ -106,10 +110,24 @@ export default function VideoPlayer({ channel, onClose }) {
       }
     };
 
-    // Si empieza a reproducir, ocultamos offline
+    // ✅ Si empieza a reproducir: ocultamos offline + registramos play (1 sola vez)
     video.onplaying = () => {
       setOffline(false);
       setNeedUserGesture(false);
+
+      // ✅ Registrar play SOLO una vez por apertura de este canal
+      if (!playedLoggedRef.current) {
+        playedLoggedRef.current = true;
+
+        // channel_id si existe (ideal), si no, no lo mandamos
+        const channelId = channel?.id || null;
+
+        logEvent({
+          event_type: "play",
+          page_path: window.location.pathname,
+          channel_id: channelId,
+        });
+      }
     };
 
     const canNativeHls =
@@ -194,7 +212,7 @@ export default function VideoPlayer({ channel, onClose }) {
       destroyHls();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [streamUrl]);
+  }, [streamUrl]); // ⚠️ dejamos igual para no “moverle” más
 
   const onUserGesturePlay = async () => {
     const v = videoRef.current;
@@ -266,6 +284,7 @@ export default function VideoPlayer({ channel, onClose }) {
                     setUsingProxy(false);
                     setStreamUrl(rawUrl);
                     setOffline(false);
+                    playedLoggedRef.current = false; // ✅ permite volver a contar play si realmente logra reproducir luego
                   }}
                   className="mt-6 bg-white/10 hover:bg-white/20 text-white px-5 py-2 rounded-xl border border-white/15"
                 >
