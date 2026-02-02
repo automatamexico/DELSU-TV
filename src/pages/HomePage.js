@@ -9,6 +9,7 @@ import ChannelCard from "../components/ChannelCard";
 import { useChannels } from "../hooks/useChannels";
 import { useAuth } from "../context/AuthContext";
 import { categories } from "../data/channels";
+import { logEvent } from "../utils/analytics";
 
 const PlayerModal = lazy(() => import("../components/PlayerModal"));
 
@@ -35,6 +36,10 @@ export default function HomePage() {
   useEffect(() => {
     const prev = document.title;
     document.title = "HispanaTV Home";
+
+    // ✅ Analytics: visita a la página (no muestra nada en UI)
+    logEvent({ event_type: "page_view", page_path: window.location.pathname });
+
     return () => {
       document.title = prev || "HispanaTV";
     };
