@@ -1,7 +1,7 @@
 // src/components/VideoPlayer.js
 import React, { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
-import { logEvent } from "../utils/analytics"; // ✅ AÑADIDO: registrar play
+import { logEvent } from "../utils/analytics";
 
 // ✅ Imagen de fondo (pon aquí tu logo o un fondo bonito)
 const OFFLINE_BG =
@@ -33,9 +33,6 @@ export default function VideoPlayer({ channel, onClose }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
 
-  // ✅ Evita duplicar plays (buffer, recover, proxy, etc.)
-  const playedLoggedRef = useRef(false);
-
   const rawUrl = channel?.stream_url || channel?.url || "";
   const [streamUrl, setStreamUrl] = useState(rawUrl);
   const [usingProxy, setUsingProxy] = useState(false);
@@ -43,6 +40,9 @@ export default function VideoPlayer({ channel, onClose }) {
   // 👇 Estado de "offline poster"
   const [offline, setOffline] = useState(false);
   const [needUserGesture, setNeedUserGesture] = useState(false);
+
+  // Evitar duplicar play por el mismo canal mientras el modal está abierto
+  const playLoggedRef = useRef(false);
 
   const blockContext = (e) => e.preventDefault();
 
@@ -52,7 +52,7 @@ export default function VideoPlayer({ channel, onClose }) {
     setUsingProxy(false);
     setOffline(false);
     setNeedUserGesture(false);
-    playedLoggedRef.current = false; // ✅ reset para contar play del nuevo canal
+    playLoggedRef.current = false;
   }, [rawUrl]);
 
   const destroyHls = () => {
@@ -73,19 +73,21 @@ export default function VideoPlayer({ channel, onClose }) {
   // ✅ Fallback automático: directo -> proxy -> offline
   const handleLoadError = () => {
     if (!usingProxy && needsProxy(rawUrl)) {
+      // eslint-disable-next-line no-console
       console.log("⚠️ Stream directo falló. Reintentando por proxy…");
       setUsingProxy(true);
       setStreamUrl(proxify(rawUrl));
       setOffline(false);
       return;
     }
+    // eslint-disable-next-line no-console
     console.log("⛔ Stream falló incluso con proxy. Mostrando offline.");
     goOffline();
   };
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !streamUrl) return;
+    if (!video || !streamUrl) return undefined;
 
     setOffline(false);
     setNeedUserGesture(false);
@@ -96,8 +98,6 @@ export default function VideoPlayer({ channel, onClose }) {
     video.onerror = null;
     video.onplaying = null;
     video.oncanplay = null;
-    video.onstalled = null;
-    video.onwaiting = null;
 
     // Autoplay normalmente requiere muted primero
     video.muted = true;
@@ -110,39 +110,22 @@ export default function VideoPlayer({ channel, onClose }) {
       }
     };
 
-    // ✅ Si empieza a reproducir: ocultamos offline + registramos play (1 sola vez)
+    // ✅ Cuando realmente empieza a reproducir: registrar PLAY (con channel_id)
     video.onplaying = () => {
       setOffline(false);
       setNeedUserGesture(false);
 
-      // ✅ Registrar PLAY con canal (país lo pone la Netlify Function)
-  // Evitamos duplicados: solo 1 play por apertura de modal
-  if (!window.__htv_play_logged) window.__htv_play_logged = {};
-  const cid = channel?.id || channel?.channel_id || channel?.uuid || null;
+      if (playLoggedRef.current) return;
 
-  if (cid && !window.__htv_play_logged[cid]) {
-    window.__htv_play_logged[cid] = true;
-    logEvent({
-      event_type: "play",
-      page_path: window.location.pathname,
-      channel_id: cid,
-    });
-  }
-};
+      const cid = channel?.id || channel?.channel_id || channel?.uuid || null;
+      if (!cid) return;
 
-      // ✅ Registrar play SOLO una vez por apertura de este canal
-      if (!playedLoggedRef.current) {
-        playedLoggedRef.current = true;
-
-        // channel_id si existe (ideal), si no, no lo mandamos
-        const channelId = channel?.id || null;
-
-        logEvent({
-          event_type: "play",
-          page_path: window.location.pathname,
-          channel_id: channelId,
-        });
-      }
+      playLoggedRef.current = true;
+      logEvent({
+        event_type: "play",
+        page_path: window.location.pathname,
+        channel_id: cid,
+      });
     };
 
     const canNativeHls =
@@ -152,12 +135,12 @@ export default function VideoPlayer({ channel, onClose }) {
     // 🎬 Caso 1: HLS nativo (Safari/iOS)
     if (canNativeHls) {
       video.src = streamUrl;
-
-      // Si llega a poder reproducir, intentamos play
-      video.oncanplay = tryPlay;
-
-      // Si truena, proxy/offline
-      video.onerror = handleLoadError;
+      video.oncanplay = () => {
+        tryPlay();
+      };
+      video.onerror = () => {
+        handleLoadError();
+      };
 
       return () => {
         video.onerror = null;
@@ -192,7 +175,6 @@ export default function VideoPlayer({ channel, onClose }) {
       });
 
       hls.on(Hls.Events.ERROR, (_, data) => {
-        // No mostramos errores, solo decidimos qué hacer
         if (!data?.fatal) return;
 
         if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
@@ -220,14 +202,14 @@ export default function VideoPlayer({ channel, onClose }) {
       };
     }
 
-    // Si nada soporta HLS, lo tratamos como offline (sin mensaje técnico)
+    // Si nada soporta HLS, offline (sin mensaje técnico)
     goOffline();
 
     return () => {
       destroyHls();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [streamUrl]); // ⚠️ dejamos igual para no “moverle” más
+  }, [streamUrl, channel]);
 
   const onUserGesturePlay = async () => {
     const v = videoRef.current;
@@ -292,14 +274,12 @@ export default function VideoPlayer({ channel, onClose }) {
                   En este momento no hay señal. Intenta más tarde.
                 </div>
 
-                {/* Botón opcional: reintentar */}
                 <button
                   onClick={() => {
-                    // Reintento manual: directo primero; si falla, el sistema proxifica solo
                     setUsingProxy(false);
                     setStreamUrl(rawUrl);
                     setOffline(false);
-                    playedLoggedRef.current = false; // ✅ permite volver a contar play si realmente logra reproducir luego
+                    playLoggedRef.current = false;
                   }}
                   className="mt-6 bg-white/10 hover:bg-white/20 text-white px-5 py-2 rounded-xl border border-white/15"
                 >
