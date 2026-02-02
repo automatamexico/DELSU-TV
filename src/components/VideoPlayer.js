@@ -1,120 +1,114 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-// Si usas hls.js, mantenlo. Si no existe en tu proyecto, deja el import como estaba.
 import Hls from "hls.js";
 
-export default function VideoPlayer({ channel, onClose }) {
+// ✅ Helper: normaliza URL
+function normalizeUrl(url) {
+  if (!url) return "";
+  const u = String(url).trim();
+  if (/^https?:\/\//i.test(u)) return u;
+  return `https://${u}`;
+}
+
+// ✅ Helper: decide si conviene proxyear (CORS / mixed content / etc)
+function shouldProxy(url) {
+  try {
+    const u = new URL(url);
+    // si es http en sitio https → mixed content → proxy
+    if (window?.location?.protocol === "https:" && u.protocol === "http:") return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+export default function VideoPlayer({ src }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
-  const [needUserGesture, setNeedUserGesture] = useState(false);
-  const [nativeError, setNativeError] = useState(null);
-  const [usingProxy, setUsingProxy] = useState(false);
 
-  // 🔒 Bloquear menú contextual (clic derecho)
+  const [usingProxy, setUsingProxy] = useState(false);
+  const [nativeError, setNativeError] = useState("");
+  const [needUserGesture, setNeedUserGesture] = useState(false);
+
+  const raw = useMemo(() => normalizeUrl(src), [src]);
+
+  // Proxy automático (si detecta mixed content) + fallback cuando HLS falla
+  const finalSrc = useMemo(() => {
+    if (!raw) return "";
+    if (usingProxy) return `/.netlify/functions/hls-http?u=${encodeURIComponent(raw)}`;
+    if (shouldProxy(raw)) return `/.netlify/functions/hls-http?u=${encodeURIComponent(raw)}`;
+    return raw;
+  }, [raw, usingProxy]);
+
+  // 🚫 bloquea menú contextual (copias/descargas)
   const blockContext = (e) => e.preventDefault();
 
-  // Resuelve src del canal (ajusta a tus claves reales)
-  const src = useMemo(() => {
-    return (
-      channel?.src ||
-      channel?.m3u8 ||
-      channel?.hls ||
-      channel?.stream_url ||
-      ""
-    );
-  }, [channel]);
-
-  // Proxy (Netlify): /hls-http/<encodeURIComponent(url)>
-  const proxiedSrc = useMemo(() => {
-    const raw = String(src || "").trim();
-    if (!raw) return "";
-    // Si ya viene proxyeado, no lo tocamos
-    if (raw.startsWith("/hls-http/")) return raw;
-    if (raw.startsWith("/.netlify/functions/hls-http")) return raw;
-    return `/hls-http/${encodeURIComponent(raw)}`;
-  }, [src]);
-
-  const finalSrc = usingProxy ? proxiedSrc : src;
-
-  // Al cambiar de canal, vuelve a empezar sin proxy
+  // Reset al cambiar el canal
   useEffect(() => {
+    setNativeError("");
+    setNeedUserGesture(false);
     setUsingProxy(false);
-    setNativeError(null);
-    setNeedUserGesture(false);
-  }, [rawSrc]);
 
-  // Intenta reproducir y detecta bloqueo de autoplay
-  const tryPlay = async () => {
-    const v = videoRef.current;
-    if (!v) return;
-    try {
-      await v.play();
-      setNeedUserGesture(false);
-    } catch (_e) {
-      // Autoplay bloqueado
-      setNeedUserGesture(true);
-    }
-  };
-
-  // Carga fuente HLS o nativa
-  useEffect(() => {
-    const v = videoRef.current;
-    setNeedUserGesture(false);
-    setNativeError(null);
-
-    if (!v || !finalSrc) return;
-
-    // Limpia instancias previas
+    // cleanup hls anterior
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
     }
-    v.removeAttribute("src");
-    v.load();
-
-    const isNativeHls = v.canPlayType("application/vnd.apple.mpegurl");
-    if (isNativeHls) {
-      v.src = finalSrc;
-      const onCanPlay = () => tryPlay();
-      const onError = () => {
-        // Si falla directo, intentamos con proxy una vez
-        if (!usingProxy) {
-          setUsingProxy(true);
-          return;
-        }
-        setNativeError("Canal fuera de línea");
-      };
-
-      v.addEventListener("canplay", onCanPlay);
-      v.addEventListener("error", onError);
-      // Precargar e intentar autoplay
+    const v = videoRef.current;
+    if (v) {
+      v.pause();
+      v.removeAttribute("src");
       v.load();
-      tryPlay();
-
-      return () => {
-        v.removeEventListener("canplay", onCanPlay);
-        v.removeEventListener("error", onError);
-      };
     }
+  }, [src]); // ✅ FIX: antes decía rawSrc (no existía)
 
-    if (Hls.isSupported()) {
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !finalSrc) return;
+
+    // Autoplay silencioso (para que no lo bloquee el navegador)
+    v.muted = true;
+
+    const tryPlay = async () => {
+      try {
+        await v.play();
+        setNeedUserGesture(false);
+      } catch {
+        // Si el navegador bloquea autoplay, pedimos gesto
+        setNeedUserGesture(true);
+      }
+    };
+
+    // Si es HLS, usar hls.js cuando hace falta
+    const canNativeHls = v.canPlayType("application/vnd.apple.mpegurl");
+    const isHls = /\.m3u8(\?|$)/i.test(finalSrc);
+
+    if (isHls && Hls.isSupported() && !canNativeHls) {
       const hls = new Hls({
-        // valores seguros por defecto
-        maxBufferLength: 30,
-        backBufferLength: 30,
+        // ajustes “seguros” para live
         enableWorker: true,
+        lowLatencyMode: false,
+        backBufferLength: 30,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
+        liveDurationInfinity: true,
       });
+
       hlsRef.current = hls;
+
+      hls.loadSource(finalSrc);
       hls.attachMedia(v);
-      hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-        hls.loadSource(finalSrc);
-      });
+
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         tryPlay();
       });
-      hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (!data?.fatal) return;
 
-        // Si falla directo, reintenta con proxy UNA sola vez
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        // Errores comunes por CORS/mixed/403/manifest
+        const fatal = data?.fatal;
+
+        if (!fatal) return;
+
+        // Primer fallo con URL directa → intentamos proxy automático
         if (!usingProxy) {
           setUsingProxy(true);
           return;
