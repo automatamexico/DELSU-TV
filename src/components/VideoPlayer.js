@@ -115,6 +115,21 @@ export default function VideoPlayer({ channel, onClose }) {
       setOffline(false);
       setNeedUserGesture(false);
 
+      // ✅ Registrar PLAY con canal (país lo pone la Netlify Function)
+  // Evitamos duplicados: solo 1 play por apertura de modal
+  if (!window.__htv_play_logged) window.__htv_play_logged = {};
+  const cid = channel?.id || channel?.channel_id || channel?.uuid || null;
+
+  if (cid && !window.__htv_play_logged[cid]) {
+    window.__htv_play_logged[cid] = true;
+    logEvent({
+      event_type: "play",
+      page_path: window.location.pathname,
+      channel_id: cid,
+    });
+  }
+};
+
       // ✅ Registrar play SOLO una vez por apertura de este canal
       if (!playedLoggedRef.current) {
         playedLoggedRef.current = true;
