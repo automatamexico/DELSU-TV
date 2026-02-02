@@ -3,9 +3,6 @@ import React from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 
-// ✅ Analytics
-import { trackEvent } from "./lib/analytics";
-
 // Páginas (ajusta si tus nombres difieren)
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
@@ -18,25 +15,26 @@ import ChannelAppPage from "./pages/ChannelAppPage";
 
 // Rutas protegidas
 import ProtectedRoute from "./routes/ProtectedRoute";
-// import ProtectedRouteAdmin from "./routes/ProtectedRouteAdmin"; // <- eliminado porque no se usa
 
 // Error boundary
 import ErrorBoundary from "./components/ErrorBoundary";
 
-/* ✅ Tracker: cuenta page_view por cada cambio de ruta */
-function PageViewTracker() {
-  const loc = useLocation();
+// ✅ analytics helper
+import { logEvent } from "./utils/analytics";
+
+function RouteAnalytics() {
+  const location = useLocation();
 
   React.useEffect(() => {
-    trackEvent("page_view", { page_path: loc.pathname });
-  }, [loc.pathname]);
+    // Registra visita de página (no muestra nada)
+    logEvent({ event_type: "page_view", page_path: location.pathname });
+  }, [location.pathname]);
 
   return null;
 }
 
 export default function App() {
   React.useEffect(() => {
-    // eslint-disable-next-line no-console
     console.log("[App] Montada. Si ves pantalla en blanco, revisa la consola por errores.");
   }, []);
 
@@ -44,8 +42,8 @@ export default function App() {
     <ErrorBoundary>
       <AuthProvider>
         <BrowserRouter>
-          {/* ✅ Contador de visitas */}
-          <PageViewTracker />
+          {/* ✅ Esto no muestra nada */}
+          <RouteAnalytics />
 
           <Routes>
             {/* Público */}
