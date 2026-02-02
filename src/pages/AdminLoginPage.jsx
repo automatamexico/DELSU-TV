@@ -1179,7 +1179,7 @@ function PaymentLinkPanel() {
 /* =========================
    ✅ NUEVO: PANEL ANALÍTICA (Visitas y Plays)
    - Lee de tabla: analytics_events
-   - Campos esperados (flexible): event_name, created_at, country, page_path
+   - Campos reales: event_type, created_at, country
    ========================= */
 function AnalyticsPanel() {
   const [loading, setLoading] = useState(false);
@@ -1233,13 +1233,13 @@ function AnalyticsPanel() {
 
       let q = supabase
         .from('analytics_events')
-        .select('event_name, created_at, country')
+        .select('event_type, created_at, country')
         .gte('created_at', since)
         .order('created_at', { ascending: true })
         .limit(50000);
 
-      // event_name
-      q = q.eq('event_name', eventName);
+      // event_type
+      q = q.eq('event_type', eventName);
 
       // country
       if (country && country !== 'ALL') {
@@ -1358,7 +1358,7 @@ function AnalyticsPanel() {
           Total: <span className="font-bold text-white">{total}</span>
         </div>
         <div className="text-xs text-gray-400">
-          Fuente: tabla <code>analytics_events</code> (event_name / created_at / country)
+          Fuente: tabla <code>analytics_events</code> (event_type / created_at / country)
         </div>
       </div>
 
