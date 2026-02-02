@@ -1,7 +1,10 @@
 // src/App.js
 import React from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+
+// ✅ Analytics
+import { trackEvent } from "./lib/analytics";
 
 // Páginas (ajusta si tus nombres difieren)
 import HomePage from "./pages/HomePage";
@@ -20,6 +23,17 @@ import ProtectedRoute from "./routes/ProtectedRoute";
 // Error boundary
 import ErrorBoundary from "./components/ErrorBoundary";
 
+/* ✅ Tracker: cuenta page_view por cada cambio de ruta */
+function PageViewTracker() {
+  const loc = useLocation();
+
+  React.useEffect(() => {
+    trackEvent("page_view", { page_path: loc.pathname });
+  }, [loc.pathname]);
+
+  return null;
+}
+
 export default function App() {
   React.useEffect(() => {
     // eslint-disable-next-line no-console
@@ -30,6 +44,9 @@ export default function App() {
     <ErrorBoundary>
       <AuthProvider>
         <BrowserRouter>
+          {/* ✅ Contador de visitas */}
+          <PageViewTracker />
+
           <Routes>
             {/* Público */}
             <Route path="/" element={<HomePage />} />
