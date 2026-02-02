@@ -1,7 +1,7 @@
 // src/pages/AdminLoginPage.jsx
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Mail, Lock, LogIn, Tv, Upload, Plus, PauseCircle, PlayCircle, AlertTriangle } from 'lucide-react';
+import { Mail, Lock, LogIn, Tv, Upload, Plus, PauseCircle, PlayCircle, AlertTriangle, BarChart3 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../context/AuthContext';
@@ -581,7 +581,7 @@ function AdminChannelForm() {
 
   return (
     <div className="mt-8 bg-gray-800/70 backdrop-blur-lg border border-gray-700 rounded-2xl p-6">
-      <div className="flex items中心 gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-4">
         <Plus className="w-5 h-5 text-rose-400" />
         <h3 className="text-xl font-semibold">Alta de nuevo canal</h3>
       </div>
@@ -1177,6 +1177,221 @@ function PaymentLinkPanel() {
 }
 
 /* =========================
+   ✅ NUEVO: PANEL ANALÍTICA (Visitas y Plays)
+   - Lee de tabla: analytics_events
+   - Campos esperados (flexible): event_name, created_at, country, page_path
+   ========================= */
+function AnalyticsPanel() {
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [period, setPeriod] = useState('day'); // day | week | month | year
+  const [eventName, setEventName] = useState('page_view'); // page_view | play
+  const [country, setCountry] = useState('ALL'); // ALL o código/nombre
+  const [countries, setCountries] = useState(['ALL']);
+  const [rows, setRows] = useState([]); // [{label, count}]
+
+  const daysBackByPeriod = (p) => {
+    if (p === 'day') return 35;
+    if (p === 'week') return 180;
+    if (p === 'month') return 540;
+    return 3650;
+  };
+
+  const toISOStart = (daysBack) => {
+    const d = new Date();
+    d.setDate(d.getDate() - daysBack);
+    return d.toISOString();
+  };
+
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const isoWeekKey = (date) => {
+    // ISO week number
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    return `${d.getUTCFullYear()}-W${pad2(weekNo)}`;
+  };
+
+  const bucketLabel = (dt) => {
+    const d = new Date(dt);
+    if (Number.isNaN(d.getTime())) return '—';
+    if (period === 'day') {
+      return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+    }
+    if (period === 'week') return isoWeekKey(d);
+    if (period === 'month') return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+    return `${d.getFullYear()}`;
+  };
+
+  const load = async () => {
+    setLoading(true);
+    setMsg('');
+    try {
+      const since = toISOStart(daysBackByPeriod(period));
+
+      let q = supabase
+        .from('analytics_events')
+        .select('event_name, created_at, country')
+        .gte('created_at', since)
+        .order('created_at', { ascending: true })
+        .limit(50000);
+
+      // event_name
+      q = q.eq('event_name', eventName);
+
+      // country
+      if (country && country !== 'ALL') {
+        q = q.eq('country', country);
+      }
+
+      const { data, error } = await q;
+      if (error) throw error;
+
+      const list = Array.isArray(data) ? data : [];
+
+      // países disponibles (para el filtro)
+      const uniqCountries = new Set(['ALL']);
+      list.forEach(r => {
+        const c = (r.country || '').toString().trim();
+        if (c) uniqCountries.add(c);
+      });
+      setCountries(Array.from(uniqCountries));
+
+      // agrupar
+      const map = new Map();
+      for (const r of list) {
+        const k = bucketLabel(r.created_at);
+        map.set(k, (map.get(k) || 0) + 1);
+      }
+
+      const out = Array.from(map.entries()).map(([label, count]) => ({ label, count }));
+      setRows(out);
+
+      if (!out.length) {
+        setMsg('Sin datos todavía para esos filtros.');
+      }
+    } catch (e) {
+      setRows([]);
+      setCountries(['ALL']);
+      setMsg(`❌ ${e.message || String(e)}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, [period, eventName, country]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const total = rows.reduce((a, b) => a + (Number(b.count) || 0), 0);
+
+  return (
+    <div className="mt-6 bg-gray-800/70 backdrop-blur-lg border border-gray-700 rounded-2xl p-6">
+      <div className="flex items-center gap-2 mb-4">
+        <BarChart3 className="w-5 h-5 text-cyan-400" />
+        <h3 className="text-xl font-semibold">Analítica (Visitas y Plays)</h3>
+      </div>
+
+      {msg && (
+        <div className={`mb-4 p-3 rounded-lg text-sm ${
+          msg.startsWith('❌') ? 'bg-red-900/40 border border-red-700 text-red-200'
+                               : 'bg-gray-900/40 border border-gray-700 text-gray-200'
+        }`}>
+          {msg}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div>
+          <label className="block text-sm text-gray-300 mb-1">Evento</label>
+          <select
+            value={eventName}
+            onChange={(e)=>setEventName(e.target.value)}
+            className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+          >
+            <option value="page_view">Visitas (page_view)</option>
+            <option value="play">Plays (play)</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm text-gray-300 mb-1">Periodo</label>
+          <select
+            value={period}
+            onChange={(e)=>setPeriod(e.target.value)}
+            className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+          >
+            <option value="day">Por día</option>
+            <option value="week">Por semana</option>
+            <option value="month">Por mes</option>
+            <option value="year">Por año</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm text-gray-300 mb-1">País</label>
+          <select
+            value={country}
+            onChange={(e)=>setCountry(e.target.value)}
+            className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+          >
+            {countries.map((c)=>(
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-end">
+          <button
+            type="button"
+            onClick={load}
+            disabled={loading}
+            className="w-full inline-flex items-center justify-center gap-2 bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 px-5 py-2.5 rounded-lg font-semibold"
+          >
+            {loading ? 'Cargando…' : 'Actualizar'}
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm">
+        <div className="text-gray-300">
+          Total: <span className="font-bold text-white">{total}</span>
+        </div>
+        <div className="text-xs text-gray-400">
+          Fuente: tabla <code>analytics_events</code> (event_name / created_at / country)
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-lg border border-gray-700 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-800/70">
+            <tr>
+              <th className="text-left px-3 py-2 border-b border-gray-700">Periodo</th>
+              <th className="text-left px-3 py-2 border-b border-gray-700">Conteo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i} className="odd:bg-gray-800/30">
+                <td className="px-3 py-2 border-b border-gray-800">{r.label}</td>
+                <td className="px-3 py-2 border-b border-gray-800 font-semibold">{r.count}</td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr>
+                <td className="px-3 py-6 text-center text-gray-400" colSpan={2}>
+                  Sin registros.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* =========================
    PÁGINA (LOGIN + FORM ADMIN)
    ========================= */
 export default function AdminLoginPage() {
@@ -1316,6 +1531,9 @@ export default function AdminLoginPage() {
 
         {/* ✅ AQUÍ VA "Link de pago" (debajo de Asignar dueño) */}
         <PaymentLinkPanel />
+
+        {/* ✅ NUEVO: Analítica */}
+        <AnalyticsPanel />
 
         <AdminChannelForm />
 
