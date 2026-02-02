@@ -24,6 +24,13 @@
   status = 200
   force  = true
 
+  [[redirects]]
+  from = "/analytics-event"
+  to   = "/.netlify/functions/analytics-event"
+  status = 200
+  force = true
+
+
 # (opcional) si algún día usas ese host sin puerto:
 # [[redirects]]
 #   from = "/hls/nyc.tvstream.mx/*"
