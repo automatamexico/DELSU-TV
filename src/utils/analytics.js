@@ -1,6 +1,7 @@
 // src/utils/analytics.js
-function getSessionId() {
-  const key = "htv_sid";
+
+function getOrCreateSessionId() {
+  const key = "htv_session_id";
   let sid = localStorage.getItem(key);
   if (!sid) {
     sid = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -9,24 +10,25 @@ function getSessionId() {
   return sid;
 }
 
-export async function logEvent({ event_type, page_path = null, channel_id = null, user_id = null }) {
+export async function logEvent({ event_type, page_path, channel_id }) {
   try {
+    const session_id = getOrCreateSessionId();
     const payload = {
       event_type,
-      page_path,
-      channel_id,
-      user_id,
-      session_id: getSessionId(),
+      page_path: page_path || window.location.pathname,
+      channel_id: channel_id || null,
+      session_id,
+      user_agent: navigator.userAgent,
     };
 
-    // manda a Netlify Function (ella pone el country)
+    // 🔒 Blindado: siempre pega a tu Function
     await fetch("/analytics-event", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
-      keepalive: true, // útil en page unload
+      keepalive: true, // ayuda cuando cierran la pestaña
     });
   } catch {
-    // Silencio total. Analytics no debe romper tu app.
+    // No rompas la app si falla analítica
   }
 }
