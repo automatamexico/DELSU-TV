@@ -10,6 +10,14 @@
   status = 200
   force = true
 
+# ✅ (PASO 5) Endpoint para analítica (Netlify Function)
+# /api/analytics -> /.netlify/functions/analytics
+[[redirects]]
+  from = "/api/analytics"
+  to   = "/.netlify/functions/analytics"
+  status = 200
+  force = true
+
 [[redirects]]
   from   = "/hls/nyc.tvstream.mx%3A8081/*"
   to     = "http://nyc.tvstream.mx:8081/:splat"
@@ -95,4 +103,3 @@ function = "log-view"
   for = "/**/*.json"
   [headers.values]
     Cache-Control = "public, max-age=60"
-
