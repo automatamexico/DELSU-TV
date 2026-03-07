@@ -147,7 +147,25 @@ export default function HomePage() {
         onFilterChange={handleFilterChange}
         filters={filters}
       />
+{/* Descripción del sitio para SEO y AdSense */}
+<div className="max-w-4xl mx-auto px-4 py-6 text-center text-gray-300">
+  <h1 className="text-2xl font-bold text-white mb-3">
+    HispanaTV - Canales de televisión en vivo
+  </h1>
 
+  <p className="text-sm leading-relaxed">
+    HispanaTV es una plataforma de televisión en línea que reúne canales en
+    vivo de diferentes países en un solo lugar. Nuestro objetivo es facilitar
+    el acceso a contenido televisivo digital mediante tecnología de streaming
+    accesible desde cualquier dispositivo con conexión a internet.
+  </p>
+
+  <p className="text-sm mt-2">
+    Los usuarios pueden descubrir y disfrutar canales de televisión online de
+    diferentes regiones, incluyendo México, Centroamérica y otros países de
+    habla hispana.
+  </p>
+</div>
       {channelsLoading && channels.length === 0 ? (
         <ChannelsSkeleton />
       ) : (
