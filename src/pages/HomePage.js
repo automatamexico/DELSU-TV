@@ -150,7 +150,7 @@ export default function HomePage() {
 {/* Descripción del sitio para SEO y AdSense */}
 <div className="max-w-4xl mx-auto px-4 py-6 text-center text-gray-300">
   <h1 className="text-2xl font-bold text-white mb-3">
-    HispanaTV - Canales de televisión en vivo
+    Canales de televisión en vivo
   </h1>
 
   <p className="text-sm leading-relaxed">
