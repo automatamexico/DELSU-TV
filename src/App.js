@@ -68,6 +68,31 @@ export default function App() {
             {/* Fallback */}
             <Route path="*" element={<HomePage />} />
           </Routes>
+
+ {/* FOOTER */}
+  <footer
+    style={{
+      marginTop: "40px",
+      padding: "20px",
+      textAlign: "center",
+      background: "#111",
+      color: "#fff",
+    }}
+  >
+    <a href="/privacy.html" style={{ margin: "10px", color: "#fff" }}>
+      Política de privacidad
+    </a>
+
+    <a href="/contact.html" style={{ margin: "10px", color: "#fff" }}>
+      Contacto
+    </a>
+
+    <a href="/about.html" style={{ margin: "10px", color: "#fff" }}>
+      Acerca de
+    </a>
+  </footer>
+
+              
         </BrowserRouter>
       </AuthProvider>
     </ErrorBoundary>
