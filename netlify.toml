@@ -37,13 +37,14 @@
   for = "/*"
   [headers.values]
     Content-Security-Policy = '''
-  default-src 'self';
+  default-src 'self' https:;
   script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://*.profitablecpmratenetwork.com;
-  connect-src 'self' https:;
-  img-src 'self' data: https:;
-  style-src 'self' 'unsafe-inline' https:;
-  font-src 'self' data: https:;
-  media-src 'self' blob: data: https:;
+  connect-src 'self' https://*;
+  img-src 'self' data: https://*;
+  style-src 'self' 'unsafe-inline' https://*;
+  font-src 'self' data: https://*;
+  media-src 'self' blob: data: https://*;
+  frame-src https://*;
   frame-ancestors *;
 '''
 
