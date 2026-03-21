@@ -20,7 +20,6 @@ function PageViewTracker() {
   const location = useLocation();
 
   React.useEffect(() => {
-    // ✅ Cuenta visita por ruta
     logEvent({
       event_type: "page_view",
       page_path: `${location.pathname}${location.search || ""}`,
@@ -32,8 +31,26 @@ function PageViewTracker() {
 }
 
 export default function App() {
+
+  // 🔥 MONETAG (PRIMER CLICK DEL SITIO)
   React.useEffect(() => {
-    // eslint-disable-next-line no-console
+    const handleFirstClick = () => {
+      if (!window.monetagShown) {
+        window.monetagShown = true;
+
+        // 👉 ANUNCIO (SIEMPRE FUNCIONA)
+        window.location.href = "https://omg10.com/4/10759952";
+      }
+    };
+
+    document.addEventListener("click", handleFirstClick, { once: true });
+
+    return () => {
+      document.removeEventListener("click", handleFirstClick);
+    };
+  }, []);
+
+  React.useEffect(() => {
     console.log("[App] Montada. Si ves pantalla en blanco, revisa la consola por errores.");
   }, []);
 
@@ -48,7 +65,7 @@ export default function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
 
-            {/* ✅ Apps (público) */}
+            {/* Apps (público) */}
             <Route path="/apps" element={<Navigate to="/" replace />} />
             <Route path="/apps/:id" element={<ChannelAppPage />} />
 
@@ -69,30 +86,29 @@ export default function App() {
             <Route path="*" element={<HomePage />} />
           </Routes>
 
- {/* FOOTER */}
-  <footer
-    style={{
-      marginTop: "40px",
-      padding: "20px",
-      textAlign: "center",
-      background: "#111",
-      color: "#fff",
-    }}
-  >
-    <a href="/privacy.html" style={{ margin: "10px", color: "#fff" }}>
-      Política de privacidad
-    </a>
+          {/* FOOTER */}
+          <footer
+            style={{
+              marginTop: "40px",
+              padding: "20px",
+              textAlign: "center",
+              background: "#111",
+              color: "#fff",
+            }}
+          >
+            <a href="/privacy.html" style={{ margin: "10px", color: "#fff" }}>
+              Política de privacidad
+            </a>
 
-    <a href="/contact.html" style={{ margin: "10px", color: "#fff" }}>
-      Contacto
-    </a>
+            <a href="/contact.html" style={{ margin: "10px", color: "#fff" }}>
+              Contacto
+            </a>
 
-    <a href="/about.html" style={{ margin: "10px", color: "#fff" }}>
-      Acerca de
-    </a>
-  </footer>
+            <a href="/about.html" style={{ margin: "10px", color: "#fff" }}>
+              Acerca de
+            </a>
+          </footer>
 
-              
         </BrowserRouter>
       </AuthProvider>
     </ErrorBoundary>
