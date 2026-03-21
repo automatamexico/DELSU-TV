@@ -56,6 +56,13 @@ export default function HomePage() {
     }
   }, []);
 
+  useEffect(() => {
+  const script = document.createElement("script");
+  script.src = "https://pl28953113.profitablecpmratenetwork.com/d7/0d/35/d70d35316bf2e1b69bb0413b32c4df2f.js"></script>; // 👈 tu código real
+  script.async = true;
+
+  document.body.appendChild(script);
+}, []);
   const { profile } = useAuth();
   const userRole = profile?.role || "user";
 
