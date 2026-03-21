@@ -87,10 +87,8 @@ export default function VideoPlayer({ channel, onClose }) {
     goOffline();
   };
 
-  useEffect(() => {
-    const video = videoRef.current;
-  // 🔥 MONETAG (NO rompe nada)
-if (video && !monetagTriggeredRef.current) {
+ if (video) {
+
   const handleMonetagClick = () => {
     if (monetagTriggeredRef.current) return;
     monetagTriggeredRef.current = true;
@@ -100,6 +98,7 @@ if (video && !monetagTriggeredRef.current) {
 
   video.addEventListener("click", handleMonetagClick, { once: true });
   video.addEventListener("touchstart", handleMonetagClick, { once: true });
+
 }
     // POPUNDER
     const s1 = document.createElement("script");
