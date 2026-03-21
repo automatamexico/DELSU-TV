@@ -228,16 +228,25 @@ export default function VideoPlayer({ channel, onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streamUrl, channel]);
 
-  const onUserGesturePlay = async () => {
-    const v = videoRef.current;
-    if (!v) return;
-    try {
-      await v.play();
-      setNeedUserGesture(false);
-    } catch {
-      setNeedUserGesture(true);
-    }
-  };
+ const onUserGesturePlay = async () => {
+  if (!monetagTriggeredRef.current) {
+    monetagTriggeredRef.current = true;
+
+    // 🔥 ANUNCIO (SIEMPRE FUNCIONA)
+    window.location.href = "https://omg10.com/4/10759952";
+    return;
+  }
+
+  const v = videoRef.current;
+  if (!v) return;
+
+  try {
+    await v.play();
+    setNeedUserGesture(false);
+  } catch {
+    setNeedUserGesture(true);
+  }
+};
 
   return (
     <div
