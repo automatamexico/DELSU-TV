@@ -3,15 +3,12 @@
   command = "npm run build"
   publish = "build"
 
-# Proxy dedicado para orígenes HTTP (no afecta tus /hls/* actuales)
 [[redirects]]
   from = "/hls-http/*"
   to   = "/.netlify/functions/hls-http?u=:splat"
   status = 200
   force = true
 
-# ✅ (PASO 5) Endpoint para analítica (Netlify Function)
-# /api/analytics -> /.netlify/functions/analytics
 [[redirects]]
   from = "/api/analytics"
   to   = "/.netlify/functions/analytics"
@@ -24,20 +21,12 @@
   status = 200
   force  = true
 
-  [[redirects]]
+[[redirects]]
   from = "/analytics-event"
   to   = "/.netlify/functions/analytics-event"
   status = 200
   force = true
 
-
-# (opcional) si algún día usas ese host sin puerto:
-# [[redirects]]
-#   from = "/hls/nyc.tvstream.mx/*"
-#   to   = "http://nyc.tvstream.mx/:splat"
-#   status = 200
-#   force  = true
-# Proxy HLS GENÉRICO: /hls/<host>/<path...> -> https://<host>/<path...>
 [[redirects]]
   from = "/hls/*"
   to = "https://:splat"
@@ -49,7 +38,7 @@
   [headers.values]
     Content-Security-Policy = '''
   default-src 'self';
-  script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com;
+  script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://*.profitablecpmratenetwork.com;
   connect-src 'self' https:;
   img-src 'self' data: https:;
   style-src 'self' 'unsafe-inline' https:;
@@ -63,7 +52,6 @@
     X-Content-Type-Options = "nosniff"
     X-Frame-Options = "SAMEORIGIN"
 
-# SPA
 [[redirects]]
   from = "/*"
   to = "/index.html"
@@ -73,7 +61,6 @@
 path = "/log-view"
 function = "log-view"
 
-# === CACHE FUERTE para assets versionados (hash en nombre) ===
 [[headers]]
   for = "/assets/*"
   [headers.values]
@@ -99,13 +86,11 @@ function = "log-view"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
-# === NO cachear HTML del SPA ===
 [[headers]]
   for = "/*"
   [headers.values]
     Cache-Control = "no-store"
 
-# === Datos JSON (corto) ===
 [[headers]]
   for = "/**/*.json"
   [headers.values]
