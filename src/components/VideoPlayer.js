@@ -32,7 +32,6 @@ function proxify(url) {
 export default function VideoPlayer({ channel, onClose }) {
   const videoRef = useRef(null);
   const monetagTriggeredRef = useRef(false);
-  const adTriggeredRef = useRef(false);
   const hlsRef = useRef(null);
 
   const rawUrl = channel?.stream_url || channel?.url || "";
@@ -55,6 +54,7 @@ export default function VideoPlayer({ channel, onClose }) {
     setOffline(false);
     setNeedUserGesture(false);
     playLoggedRef.current = false;
+    monetagTriggeredRef.current = false;
   }, [rawUrl]);
 
   const destroyHls = () => {
@@ -87,34 +87,18 @@ export default function VideoPlayer({ channel, onClose }) {
     goOffline();
   };
 
- if (video) {
-
-  const handleMonetagClick = () => {
-    if (monetagTriggeredRef.current) return;
-    monetagTriggeredRef.current = true;
-
-    window.open("https://omg10.com/4/10759952", "_blank");
-  };
-
-  video.addEventListener("click", handleMonetagClick, { once: true });
-  video.addEventListener("touchstart", handleMonetagClick, { once: true });
-
-}
-    // POPUNDER
-    const s1 = document.createElement("script");
-    s1.src = "https://pl28953081.profitablecpmratenetwork.com/12/21/1f/12211ff6a4bf0ab3738cb48b0e9d3533.js";
-    document.body.appendChild(s1);
-
-    // SOCIAL BAR
-    const s2 = document.createElement("script");
-    s2.src = "https://pl28953113.profitablecpmratenetwork.com/d7/0d/35/d70d35316bf2e1b69bb0413b32c4df2f.js";
-    document.body.appendChild(s2);
-  };
-
-  video.addEventListener("click", activarAds, { once: true });
-  video.addEventListener("touchstart", activarAds, { once: true });
-}
+  useEffect(() => {
+    const video = videoRef.current;
     if (!video || !streamUrl) return undefined;
+
+    const handleMonetagClick = () => {
+      if (monetagTriggeredRef.current) return;
+      monetagTriggeredRef.current = true;
+      window.open("https://omg10.com/4/10759952", "_blank");
+    };
+
+    video.addEventListener("click", handleMonetagClick, { once: true });
+    video.addEventListener("touchstart", handleMonetagClick, { once: true });
 
     setOffline(false);
     setNeedUserGesture(false);
@@ -170,6 +154,8 @@ export default function VideoPlayer({ channel, onClose }) {
       };
 
       return () => {
+        video.removeEventListener("click", handleMonetagClick);
+        video.removeEventListener("touchstart", handleMonetagClick);
         video.onerror = null;
         video.onplaying = null;
         video.oncanplay = null;
@@ -222,6 +208,8 @@ export default function VideoPlayer({ channel, onClose }) {
       });
 
       return () => {
+        video.removeEventListener("click", handleMonetagClick);
+        video.removeEventListener("touchstart", handleMonetagClick);
         destroyHls();
         video.onerror = null;
         video.onplaying = null;
@@ -233,6 +221,8 @@ export default function VideoPlayer({ channel, onClose }) {
     goOffline();
 
     return () => {
+      video.removeEventListener("click", handleMonetagClick);
+      video.removeEventListener("touchstart", handleMonetagClick);
       destroyHls();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -307,6 +297,7 @@ export default function VideoPlayer({ channel, onClose }) {
                     setStreamUrl(rawUrl);
                     setOffline(false);
                     playLoggedRef.current = false;
+                    monetagTriggeredRef.current = false;
                   }}
                   className="mt-6 bg-white/10 hover:bg-white/20 text-white px-5 py-2 rounded-xl border border-white/15"
                 >
