@@ -31,6 +31,7 @@ function proxify(url) {
 
 export default function VideoPlayer({ channel, onClose }) {
   const videoRef = useRef(null);
+  const adTriggeredRef = useRef(false);
   const hlsRef = useRef(null);
 
   const rawUrl = channel?.stream_url || channel?.url || "";
@@ -87,6 +88,25 @@ export default function VideoPlayer({ channel, onClose }) {
 
   useEffect(() => {
     const video = videoRef.current;
+    if (video) {
+  const activarAds = () => {
+    if (adTriggeredRef.current) return;
+    adTriggeredRef.current = true;
+
+    // POPUNDER
+    const s1 = document.createElement("script");
+    s1.src = "https://pl28953081.profitablecpmratenetwork.com/12/21/1f/12211ff6a4bf0ab3738cb48b0e9d3533.js";
+    document.body.appendChild(s1);
+
+    // SOCIAL BAR
+    const s2 = document.createElement("script");
+    s2.src = "https://pl28953113.profitablecpmratenetwork.com/d7/0d/35/d70d35316bf2e1b69bb0413b32c4df2f.js";
+    document.body.appendChild(s2);
+  };
+
+  video.addEventListener("click", activarAds, { once: true });
+  video.addEventListener("touchstart", activarAds, { once: true });
+}
     if (!video || !streamUrl) return undefined;
 
     setOffline(false);
