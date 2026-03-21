@@ -3,7 +3,6 @@ import React, { useState, Suspense, lazy, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
 import Header from "../components/Header";
 import CategoryFilter from "../components/CategoryFilter";
-// ⬇️ usamos el carrusel y la tarjeta
 import CarouselGridLimited from "../components/CarouselGridLimited";
 import ChannelCard from "../components/ChannelCard";
 import { useChannels } from "../hooks/useChannels";
@@ -32,19 +31,17 @@ function norm(v) {
 }
 
 export default function HomePage() {
-  // ---- TÍTULO DE LA PESTAÑA ----
+
   useEffect(() => {
     const prev = document.title;
     document.title = "HispanaTV Home";
 
-    // ✅ Analytics: visita a la página (no muestra nada en UI)
     logEvent({ event_type: "page_view", page_path: window.location.pathname });
 
     return () => {
       document.title = prev || "HispanaTV";
     };
   }, []);
-  // -------------------------------
 
   const { profile } = useAuth();
   const userRole = profile?.role || "user";
@@ -63,16 +60,13 @@ export default function HomePage() {
 
   const [selectedChannel, setSelectedChannel] = useState(null);
 
-  // Ocultar canales suspendidos
   const visibleChannels = useMemo(
     () => (channels || []).filter((c) => !c?.is_suspended),
     [channels]
   );
 
-  // Estado de País seleccionado
   const [selectedCountry, setSelectedCountry] = useState("");
 
-  // Lista de países únicos + bandera desde canales visibles
   const countryItems = useMemo(() => {
     const map = new Map();
     (visibleChannels || []).forEach((c) => {
@@ -91,7 +85,6 @@ export default function HomePage() {
     );
   }, [visibleChannels]);
 
-  // Filtrado adicional por país
   const countryFilteredChannels = useMemo(() => {
     if (!selectedCountry) return visibleChannels;
     return (visibleChannels || []).filter(
@@ -99,21 +92,18 @@ export default function HomePage() {
     );
   }, [visibleChannels, selectedCountry]);
 
-  // ✅ "Todos" NO cuenta como filtro activo (es el estado Home)
   const isTodosCategory = useMemo(() => {
     const c = norm(selectedCategory);
     return c === "" || c === "todos" || c === "todo" || c === "all";
   }, [selectedCategory]);
 
-  // ✅ ¿Hay filtros activos? (categoría ≠ Todos, país o búsqueda)
   const hasActiveFilters = useMemo(() => {
     const hasSearch = norm(searchTerm).length > 0;
-    const hasCategory = !isTodosCategory; // solo cuenta si NO es Todos/All
+    const hasCategory = !isTodosCategory;
     const hasCountry = norm(selectedCountry).length > 0;
     return hasSearch || hasCategory || hasCountry;
   }, [searchTerm, selectedCountry, isTodosCategory]);
 
-  // ✅ Evitar repetidos al mostrar resultados filtrados (por id o por url)
   const uniqueFilteredChannels = useMemo(() => {
     const seen = new Set();
     const out = [];
@@ -136,24 +126,27 @@ export default function HomePage() {
     return out;
   }, [countryFilteredChannels]);
 
-const handleChannelClick = (channel) => {
-  const now = Date.now();
+  // 🔥 MONETAG SOLO EN CLICK DE CANAL
+  const handleChannelClick = (channel) => {
+    const now = Date.now();
 
-  // ⏱️ solo cada 5 minutos
-  if (!window.lastAdTime || now - window.lastAdTime > 900000) {
-    window.lastAdTime = now;
+    if (!window.lastAdTime || now - window.lastAdTime > 900000) {
+      window.lastAdTime = now;
 
-    const newWindow = window.open("https://omg10.com/4/10759952", "_blank");
+      const newWindow = window.open("https://omg10.com/4/10759952", "_blank");
 
-    // 👉 fallback SIN bloquear canal
-    if (!newWindow) {
-      window.open("https://omg10.com/4/10759952", "_self");
+      if (!newWindow) {
+        window.open("https://omg10.com/4/10759952", "_self");
+      }
     }
-  }
 
-  // 🎬 SIEMPRE abre el canal
-  setSelectedChannel(channel);
-};
+    setSelectedChannel(channel);
+  };
+
+  // 🔥 FUNCIÓN QUE FALTABA (ARREGLA ERROR)
+  const handleClosePlayer = () => {
+    setSelectedChannel(null);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
@@ -163,25 +156,18 @@ const handleChannelClick = (channel) => {
         onFilterChange={handleFilterChange}
         filters={filters}
       />
-{/* Descripción del sitio para SEO y AdSense */}
-<div className="max-w-4xl mx-auto px-4 py-6 text-center text-gray-300">
-  <h1 className="text-2xl font-bold text-white mb-3">
-    Canales de televisión en vivo
-  </h1>
 
-  <p className="text-sm leading-relaxed">
-    HispanaTV es una plataforma de televisión en línea que reúne canales en
-    vivo de diferentes países en un solo lugar. Nuestro objetivo es facilitar
-    el acceso a contenido televisivo digital mediante tecnología de streaming
-    accesible desde cualquier dispositivo con conexión a internet.
-  </p>
+      <div className="max-w-4xl mx-auto px-4 py-6 text-center text-gray-300">
+        <h1 className="text-2xl font-bold text-white mb-3">
+          Canales de televisión en vivo
+        </h1>
 
-  <p className="text-sm mt-2">
-    Los usuarios pueden descubrir y disfrutar canales de televisión online de
-    diferentes regiones, incluyendo México, Centroamérica y otros países de
-    habla hispana.
-  </p>
-</div>
+        <p className="text-sm leading-relaxed">
+          HispanaTV es una plataforma de televisión en línea que reúne canales en
+          vivo de diferentes países en un solo lugar.
+        </p>
+      </div>
+
       {channelsLoading && channels.length === 0 ? (
         <ChannelsSkeleton />
       ) : (
@@ -200,23 +186,17 @@ const handleChannelClick = (channel) => {
             categories={categories}
             selectedCategory={selectedCategory}
             onCategoryChange={setSelectedCategory}
-            /* País */
             selectedCountry={selectedCountry}
             onCountryChange={setSelectedCountry}
             countryItems={countryItems}
           />
 
-          <motion.main
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.35 }}
-          >
+          <motion.main initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             {!hasActiveFilters ? (
-              // ✅ HOME (Todos + sin país + sin búsqueda): carrusel
               <CarouselGridLimited
                 items={countryFilteredChannels}
                 maxRows={5}
-                cardWidth={360} // ancho donde la card cabe completa (poster + texto)
+                cardWidth={360}
                 gap={24}
                 baseSpeed={40}
                 renderItem={(ch) => (
@@ -224,19 +204,10 @@ const handleChannelClick = (channel) => {
                 )}
               />
             ) : (
-              // ✅ Con filtros/búsqueda: grid fijo (sin carrusel) y SIN repetidos
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 p-4">
                 {uniqueFilteredChannels.map((ch) => (
                   <ChannelCard
-                    key={
-                      ch?.id ??
-                      ch?.channel_id ??
-                      ch?.uuid ??
-                      ch?.stream_url ??
-                      ch?.url ??
-                      ch?.title ??
-                      ch?.name
-                    }
+                    key={ch.id || ch.url}
                     channel={ch}
                     onClick={handleChannelClick}
                   />
