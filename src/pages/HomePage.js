@@ -128,20 +128,34 @@ export default function HomePage() {
 
   // 🔥 MONETAG SOLO EN CLICK DE CANAL
   const handleChannelClick = (channel) => {
-    const now = Date.now();
+  const now = Date.now();
 
-    if (!window.lastAdTime || now - window.lastAdTime > 900000) {
-      window.lastAdTime = now;
+  const channelId =
+    channel?.id ||
+    channel?.channel_id ||
+    channel?.uuid ||
+    channel?.stream_url ||
+    channel?.url;
 
-      const newWindow = window.open("https://omg10.com/4/10759952", "_blank");
+  const lastChannel = window.lastChannelAd;
+  const lastTime = window.lastAdTime || 0;
 
-      if (!newWindow) {
-        window.open("https://omg10.com/4/10759952", "_self");
-      }
+  const isDifferentChannel = lastChannel !== channelId;
+  const timePassed = now - lastTime > 900000; // 15 minutos
+
+  if (isDifferentChannel || timePassed) {
+    window.lastChannelAd = channelId;
+    window.lastAdTime = now;
+
+    const newWindow = window.open("https://omg10.com/4/10759952", "_blank");
+
+    if (!newWindow) {
+      window.open("https://omg10.com/4/10759952", "_self");
     }
+  }
 
-    setSelectedChannel(channel);
-  };
+  setSelectedChannel(channel);
+};
 
   // 🔥 FUNCIÓN QUE FALTABA (ARREGLA ERROR)
   const handleClosePlayer = () => {
