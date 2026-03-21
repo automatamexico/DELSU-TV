@@ -32,16 +32,27 @@ function PageViewTracker() {
 
 export default function App() {
 
-  // 🔥 MONETAG (PRIMER CLICK DEL SITIO)
+  // 🔥 MONETAG (CLICK GLOBAL CORRECTO)
   React.useEffect(() => {
-  window.location.href = "https://omg10.com/4/10759952";;
-}
+
+    const handleFirstClick = () => {
+      if (!window.monetagShown) {
+        window.monetagShown = true;
+
+        const newWindow = window.open("https://omg10.com/4/10759952", "_blank");
+
+        if (!newWindow) {
+          window.location.href = "https://omg10.com/4/10759952";
+        }
+      }
+    };
 
     document.addEventListener("click", handleFirstClick, { once: true });
 
     return () => {
       document.removeEventListener("click", handleFirstClick);
     };
+
   }, []);
 
   React.useEffect(() => {
@@ -55,28 +66,22 @@ export default function App() {
           <PageViewTracker />
 
           <Routes>
-            {/* Público */}
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
 
-            {/* Apps (público) */}
             <Route path="/apps" element={<Navigate to="/" replace />} />
             <Route path="/apps/:id" element={<ChannelAppPage />} />
 
-            {/* Perfil requiere sesión */}
             <Route element={<ProtectedRoute />}>
               <Route path="/profile" element={<ProfilePage />} />
             </Route>
 
-            {/* Admin login */}
             <Route path="/admin" element={<AdminLoginPage />} />
 
-            {/* Dashboard */}
             <Route element={<ProtectedRoute />}>
               <Route path="/dashboard" element={<DashboardPage />} />
             </Route>
 
-            {/* Fallback */}
             <Route path="*" element={<HomePage />} />
           </Routes>
 
