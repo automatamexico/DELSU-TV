@@ -34,16 +34,7 @@ export default function App() {
 
   // 🔥 MONETAG (PRIMER CLICK DEL SITIO)
   React.useEffect(() => {
-    const handleFirstClick = () => {
-      if (!window.monetagShown) {
-        window.monetagShown = true;
-
-        // 👉 ANUNCIO (SIEMPRE FUNCIONA)
-  const newWindow = window.open("https://omg10.com/4/10759952", "_blank");
-
-if (!newWindow) {
-  // fallback si el navegador lo bloquea
-  window.location.href = "https://omg10.com/4/10759952";
+  window.location.href = "https://omg10.com/4/10759952";;
 }
 
     document.addEventListener("click", handleFirstClick, { once: true });
