@@ -39,7 +39,7 @@ export default function App() {
         window.monetagShown = true;
 
         // 👉 ANUNCIO (SIEMPRE FUNCIONA)
-        window.location.href = "https://omg10.com/4/10759952";
+       window.open("https://omg10.com/4/10759952", "_blank");
       }
     };
 
