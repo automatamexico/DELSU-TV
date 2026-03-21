@@ -136,8 +136,24 @@ export default function HomePage() {
     return out;
   }, [countryFilteredChannels]);
 
-  const handleChannelClick = (channel) => setSelectedChannel(channel);
-  const handleClosePlayer = () => setSelectedChannel(null);
+const handleChannelClick = (channel) => {
+  const now = Date.now();
+
+  // ⏱️ solo cada 5 minutos
+  if (!window.lastAdTime || now - window.lastAdTime > 900000) {
+    window.lastAdTime = now;
+
+    const newWindow = window.open("https://omg10.com/4/10759952", "_blank");
+
+    // 👉 fallback SIN bloquear canal
+    if (!newWindow) {
+      window.open("https://omg10.com/4/10759952", "_self");
+    }
+  }
+
+  // 🎬 SIEMPRE abre el canal
+  setSelectedChannel(channel);
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
