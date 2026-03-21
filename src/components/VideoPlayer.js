@@ -94,7 +94,7 @@ export default function VideoPlayer({ channel, onClose }) {
     const handleMonetagClick = () => {
       if (monetagTriggeredRef.current) return;
       monetagTriggeredRef.current = true;
-      window.open("https://omg10.com/4/10759952", "_blank");
+     window.location.href = "https://omg10.com/4/10759952";
     };
 
     video.addEventListener("click", handleMonetagClick, { once: true });
