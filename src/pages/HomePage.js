@@ -43,6 +43,19 @@ export default function HomePage() {
     };
   }, []);
 
+  // 🔥 ADSTERRA SCRIPT (CARGA CORRECTA EN REACT)
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.src = "https://pl28953180.profitablecpmratenetwork.com/a6a58be151a55e133408c898f064dc0a/invoke.js";
+    script.async = true;
+    script.setAttribute("data-cfasync", "false");
+
+    const container = document.getElementById("adsterra-container");
+    if (container && !container.hasChildNodes()) {
+      container.appendChild(script);
+    }
+  }, []);
+
   const { profile } = useAuth();
   const userRole = profile?.role || "user";
 
@@ -126,38 +139,37 @@ export default function HomePage() {
     return out;
   }, [countryFilteredChannels]);
 
-  // 🔥 MONETAG SOLO EN CLICK DE CANAL
+  // 🔥 MONETAG (PRO)
   const handleChannelClick = (channel) => {
-  const now = Date.now();
+    const now = Date.now();
 
-  const channelId =
-    channel?.id ||
-    channel?.channel_id ||
-    channel?.uuid ||
-    channel?.stream_url ||
-    channel?.url;
+    const channelId =
+      channel?.id ||
+      channel?.channel_id ||
+      channel?.uuid ||
+      channel?.stream_url ||
+      channel?.url;
 
-  const lastChannel = window.lastChannelAd;
-  const lastTime = window.lastAdTime || 0;
+    const lastChannel = window.lastChannelAd;
+    const lastTime = window.lastAdTime || 0;
 
-  const isDifferentChannel = lastChannel !== channelId;
-  const timePassed = now - lastTime > 900000; // 15 minutos
+    const isDifferentChannel = lastChannel !== channelId;
+    const timePassed = now - lastTime > 900000;
 
-  if (isDifferentChannel || timePassed) {
-    window.lastChannelAd = channelId;
-    window.lastAdTime = now;
+    if (isDifferentChannel || timePassed) {
+      window.lastChannelAd = channelId;
+      window.lastAdTime = now;
 
-    const newWindow = window.open("https://omg10.com/4/10759952", "_blank");
+      const newWindow = window.open("https://omg10.com/4/10759952", "_blank");
 
-    if (!newWindow) {
-      window.open("https://omg10.com/4/10759952", "_self");
+      if (!newWindow) {
+        window.open("https://omg10.com/4/10759952", "_self");
+      }
     }
-  }
 
-  setSelectedChannel(channel);
-};
+    setSelectedChannel(channel);
+  };
 
-  // 🔥 FUNCIÓN QUE FALTABA (ARREGLA ERROR)
   const handleClosePlayer = () => {
     setSelectedChannel(null);
   };
@@ -170,6 +182,11 @@ export default function HomePage() {
         onFilterChange={handleFilterChange}
         filters={filters}
       />
+
+      {/* 🔥 ADSTERRA BANNER */}
+      <div id="adsterra-container" style={{ textAlign: "center", padding: "20px" }}>
+        <div id="container-a6a58be151a55e133408c898f064dc0a"></div>
+      </div>
 
       <div className="max-w-4xl mx-auto px-4 py-6 text-center text-gray-300">
         <h1 className="text-2xl font-bold text-white mb-3">
