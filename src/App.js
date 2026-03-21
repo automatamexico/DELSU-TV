@@ -32,29 +32,6 @@ function PageViewTracker() {
 
 export default function App() {
 
-  // 🔥 MONETAG (CLICK GLOBAL CORRECTO)
-  React.useEffect(() => {
-
-    const handleFirstClick = () => {
-      if (!window.monetagShown) {
-        window.monetagShown = true;
-
-        const newWindow = window.open("https://omg10.com/4/10759952", "_blank");
-
-        if (!newWindow) {
-          window.location.href = "https://omg10.com/4/10759952";
-        }
-      }
-    };
-
-    document.addEventListener("click", handleFirstClick, { once: true });
-
-    return () => {
-      document.removeEventListener("click", handleFirstClick);
-    };
-
-  }, []);
-
   React.useEffect(() => {
     console.log("[App] Montada. Si ves pantalla en blanco, revisa la consola por errores.");
   }, []);
