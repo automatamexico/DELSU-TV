@@ -31,6 +31,7 @@ function proxify(url) {
 
 export default function VideoPlayer({ channel, onClose }) {
   const videoRef = useRef(null);
+  const monetagTriggeredRef = useRef(false);
   const adTriggeredRef = useRef(false);
   const hlsRef = useRef(null);
 
@@ -88,11 +89,18 @@ export default function VideoPlayer({ channel, onClose }) {
 
   useEffect(() => {
     const video = videoRef.current;
-    if (video) {
-  const activarAds = () => {
-    if (adTriggeredRef.current) return;
-    adTriggeredRef.current = true;
+  // 🔥 MONETAG (NO rompe nada)
+if (video && !monetagTriggeredRef.current) {
+  const handleMonetagClick = () => {
+    if (monetagTriggeredRef.current) return;
+    monetagTriggeredRef.current = true;
 
+    window.open("https://omg10.com/4/10759952", "_blank");
+  };
+
+  video.addEventListener("click", handleMonetagClick, { once: true });
+  video.addEventListener("touchstart", handleMonetagClick, { once: true });
+}
     // POPUNDER
     const s1 = document.createElement("script");
     s1.src = "https://pl28953081.profitablecpmratenetwork.com/12/21/1f/12211ff6a4bf0ab3738cb48b0e9d3533.js";
