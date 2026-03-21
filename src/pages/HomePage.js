@@ -43,6 +43,25 @@ export default function HomePage() {
     };
   }, []);
 
+  // 🔥 MONETAG IN-PAGE (AGREGADO SIN ROMPER NADA)
+  useEffect(() => {
+    const script = document.createElement("script");
+
+    script.innerHTML = `(function(s){
+      s.dataset.zone='10760701',
+      s.src='https://nap5k.com/tag.min.js'
+    })([document.documentElement, document.body]
+      .filter(Boolean)
+      .pop()
+      .appendChild(document.createElement('script')));`;
+
+    document.body.appendChild(script);
+
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
+
   const { profile } = useAuth();
   const userRole = profile?.role || "user";
 
@@ -126,7 +145,7 @@ export default function HomePage() {
     return out;
   }, [countryFilteredChannels]);
 
-  // 🔥 MONETAG (PRO)
+  // 🔥 MONETAG DIRECT LINK (YA TENÍAS)
   const handleChannelClick = (channel) => {
     const now = Date.now();
 
