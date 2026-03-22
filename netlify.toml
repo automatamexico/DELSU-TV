@@ -37,17 +37,18 @@
   for = "/*"
   [headers.values]
     Content-Security-Policy = '''
-  default-src 'self' https:;
-  script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://*.profitablecpmratenetwork.com;
-  connect-src 'self' https://*;
-  img-src 'self' data: https://*;
-  style-src 'self' 'unsafe-inline' https://*;
-  font-src 'self' data: https://*;
-  media-src 'self' blob: data: https://*;
-  frame-src https://*;
+  default-src 'self' https: data: blob:;
+  script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://*.profitablecpmratenetwork.com https://nap5k.com https://pagead2.googlesyndication.com https://static.cloudflareinsights.com;
+  script-src-elem 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://*.profitablecpmratenetwork.com https://nap5k.com https://pagead2.googlesyndication.com https://static.cloudflareinsights.com;
+  connect-src 'self' https: wss:;
+  img-src 'self' data: blob: https:;
+  style-src 'self' 'unsafe-inline' https:;
+  font-src 'self' data: https:;
+  media-src 'self' blob: data: https:;
+  frame-src 'self' https:;
+  child-src 'self' https:;
   frame-ancestors *;
 '''
-
     Referrer-Policy = "strict-origin-when-cross-origin"
     Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
     X-Content-Type-Options = "nosniff"
