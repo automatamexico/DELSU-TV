@@ -201,7 +201,11 @@ export default function HomePage() {
           vivo de diferentes países en un solo lugar.
         </p>
       </div>
-
+{errorMsg && (
+  <div className="px-4 py-2 text-xs text-red-400">
+    {errorMsg}
+  </div>
+)}
       {channelsLoading && channels.length === 0 ? (
         <ChannelsSkeleton />
       ) : (
