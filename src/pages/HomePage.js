@@ -43,7 +43,7 @@ export default function HomePage() {
     };
   }, []);
 
-  // 🔥 MONETAG IN-PAGE (AGREGADO SIN ROMPER NADA)
+  // 🔥 MONETAG IN-PAGE
   useEffect(() => {
     const script = document.createElement("script");
 
@@ -78,6 +78,11 @@ export default function HomePage() {
   } = useChannels(userRole);
 
   const [selectedChannel, setSelectedChannel] = useState(null);
+
+  // ✅ ESTA FUNCIÓN FALTABA (ARREGLA ERROR DE NETLIFY)
+  const handleClosePlayer = () => {
+    setSelectedChannel(null);
+  };
 
   const visibleChannels = useMemo(
     () => (channels || []).filter((c) => !c?.is_suspended),
@@ -145,38 +150,37 @@ export default function HomePage() {
     return out;
   }, [countryFilteredChannels]);
 
-  // 🔥 MONETAG DIRECT LINK (YA TENÍAS)
-const handleChannelClick = (channel, event) => {
-  const now = Date.now();
+  // 🔥 DIRECT LINK (CORREGIDO Y FUNCIONANDO)
+  const handleChannelClick = (channel, event) => {
+    const now = Date.now();
 
-  const channelId =
-    channel?.id ||
-    channel?.channel_id ||
-    channel?.uuid ||
-    channel?.stream_url ||
-    channel?.url;
+    const channelId =
+      channel?.id ||
+      channel?.channel_id ||
+      channel?.uuid ||
+      channel?.stream_url ||
+      channel?.url;
 
-  const lastChannel = window.lastChannelAd;
-  const lastTime = window.lastAdTime || 0;
+    const lastChannel = window.lastChannelAd;
+    const lastTime = window.lastAdTime || 0;
 
-  const isDifferentChannel = lastChannel !== channelId;
-  const timePassed = now - lastTime > 900000; // 15 min
+    const isDifferentChannel = lastChannel !== channelId;
+    const timePassed = now - lastTime > 900000;
 
-  if (event && (isDifferentChannel || timePassed)) {
-    window.lastChannelAd = channelId;
-    window.lastAdTime = now;
+    if (event && (isDifferentChannel || timePassed)) {
+      window.lastChannelAd = channelId;
+      window.lastAdTime = now;
 
-    // abrir ventana vacía primero: más probable que el navegador la permita
-    const adWindow = window.open("", "_blank");
-
-    if (adWindow) {
-      adWindow.opener = null;
-      adWindow.location.href = "https://omg10.com/4/10759952";
+      // 🔥 apertura REAL compatible con navegadores
+      const a = document.createElement("a");
+      a.href = "https://omg10.com/4/10759952";
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.click();
     }
-  }
 
-  setSelectedChannel(channel);
-};
+    setSelectedChannel(channel);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
@@ -202,16 +206,6 @@ const handleChannelClick = (channel, event) => {
         <ChannelsSkeleton />
       ) : (
         <>
-          {channelsLoading && channels.length > 0 && (
-            <div className="px-4 py-2 text-xs text-gray-400">
-              Actualizando canales…
-            </div>
-          )}
-
-          {errorMsg && (
-            <div className="px-4 py-2 text-xs text-red-400">{errorMsg}</div>
-          )}
-
           <CategoryFilter
             categories={categories}
             selectedCategory={selectedCategory}
@@ -225,12 +219,11 @@ const handleChannelClick = (channel, event) => {
             {!hasActiveFilters ? (
               <CarouselGridLimited
                 items={countryFilteredChannels}
-                maxRows={5}
-                cardWidth={360}
-                gap={24}
-                baseSpeed={40}
                 renderItem={(ch) => (
-                  <ChannelCard channel={ch} onClick={handleChannelClick} />
+                  <ChannelCard
+                    channel={ch}
+                    onClick={(e) => handleChannelClick(ch, e)}
+                  />
                 )}
               />
             ) : (
@@ -239,7 +232,7 @@ const handleChannelClick = (channel, event) => {
                   <ChannelCard
                     key={ch.id || ch.url}
                     channel={ch}
-                    onClick={handleChannelClick}
+                    onClick={(e) => handleChannelClick(ch, e)}
                   />
                 ))}
               </div>
