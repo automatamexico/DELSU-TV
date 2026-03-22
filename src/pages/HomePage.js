@@ -162,17 +162,17 @@ const handleChannelClick = (channel, event) => {
   const isDifferentChannel = lastChannel !== channelId;
   const timePassed = now - lastTime > 900000;
 
-  // 🛑 SOLO controlar anuncio (NO bloquear player)
-  if (event && event.isTrusted && (isDifferentChannel || timePassed)) {
+  // 🔥 SOLO si hay evento (evita ejecuciones automáticas)
+  if (event && (isDifferentChannel || timePassed)) {
     window.lastChannelAd = channelId;
     window.lastAdTime = now;
 
     setTimeout(() => {
       window.open("https://omg10.com/4/10759952", "_blank");
-    }, 200);
+    }, 150);
   }
 
-  // ▶️ SIEMPRE abrir el canal
+  // ▶️ siempre abrir canal
   setSelectedChannel(channel);
 };
 
