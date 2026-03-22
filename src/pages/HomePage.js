@@ -160,26 +160,23 @@ const handleChannelClick = (channel, event) => {
   const lastTime = window.lastAdTime || 0;
 
   const isDifferentChannel = lastChannel !== channelId;
-  const timePassed = now - lastTime > 900000;
+  const timePassed = now - lastTime > 900000; // 15 min
 
-  // 🔥 ABRIR ANUNCIO COMO CLICK REAL (NO BLOQUEABLE)
   if (event && (isDifferentChannel || timePassed)) {
     window.lastChannelAd = channelId;
     window.lastAdTime = now;
 
-    const a = document.createElement("a");
-    a.href = "https://omg10.com/4/10759952";
-    a.target = "_blank";
-    a.rel = "noopener noreferrer";
-    a.click();
+    // abrir ventana vacía primero: más probable que el navegador la permita
+    const adWindow = window.open("", "_blank");
+
+    if (adWindow) {
+      adWindow.opener = null;
+      adWindow.location.href = "https://omg10.com/4/10759952";
+    }
   }
 
-  // ▶️ abrir canal
   setSelectedChannel(channel);
 };
-  const handleClosePlayer = () => {
-    setSelectedChannel(null);
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
