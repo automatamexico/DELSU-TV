@@ -147,9 +147,6 @@ export default function HomePage() {
 
   // 🔥 MONETAG DIRECT LINK (YA TENÍAS)
 const handleChannelClick = (channel, event) => {
-  // 🛑 SOLO permitir clicks reales
-  if (!event || !event.isTrusted) return;
-
   const now = Date.now();
 
   const channelId =
@@ -165,17 +162,17 @@ const handleChannelClick = (channel, event) => {
   const isDifferentChannel = lastChannel !== channelId;
   const timePassed = now - lastTime > 900000;
 
-  if (isDifferentChannel || timePassed) {
+  // 🛑 SOLO controlar anuncio (NO bloquear player)
+  if (event && event.isTrusted && (isDifferentChannel || timePassed)) {
     window.lastChannelAd = channelId;
     window.lastAdTime = now;
 
-    // 👇 SOLO UNA apertura y con pequeño delay (mejor en móvil)
     setTimeout(() => {
       window.open("https://omg10.com/4/10759952", "_blank");
     }, 200);
   }
 
-  // ▶️ abrir canal normal
+  // ▶️ SIEMPRE abrir el canal
   setSelectedChannel(channel);
 };
 
