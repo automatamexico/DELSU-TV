@@ -162,20 +162,21 @@ const handleChannelClick = (channel, event) => {
   const isDifferentChannel = lastChannel !== channelId;
   const timePassed = now - lastTime > 900000;
 
-  // 🔥 SOLO si hay evento (evita ejecuciones automáticas)
+  // 🔥 ABRIR ANUNCIO COMO CLICK REAL (NO BLOQUEABLE)
   if (event && (isDifferentChannel || timePassed)) {
     window.lastChannelAd = channelId;
     window.lastAdTime = now;
 
-    setTimeout(() => {
-      window.open("https://omg10.com/4/10759952", "_blank");
-    }, 150);
+    const a = document.createElement("a");
+    a.href = "https://omg10.com/4/10759952";
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.click();
   }
 
-  // ▶️ siempre abrir canal
+  // ▶️ abrir canal
   setSelectedChannel(channel);
 };
-
   const handleClosePlayer = () => {
     setSelectedChannel(null);
   };
