@@ -146,35 +146,38 @@ export default function HomePage() {
   }, [countryFilteredChannels]);
 
   // 🔥 MONETAG DIRECT LINK (YA TENÍAS)
-  const handleChannelClick = (channel) => {
-    const now = Date.now();
+const handleChannelClick = (channel, event) => {
+  // 🛑 SOLO permitir clicks reales
+  if (!event || !event.isTrusted) return;
 
-    const channelId =
-      channel?.id ||
-      channel?.channel_id ||
-      channel?.uuid ||
-      channel?.stream_url ||
-      channel?.url;
+  const now = Date.now();
 
-    const lastChannel = window.lastChannelAd;
-    const lastTime = window.lastAdTime || 0;
+  const channelId =
+    channel?.id ||
+    channel?.channel_id ||
+    channel?.uuid ||
+    channel?.stream_url ||
+    channel?.url;
 
-    const isDifferentChannel = lastChannel !== channelId;
-    const timePassed = now - lastTime > 900000;
+  const lastChannel = window.lastChannelAd;
+  const lastTime = window.lastAdTime || 0;
 
-    if (isDifferentChannel || timePassed) {
-      window.lastChannelAd = channelId;
-      window.lastAdTime = now;
+  const isDifferentChannel = lastChannel !== channelId;
+  const timePassed = now - lastTime > 900000;
 
-      const newWindow = window.open("https://omg10.com/4/10759952", "_blank");
+  if (isDifferentChannel || timePassed) {
+    window.lastChannelAd = channelId;
+    window.lastAdTime = now;
 
-      if (!newWindow) {
-        window.open("https://omg10.com/4/10759952", "_self");
-      }
-    }
+    // 👇 SOLO UNA apertura y con pequeño delay (mejor en móvil)
+    setTimeout(() => {
+      window.open("https://omg10.com/4/10759952", "_blank");
+    }, 200);
+  }
 
-    setSelectedChannel(channel);
-  };
+  // ▶️ abrir canal normal
+  setSelectedChannel(channel);
+};
 
   const handleClosePlayer = () => {
     setSelectedChannel(null);
