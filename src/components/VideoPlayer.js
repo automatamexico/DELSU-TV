@@ -232,47 +232,7 @@ export default function VideoPlayer({ channel, onClose }) {
   if (!monetagTriggeredRef.current) {
     monetagTriggeredRef.current = true;
 
-    // 🔥 ANUNCIO (SIEMPRE FUNCIONA)
-    window.location.href = "https://omg10.com/4/10759952";
-    return;
-  }
-
-  const v = videoRef.current;
-  if (!v) return;
-
-  try {
-    await v.play();
-    setNeedUserGesture(false);
-  } catch {
-    setNeedUserGesture(true);
-  }
-};
-
-  return (
-    <div
-      className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
-      onContextMenu={blockContext}
-    >
-      <div className="relative w-full max-w-5xl bg-black rounded-2xl overflow-hidden shadow-2xl">
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 z-30 bg-white/10 hover:bg-white/20 text-white px-3 py-1 rounded-lg text-sm"
-        >
-          Cerrar
-        </button>
-
-        <div className="relative">
-          <video
-            ref={videoRef}
-            className="w-full h-[60vh] md:h-[70vh] object-contain bg-black"
-            controls
-            playsInline
-            preload="metadata"
-            controlsList="nodownload noplaybackrate"
-            disablePictureInPicture
-            onContextMenu={blockContext}
-          />
-
+   
           {/* ✅ Overlay OFFLINE (no muestra errores técnicos) */}
           {offline && (
             <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black">
