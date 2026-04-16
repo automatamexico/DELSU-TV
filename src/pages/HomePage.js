@@ -43,26 +43,6 @@ export default function HomePage() {
     };
   }, []);
 
-  
-  // 🔥 MONETAG IN-PAGE
-  useEffect(() => {
-    const script = document.createElement("script");
-
-    script.innerHTML = `(function(s){
-      s.dataset.zone='10760701',
-      s.src='https://nap5k.com/tag.min.js'
-    })([document.documentElement, document.body]
-      .filter(Boolean)
-      .pop()
-      .appendChild(document.createElement('script')));`;
-
-    document.body.appendChild(script);
-
-    return () => {
-      document.body.removeChild(script);
-    };
-  }, []);
-
   const { profile } = useAuth();
   const userRole = profile?.role || "user";
 
@@ -79,7 +59,6 @@ export default function HomePage() {
   } = useChannels(userRole);
 
   const [selectedChannel, setSelectedChannel] = useState(null);
-
 
   // ✅ ESTA FUNCIÓN FALTABA (ARREGLA ERROR DE NETLIFY)
   const handleClosePlayer = () => {
@@ -152,35 +131,7 @@ export default function HomePage() {
     return out;
   }, [countryFilteredChannels]);
 
-  // 🔥 DIRECT LINK (CORREGIDO Y FUNCIONANDO)
   const handleChannelClick = (channel, event) => {
-    const now = Date.now();
-
-    const channelId =
-      channel?.id ||
-      channel?.channel_id ||
-      channel?.uuid ||
-      channel?.stream_url ||
-      channel?.url;
-
-    const lastChannel = window.lastChannelAd;
-    const lastTime = window.lastAdTime || 0;
-
-    const isDifferentChannel = lastChannel !== channelId;
-    const timePassed = now - lastTime > 900000;
-
-    if (event && (isDifferentChannel || timePassed)) {
-      window.lastChannelAd = channelId;
-      window.lastAdTime = now;
-
-      // 🔥 apertura REAL compatible con navegadores
-      const a = document.createElement("a");
-      a.href = "https://omg10.com/4/10759952";
-      a.target = "_blank";
-      a.rel = "noopener noreferrer";
-      a.click();
-    }
-
     setSelectedChannel(channel);
   };
 
