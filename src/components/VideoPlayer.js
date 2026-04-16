@@ -31,7 +31,6 @@ function proxify(url) {
 
 export default function VideoPlayer({ channel, onClose }) {
   const videoRef = useRef(null);
-  const monetagTriggeredRef = useRef(false);
   const hlsRef = useRef(null);
 
   const rawUrl = channel?.stream_url || channel?.url || "";
@@ -54,7 +53,6 @@ export default function VideoPlayer({ channel, onClose }) {
     setOffline(false);
     setNeedUserGesture(false);
     playLoggedRef.current = false;
-    monetagTriggeredRef.current = false;
   }, [rawUrl]);
 
   const destroyHls = () => {
@@ -90,15 +88,6 @@ export default function VideoPlayer({ channel, onClose }) {
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !streamUrl) return undefined;
-
-    const handleMonetagClick = () => {
-      if (monetagTriggeredRef.current) return;
-      monetagTriggeredRef.current = true;
-     window.location.href = "https://omg10.com/4/10759952";
-    };
-
-    video.addEventListener("click", handleMonetagClick, { once: true });
-    video.addEventListener("touchstart", handleMonetagClick, { once: true });
 
     setOffline(false);
     setNeedUserGesture(false);
@@ -154,8 +143,6 @@ export default function VideoPlayer({ channel, onClose }) {
       };
 
       return () => {
-        video.removeEventListener("click", handleMonetagClick);
-        video.removeEventListener("touchstart", handleMonetagClick);
         video.onerror = null;
         video.onplaying = null;
         video.oncanplay = null;
@@ -208,8 +195,6 @@ export default function VideoPlayer({ channel, onClose }) {
       });
 
       return () => {
-        video.removeEventListener("click", handleMonetagClick);
-        video.removeEventListener("touchstart", handleMonetagClick);
         destroyHls();
         video.onerror = null;
         video.onplaying = null;
@@ -221,18 +206,48 @@ export default function VideoPlayer({ channel, onClose }) {
     goOffline();
 
     return () => {
-      video.removeEventListener("click", handleMonetagClick);
-      video.removeEventListener("touchstart", handleMonetagClick);
       destroyHls();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streamUrl, channel]);
 
- const onUserGesturePlay = async () => {
-  if (!monetagTriggeredRef.current) {
-    monetagTriggeredRef.current = true;
+  const onUserGesturePlay = async () => {
+    const v = videoRef.current;
+    if (!v) return;
 
-   
+    try {
+      await v.play();
+      setNeedUserGesture(false);
+    } catch {
+      setNeedUserGesture(true);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+      onContextMenu={blockContext}
+    >
+      <div className="relative w-full max-w-5xl bg-black rounded-2xl overflow-hidden shadow-2xl">
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 z-30 bg-white/10 hover:bg-white/20 text-white px-3 py-1 rounded-lg text-sm"
+        >
+          Cerrar
+        </button>
+
+        <div className="relative">
+          <video
+            ref={videoRef}
+            className="w-full h-[60vh] md:h-[70vh] object-contain bg-black"
+            controls
+            playsInline
+            preload="metadata"
+            controlsList="nodownload noplaybackrate"
+            disablePictureInPicture
+            onContextMenu={blockContext}
+          />
+
           {/* ✅ Overlay OFFLINE (no muestra errores técnicos) */}
           {offline && (
             <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black">
@@ -266,7 +281,6 @@ export default function VideoPlayer({ channel, onClose }) {
                     setStreamUrl(rawUrl);
                     setOffline(false);
                     playLoggedRef.current = false;
-                    monetagTriggeredRef.current = false;
                   }}
                   className="mt-6 bg-white/10 hover:bg-white/20 text-white px-5 py-2 rounded-xl border border-white/15"
                 >
