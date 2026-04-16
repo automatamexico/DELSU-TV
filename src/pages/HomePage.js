@@ -43,42 +43,6 @@ export default function HomePage() {
     };
   }, []);
 
-  // 🔥 MONETAG IN-PAGE
-  useEffect(() => {
-    const script = document.createElement("script");
-
-    script.innerHTML = `(function(s){
-      s.dataset.zone='10760701',
-      s.src='https://nap5k.com/tag.min.js'
-    })([document.documentElement, document.body]
-      .filter(Boolean)
-      .pop()
-      .appendChild(document.createElement('script')));`;
-
-    document.body.appendChild(script);
-
-    return () => {
-      document.body.removeChild(script);
-    };
-  }, []);
-
-  const { profile } = useAuth();
-  const userRole = profile?.role || "user";
-
-  const {
-    channels,
-    loading: channelsLoading,
-    errorMsg,
-    searchTerm,
-    setSearchTerm,
-    selectedCategory,
-    setSelectedCategory,
-    filters,
-    handleFilterChange,
-  } = useChannels(userRole);
-
-  const [selectedChannel, setSelectedChannel] = useState(null);
-
   // ✅ ESTA FUNCIÓN FALTABA (ARREGLA ERROR DE NETLIFY)
   const handleClosePlayer = () => {
     setSelectedChannel(null);
